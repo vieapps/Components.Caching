@@ -942,14 +942,14 @@ namespace net.vieapps.Components.Caching
 #endif
 		}
 
-		void _SetIfNotExists(string key, object value, string expirationType = null, int expirationTime = 0)
+		bool _SetIfNotExists(string key, object value, string expirationType = null, int expirationTime = 0)
 		{
-			this._Set(key, value, expirationType, expirationTime, true, CacheItemPriority.Default, StoreMode.Add);
+			return this._Set(key, value, expirationType, expirationTime, true, CacheItemPriority.Default, StoreMode.Add);
 		}
 
-		void _SetIfAlreadyExists(string key, object value, string expirationType = null, int expirationTime = 0)
+		bool _SetIfAlreadyExists(string key, object value, string expirationType = null, int expirationTime = 0)
 		{
-			this._Set(key, value, expirationType, expirationTime, true, CacheItemPriority.Default, StoreMode.Replace);
+			return this._Set(key, value, expirationType, expirationTime, true, CacheItemPriority.Default, StoreMode.Replace);
 		}
 
 		bool _SetAsFragments(string key, Type type, List<byte[]> fragments, string expirationType = null, int expirationTime = 0, CacheItemPriority priority = CacheItemPriority.Default, StoreMode mode = StoreMode.Set)
@@ -1781,9 +1781,10 @@ namespace net.vieapps.Components.Caching
 		/// <param name="value">The object that is to be cached</param>
 		/// <param name="expirationType">The type of object expiration (Slidding/Absolute)</param>
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
-		public void SetIfNotExists(string key, object value, string expirationType = null, int expirationTime = 0)
+		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
+		public bool SetIfNotExists(string key, object value, string expirationType = null, int expirationTime = 0)
 		{
-			this._SetIfNotExists(key, value, expirationType, expirationTime);
+			return this._SetIfNotExists(key, value, expirationType, expirationTime);
 		}
 
 		/// <summary>
@@ -1793,9 +1794,10 @@ namespace net.vieapps.Components.Caching
 		/// <param name="value">The object that is to be cached</param>
 		/// <param name="expirationType">The type of object expiration (Slidding/Absolute)</param>
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
-		public void SetIfAlreadyExists(string key, object value, string expirationType = null, int expirationTime = 0)
+		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
+		public bool SetIfAlreadyExists(string key, object value, string expirationType = null, int expirationTime = 0)
 		{
-			this._SetIfAlreadyExists(key, value, expirationType, expirationTime);
+			return this._SetIfAlreadyExists(key, value, expirationType, expirationTime);
 		}
 
 		/// <summary>
@@ -2105,16 +2107,16 @@ namespace net.vieapps.Components.Caching
 		/// <param name="value">The object that is to be cached</param>
 		/// <param name="expirationType">The type of object expiration (Slidding/Absolute)</param>
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
-		public Task SetIfNotExistsAsync(string key, object value, string expirationType = null, int expirationTime = 0)
+		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
+		public Task<bool> SetIfNotExistsAsync(string key, object value, string expirationType = null, int expirationTime = 0)
 		{
 			try
 			{
-				this.SetIfNotExists(key, value, expirationType, expirationTime);
-				return Task.CompletedTask;
+				return Task.FromResult<bool>(this.SetIfNotExists(key, value, expirationType, expirationTime));
 			}
 			catch (Exception ex)
 			{
-				return Task.FromException(ex);
+				return Task.FromException<bool>(ex);
 			}
 		}
 
@@ -2125,16 +2127,16 @@ namespace net.vieapps.Components.Caching
 		/// <param name="value">The object that is to be cached</param>
 		/// <param name="expirationType">The type of object expiration (Slidding/Absolute)</param>
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
-		public Task SetIfAlreadyExistsAsync(string key, object value, string expirationType = null, int expirationTime = 0)
+		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
+		public Task<bool> SetIfAlreadyExistsAsync(string key, object value, string expirationType = null, int expirationTime = 0)
 		{
 			try
 			{
-				this.SetIfAlreadyExists(key, value, expirationType, expirationTime);
-				return Task.CompletedTask;
+				return Task.FromResult<bool>(this.SetIfAlreadyExists(key, value, expirationType, expirationTime));				
 			}
 			catch (Exception ex)
 			{
-				return Task.FromException(ex);
+				return Task.FromException<bool>(ex);
 			}
 		}
 
