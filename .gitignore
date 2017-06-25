@@ -1,0 +1,10 @@
+*~
+*.user
+*.suo
+.DS_Store
+.vs/
+.vscode/
+.fake/
+packages/
+bin/
+obj/
