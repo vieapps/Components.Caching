@@ -14,7 +14,7 @@ using System.Security.Permissions;
 // Change these attribute values to modify the information associated with an assembly.
 [assembly: AssemblyTitle("VIEApps NGX")]
 [assembly: AssemblyDescription("Core components of VIEApps NGX")]
-[assembly: AssemblyDefaultAlias("VIEApps.Components.Cache")]
+[assembly: AssemblyDefaultAlias("VIEApps.Components.Caching")]
 [assembly: AssemblyConfiguration("Production/Stable")]
 [assembly: AssemblyCompany("VIEApps.net")]
 [assembly: AssemblyProduct("VIEApps NGX")]
@@ -37,4 +37,4 @@ using System.Security.Permissions;
 //      Revision
 [assembly: AssemblyVersion("10.1")]
 [assembly: AssemblyFileVersion("10.1")]
-[assembly: AssemblyInformationalVersion("10.1.nemc-2017.06.24")]
+[assembly: AssemblyInformationalVersion("10.1.ngxv-2017.07.02")]
