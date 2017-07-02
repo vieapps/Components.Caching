@@ -137,14 +137,18 @@ namespace net.vieapps.Components.Caching
 		public CacheManager(string name, string expirationType, int expirationTime, Mode mode, bool activeSynchronize = false, bool updateKeys = false, bool monitorKeys = false, bool throwObjectTooLargeForCacheException = false)
 		{
 			// zone name
-			this._name = string.IsNullOrWhiteSpace(name) ? "VIEApps-Cache-Storage" : System.Text.RegularExpressions.Regex.Replace(name, "[^0-9a-zA-Z:-]+", "");
+			this._name = string.IsNullOrWhiteSpace(name)
+				? "VIEApps-Cache-Storage"
+				: System.Text.RegularExpressions.Regex.Replace(name, "[^0-9a-zA-Z:-]+", "");
 
 			// expiration type
 			if (!string.IsNullOrWhiteSpace(expirationType) && expirationType.ToLower().Equals("absolute"))
 				this._expirationType = "Absolute";
 
 			// expiration time
-			this._expirationTime = expirationTime > 0 ? expirationTime : 30;
+			this._expirationTime = expirationTime > 0
+				? expirationTime
+				: CacheManager.DefaultExpirationTime;
 
 			// change mode of caching to Internal (In-Process)
 			if (mode.Equals(Mode.Internal))
@@ -236,12 +240,12 @@ namespace net.vieapps.Components.Caching
 		#region Helper methods
 		string _GetKey(string key)
 		{
-			return this._name + "@" + key;
+			return this._name + "@" + key.Replace(" ", "-");
 		}
 
 		string _GetFragmentKey(string key, int index)
 		{
-			return key + "$[Fragment<" + index.ToString() + ">]";
+			return key.Replace(" ", "-") + "$[Fragment<" + index.ToString() + ">]";
 		}
 		#endregion
 
@@ -275,11 +279,11 @@ namespace net.vieapps.Components.Caching
 					string debug = "[" + this._name + " > " + Process.GetCurrentProcess().Id.ToString() + " : " + AppDomain.CurrentDomain.Id.ToString() + " : " + Thread.CurrentThread.ManagedThreadId.ToString() + "]";
 					Debug.WriteLine(debug + " (" + DateTime.Now.ToString("HH:mm:ss.fff") + ") <PULL>: Start to pull keys [" + this._RegionKey + "] from distributed cache");
 #endif
-					await this._PullKeysAsync(null).ConfigureAwait(false);
+					await this._PullKeysAsync().ConfigureAwait(false);
 				}).ConfigureAwait(false);
 		}
 
-		async Task _PullKeysAsync(Action callback)
+		async Task _PullKeysAsync(Action callback = null)
 		{
 #if DEBUG
 			string debug = "[" + this._name + " > " + Process.GetCurrentProcess().Id.ToString() + " : " + AppDomain.CurrentDomain.Id.ToString() + " : " + Thread.CurrentThread.ManagedThreadId.ToString() + "]";
@@ -374,9 +378,9 @@ namespace net.vieapps.Components.Caching
 
 		#region Update (Push) Keys methods
 #if DEBUG
-		async Task _PushKeysAsync(string label, bool checkUpdatedKeys, Action callback)
+		async Task _PushKeysAsync(string label, bool checkUpdatedKeys = true, Action callback = null)
 #else
-		async Task _PushKeysAsync(bool checkUpdatedKeys, Action callback)
+		async Task _PushKeysAsync(bool checkUpdatedKeys = true, Action callback = null)
 #endif
 		{
 #if DEBUG
@@ -678,9 +682,9 @@ namespace net.vieapps.Components.Caching
 		}
 
 #if DEBUG
-		void _UpdateKeys(string label, int delay, bool checkUpdatedKeys, Action callback)
+		void _UpdateKeys(string label, int delay = 13, bool checkUpdatedKeys = true, Action callback = null)
 #else
-		void _UpdateKeys(int delay, bool checkUpdatedKeys, Action callback)
+		void _UpdateKeys(int delay = 13, bool checkUpdatedKeys = true, Action callback = null)
 #endif
 		{
 #if DEBUG
@@ -769,9 +773,9 @@ namespace net.vieapps.Components.Caching
 
 				if (doPush && this._addedKeys.Count > 0)
 #if DEBUG
-					this._UpdateKeys("SET", 113, true, null);
+					this._UpdateKeys("SET", 113);
 #else
-					this._UpdateKeys(113, true, null);
+					this._UpdateKeys(113);
 #endif
 			}
 		}
@@ -906,9 +910,9 @@ namespace net.vieapps.Components.Caching
 			// push keys
 			if (this._mode.Equals(Mode.Distributed) && (this._activeSynchronize || this._updateKeys) && this._addedKeys.Count > 0)
 #if DEBUG
-				this._UpdateKeys("SET-MULTIPLE", 113, true, null);
+				this._UpdateKeys("SET-MULTIPLE", 113);
 #else
-				this._UpdateKeys(113, true, null);
+				this._UpdateKeys(113);
 #endif
 		}
 
@@ -936,9 +940,9 @@ namespace net.vieapps.Components.Caching
 			// push keys
 			if (this._mode.Equals(Mode.Distributed) && (this._activeSynchronize || this._updateKeys) && this._addedKeys.Count > 0)
 #if DEBUG
-				this._UpdateKeys("SET-MULTIPLE", 113, true, null);
+				this._UpdateKeys("SET-MULTIPLE", 113);
 #else
-				this._UpdateKeys(113, true, null);
+				this._UpdateKeys(113);
 #endif
 		}
 
@@ -1348,9 +1352,9 @@ namespace net.vieapps.Components.Caching
 
 					if (doPush && this._removedKeys.Count > 0)
 #if DEBUG
-						this._UpdateKeys("REMOVE", 213, true, null);
+						this._UpdateKeys("REMOVE", 213);
 #else
-						this._UpdateKeys(213, true, null);
+						this._UpdateKeys(213);
 #endif
 				}
 			}
@@ -1373,9 +1377,9 @@ namespace net.vieapps.Components.Caching
 			// push keys
 			if (this._mode.Equals(Mode.Distributed) && (this._activeSynchronize || this._updateKeys) && this._removedKeys.Count > 0)
 #if DEBUG
-				this._UpdateKeys("REMOVE-MULTIPLE", 213, true, null);
+				this._UpdateKeys("REMOVE-MULTIPLE", 213);
 #else
-				this._UpdateKeys(213, true, null);
+				this._UpdateKeys(213);
 #endif
 		}
 
@@ -1438,9 +1442,9 @@ namespace net.vieapps.Components.Caching
 
 				if (this._removedKeys.Count > 0)
 #if DEBUG
-					this._UpdateKeys("REMOVED-CALLBACK", 213, true, null);
+					this._UpdateKeys("REMOVED-CALLBACK", 213);
 #else
-					this._UpdateKeys(213, true, null);
+					this._UpdateKeys(213);
 #endif
 			}
 
