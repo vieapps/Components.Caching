@@ -26,15 +26,11 @@ using System.Security.Permissions;
 // If you need to access a type in this assembly from COM, set the ComVisible attribute to true on that type.
 [assembly: ComVisible(false)]
 
-// The following GUID is for the ID of the typelib if this project is exposed to COM
-[assembly: Guid("1C93730E-B0B3-410F-BADE-C03AB45EDD1F")]
-
 // Version information for an assembly consists of the following four values:
-//
 //      Major Version
 //      Minor Version 
 //      Build Number
 //      Revision
 [assembly: AssemblyVersion("10.1")]
 [assembly: AssemblyFileVersion("10.1")]
-[assembly: AssemblyInformationalVersion("10.1.ngxv-2017.07.02")]
+[assembly: AssemblyInformationalVersion("10.1.cewa-2017.07.06")]

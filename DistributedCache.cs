@@ -20,6 +20,7 @@ namespace net.vieapps.Components.Caching
 
 		#region Common
 		static MemcachedClient _Client = new MemcachedClient();
+
 		internal static MemcachedClient Client
 		{
 			get
@@ -29,6 +30,7 @@ namespace net.vieapps.Components.Caching
 		}
 
 		static long _ExpirationTime = 900000;
+
 		internal static long ExpirationTime
 		{
 			get
