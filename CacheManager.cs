@@ -1480,14 +1480,7 @@ namespace net.vieapps.Components.Caching
 				{
 					exist = this._mode.Equals(Mode.Internal)
 						? this._bag.Contains(this._GetKey(key))
-						: DistributedCache.Client.Append(this._GetKey(key), new ArraySegment<byte>(new byte[0]));
-
-					if (!exist && this._mode.Equals(Mode.Distributed))
-						try
-						{
-							DistributedCache.Client.Remove(this._GetKey(key));
-						}
-						catch { }
+						: DistributedCache.Exists(this._GetKey(key));
 				}
 				catch (Exception ex)
 				{

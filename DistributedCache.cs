@@ -386,5 +386,39 @@ namespace net.vieapps.Components.Caching
 		}
 		#endregion
 
+		#region Exists
+		/// <summary>
+		/// Determines whether a key is exists or not
+		/// </summary>
+		/// <param name="key">The string that presents key of cached item need to check</param>
+		/// <returns>Returns a boolean value indicating if the object that associates with the key is cached or not</returns>
+		public static bool Exists(string key)
+		{
+			if (!DistributedCache.Client.Append(key, new ArraySegment<byte>(new byte[0])))
+			{
+				DistributedCache.Client.Remove(key);
+				return false;
+			}
+			return true;
+		}
+
+		/// <summary>
+		/// Determines whether a key is exists or not
+		/// </summary>
+		/// <param name="key">The string that presents key of cached item need to check</param>
+		/// <returns>Returns a boolean value indicating if the object that associates with the key is cached or not</returns>
+		public static Task<bool> ExistsAsync(string key)
+		{
+			try
+			{
+				return Task.FromResult<bool>(DistributedCache.Exists(key));
+			}
+			catch (Exception ex)
+			{
+				return Task.FromException<bool>(ex);
+			}
+		}
+		#endregion
+
 	}
 }
