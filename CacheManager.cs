@@ -76,7 +76,7 @@ namespace net.vieapps.Components.Caching
 		string _expirationType = CacheManager.DefaultExpirationType;
 		int _expirationTime = CacheManager.DefaultExpirationTime;
 		int _fragmentSize = CacheManager.DefaultFragmentSize;
-		bool _activeSynchronize = false, _updateKeys = false, _monitorKeys = false, _throwObjectTooLargeForCacheException = false;
+		bool _activeSynchronize = false, _updateKeys = false, _monitorKeys = false;
 		HashSet<string> _activeKeys = null, _addedKeys = null, _removedKeys = null;
 		MemoryCache _bag = MemoryCache.Default;
 		ReaderWriterLockSlim _lock = new ReaderWriterLockSlim(LockRecursionPolicy.SupportsRecursion);
@@ -133,8 +133,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="activeSynchronize">true to active synchronize keys when working mode is Distributed (active synchronize keys between in-process cache and distributed cache)</param>
 		/// <param name="updateKeys">true to active update keys when working mode is Distributed</param>
 		/// <param name="monitorKeys">true to active monitor keys when working mode is Distributed with RemovedCallback</param>
-		/// <param name="throwObjectTooLargeForCacheException">true to throw 'Object too large for cache' exception when working mode is Distributed</param>
-		public CacheManager(string name, string expirationType, int expirationTime, Mode mode, bool activeSynchronize = false, bool updateKeys = false, bool monitorKeys = false, bool throwObjectTooLargeForCacheException = false)
+		public CacheManager(string name, string expirationType, int expirationTime, Mode mode, bool activeSynchronize = false, bool updateKeys = false, bool monitorKeys = false)
 		{
 			// zone name
 			this._name = string.IsNullOrWhiteSpace(name)
@@ -160,7 +159,6 @@ namespace net.vieapps.Components.Caching
 				this._activeSynchronize = activeSynchronize;
 				this._updateKeys = updateKeys;
 				this._monitorKeys = monitorKeys;
-				this._throwObjectTooLargeForCacheException = throwObjectTooLargeForCacheException;
 			}
 
 			// prepare keys
@@ -276,7 +274,7 @@ namespace net.vieapps.Components.Caching
 				{
 					await Task.Delay(13);
 #if DEBUG
-					string debug = "[" + this._name + " > " + Process.GetCurrentProcess().Id.ToString() + " : " + AppDomain.CurrentDomain.Id.ToString() + " : " + Thread.CurrentThread.ManagedThreadId.ToString() + "]";
+					var debug = CacheManager.GetLogPrefix(this._name);
 					Debug.WriteLine(debug + " (" + DateTime.Now.ToString("HH:mm:ss.fff") + ") <PULL>: Start to pull keys [" + this._RegionKey + "] from distributed cache");
 #endif
 					await this._PullKeysAsync().ConfigureAwait(false);
@@ -286,7 +284,7 @@ namespace net.vieapps.Components.Caching
 		async Task _PullKeysAsync(Action callback = null)
 		{
 #if DEBUG
-			string debug = "[" + this._name + " > " + Process.GetCurrentProcess().Id.ToString() + " : " + AppDomain.CurrentDomain.Id.ToString() + " : " + Thread.CurrentThread.ManagedThreadId.ToString() + "]";
+			var debug = CacheManager.GetLogPrefix(this._name);
 #endif
 			// stop if other task is process pulling/pushing
 			if (this._bag.Contains(this._RegionPullingFlag))
@@ -384,7 +382,7 @@ namespace net.vieapps.Components.Caching
 #endif
 		{
 #if DEBUG
-			string debug = "[" + this._name + " > " + Process.GetCurrentProcess().Id.ToString() + " : " + AppDomain.CurrentDomain.Id.ToString() + " : " + Thread.CurrentThread.ManagedThreadId.ToString() + "]";
+			var debug = CacheManager.GetLogPrefix(this._name);
 #endif
 
 			// stop if other task is pushing
@@ -688,7 +686,7 @@ namespace net.vieapps.Components.Caching
 #endif
 		{
 #if DEBUG
-			string debug = "[" + this._name + " > " + Process.GetCurrentProcess().Id.ToString() + " : " + AppDomain.CurrentDomain.Id.ToString() + " : " + Thread.CurrentThread.ManagedThreadId.ToString() + "]";
+			var debug = CacheManager.GetLogPrefix(this._name);
 #endif
 
 			if (this._bag.Contains(this._RegionUpdatingFlag))
@@ -885,8 +883,6 @@ namespace net.vieapps.Components.Caching
 				catch (Exception ex)
 				{
 					CacheManager.WriteLogs(this._name, "Error occurred while updating an object into cache [" + value.GetType().ToString() + "#" + key + "]", ex);
-					if (ex != null && ex.Message != null && ex.Message.Contains("object too large for cache") && this._throwObjectTooLargeForCacheException)
-						throw ex;
 				}
 
 			// update mapping key when added successful
@@ -904,7 +900,7 @@ namespace net.vieapps.Components.Caching
 				return;
 
 #if DEBUG
-			string debug = "[" + this._name + " > " + Process.GetCurrentProcess().Id.ToString() + " : " + AppDomain.CurrentDomain.Id.ToString() + " : " + Thread.CurrentThread.ManagedThreadId.ToString() + "]";
+			var debug = CacheManager.GetLogPrefix(this._name);
 			Stopwatch stopwatch = new Stopwatch();
 			stopwatch.Start();
 #endif
@@ -934,7 +930,7 @@ namespace net.vieapps.Components.Caching
 				return;
 
 #if DEBUG
-			string debug = "[" + this._name + " > " + Process.GetCurrentProcess().Id.ToString() + " : " + AppDomain.CurrentDomain.Id.ToString() + " : " + Thread.CurrentThread.ManagedThreadId.ToString() + "]";
+			var debug = CacheManager.GetLogPrefix(this._name);
 			Stopwatch stopwatch = new Stopwatch();
 			stopwatch.Start();
 #endif
@@ -999,7 +995,7 @@ namespace net.vieapps.Components.Caching
 				return this._Set(key, value, expirationType, expirationTime, true, priority, mode);
 
 #if DEBUG
-			string debug = "[FRAGMENTS > " + Process.GetCurrentProcess().Id.ToString() + " : " + AppDomain.CurrentDomain.Id.ToString() + " : " + Thread.CurrentThread.ManagedThreadId.ToString() + "]";
+			var debug = CacheManager.GetLogPrefix("FRAGMENTS", " > ");
 #endif
 
 			// check to see the object is serializable
@@ -1089,7 +1085,7 @@ namespace net.vieapps.Components.Caching
 				throw new ArgumentNullException(key);
 
 #if DEBUG
-			string debug = "[" + this._name + " > " + Process.GetCurrentProcess().Id.ToString() + " : " + AppDomain.CurrentDomain.Id.ToString() + " : " + Thread.CurrentThread.ManagedThreadId.ToString() + "]";
+			var debug = CacheManager.GetLogPrefix(this._name);
 			Stopwatch stopwatch = new Stopwatch();
 			stopwatch.Start();
 #endif
@@ -1135,7 +1131,7 @@ namespace net.vieapps.Components.Caching
 				return null;
 
 #if DEBUG
-			string debug = "[" + this._name + " > " + Process.GetCurrentProcess().Id.ToString() + " : " + AppDomain.CurrentDomain.Id.ToString() + " : " + Thread.CurrentThread.ManagedThreadId.ToString() + "]";
+			var debug = CacheManager.GetLogPrefix(this._name);
 			Stopwatch stopwatch = new Stopwatch();
 			stopwatch.Start();
 #endif
@@ -1496,7 +1492,7 @@ namespace net.vieapps.Components.Caching
 #if DEBUG
 			Stopwatch stopwatch = new Stopwatch();
 			stopwatch.Start();
-			string debug = "[" + this._name + " > " + Process.GetCurrentProcess().Id.ToString() + " : " + AppDomain.CurrentDomain.Id.ToString() + " : " + Thread.CurrentThread.ManagedThreadId.ToString() + "]";
+			var debug = CacheManager.GetLogPrefix(this._name);
 #endif
 
 			// get keys
@@ -1627,7 +1623,7 @@ namespace net.vieapps.Components.Caching
 #if DEBUG
 			Stopwatch stopwatch = new Stopwatch();
 			stopwatch.Start();
-			string debug = "[" + this._name + " > " + Process.GetCurrentProcess().Id.ToString() + " : " + AppDomain.CurrentDomain.Id.ToString() + " : " + Thread.CurrentThread.ManagedThreadId.ToString() + "]";
+			var debug = CacheManager.GetLogPrefix(this._name);
 #endif
 
 			// prepare keys
@@ -1667,7 +1663,7 @@ namespace net.vieapps.Components.Caching
 #if DEBUG
 			Stopwatch stopwatch = new Stopwatch();
 			stopwatch.Start();
-			string debug = "[" + this._name + " > " + Process.GetCurrentProcess().Id.ToString() + " : " + AppDomain.CurrentDomain.Id.ToString() + " : " + Thread.CurrentThread.ManagedThreadId.ToString() + "]";
+			var debug = CacheManager.GetLogPrefix(this._name);
 #endif
 
 			// remove all
@@ -2677,13 +2673,17 @@ namespace net.vieapps.Components.Caching
 		// -----------------------------------------------------
 
 		#region [Static] Working with logs
+		static string GetLogPrefix(string label, string seperator = ":")
+		{
+			return label + seperator + "[" + Process.GetCurrentProcess().Id.ToString() + " : " + AppDomain.CurrentDomain.Id.ToString() + " : " + Thread.CurrentThread.ManagedThreadId.ToString() + "]";
+		}
+
 		static string LogsPath = null;
 
 		static async Task WriteLogs(string filePath, string region, List<string> logs, Exception ex)
 		{
 			// prepare
-			var info = DateTime.Now.ToString("HH:mm:ss.fff") + "\t" + "[" + Process.GetCurrentProcess().Id.ToString()
-				+ " : " + AppDomain.CurrentDomain.Id.ToString() + " : " + Thread.CurrentThread.ManagedThreadId.ToString() + "]" + "\t" + region + "\t";
+			var info = CacheManager.GetLogPrefix(DateTime.Now.ToString("HH:mm:ss.fff"), "\t") + "\t" + region + "\t";
 
 			var content = "";
 			if (logs != null)
