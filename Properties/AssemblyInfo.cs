@@ -1,14 +1,5 @@
-﻿using System;
-using System.Reflection;
-using System.Runtime.CompilerServices;
+﻿using System.Reflection;
 using System.Runtime.InteropServices;
-using System.Security.Permissions;
-
-/* 
- * Tells the compiler to make sure the whole assembly is CLS Compliant,
- * this is nessisary for users that may not be using C# to access and use this assembly.
- */
-[assembly: CLSCompliant(true)]
 
 // General Information about an assembly is controlled through the following set of attributes.
 // Change these attribute values to modify the information associated with an assembly.
@@ -33,4 +24,4 @@ using System.Security.Permissions;
 //      Revision
 [assembly: AssemblyVersion("10.1")]
 [assembly: AssemblyFileVersion("10.1")]
-[assembly: AssemblyInformationalVersion("10.1.cewa-2017.07.06")]
+[assembly: AssemblyInformationalVersion("10.1.lgsp-2017.08.08")]
