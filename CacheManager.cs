@@ -9,6 +9,7 @@ using System.IO.Compression;
 using System.Runtime.Caching;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Diagnostics;
+using System.Configuration;
 
 using Enyim.Caching.Memcached;
 #endregion
@@ -2730,30 +2731,45 @@ namespace net.vieapps.Components.Caching
 		static void WriteLogs(string region, List<string> logs, Exception ex)
 		{
 			// prepare path of all log files
-			if (CacheManager.LogsPath == null)
+			if (string.IsNullOrWhiteSpace(CacheManager.LogsPath))
 				try
 				{
-					CacheManager.LogsPath = !string.IsNullOrWhiteSpace(System.Web.HttpRuntime.AppDomainAppPath)
-						? System.Web.HttpRuntime.AppDomainAppPath
-						: Directory.GetCurrentDirectory();
+					CacheManager.LogsPath = ConfigurationManager.AppSettings["vieapps:LogsPath"];
 					if (!CacheManager.LogsPath.EndsWith(@"\"))
 						CacheManager.LogsPath += @"\";
 				}
 				catch { }
 
-			// write logs
-			if (CacheManager.LogsPath != null)
-			{
-				var filePath = CacheManager.LogsPath + @"Logs\" + DateTime.Now.ToString("yyyy-MM-dd") + ".CacheManager.txt";
-				Task.Run(async () =>
+			if (string.IsNullOrWhiteSpace(CacheManager.LogsPath))
+				try
 				{
-					try
-					{
-						await CacheManager.WriteLogs(filePath, region, logs, ex).ConfigureAwait(false);
-					}
-					catch { }
-				}).ConfigureAwait(false);
-			}
+					CacheManager.LogsPath = !string.IsNullOrWhiteSpace(System.Web.HttpRuntime.AppDomainAppPath)
+						? System.Web.HttpRuntime.AppDomainAppPath + @"\Logs\"
+						: null;
+				}
+				catch { }
+
+			if (string.IsNullOrWhiteSpace(CacheManager.LogsPath))
+				try
+				{
+					CacheManager.LogsPath = Directory.GetCurrentDirectory() + @"\Logs\";
+				}
+				catch { }
+
+			// stop if a valid path is not found
+			if (string.IsNullOrWhiteSpace(CacheManager.LogsPath))
+				return;
+
+			// build file path and write logs via other thread
+			var filePath = CacheManager.LogsPath + DateTime.Now.ToString("yyyy-MM-dd") + ".CacheManager.txt";
+			Task.Run(async () =>
+			{
+				try
+				{
+					await CacheManager.WriteLogs(filePath, region, logs, ex).ConfigureAwait(false);
+				}
+				catch { }
+			}).ConfigureAwait(false);
 		}
 
 		static void WriteLogs(string region, string log, Exception ex)
