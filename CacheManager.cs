@@ -27,6 +27,7 @@ namespace net.vieapps.Components.Caching
 		/// <summary>
 		/// Caching mode
 		/// </summary>
+		[Serializable]
 		public enum Mode
 		{
 			/// <summary>
@@ -232,6 +233,28 @@ namespace net.vieapps.Components.Caching
 			get
 			{
 				return this._RegionKey + "<Pushing-Flag>";
+			}
+		}
+
+		/// <summary>
+		/// Gets the expiration type (Sliding or Absolute)
+		/// </summary>
+		public string ExpirationType
+		{
+			get
+			{
+				return this._expirationType;
+			}
+		}
+
+		/// <summary>
+		/// Gets the expiration time (in minutes)
+		/// </summary>
+		public int ExpirationTime
+		{
+			get
+			{
+				return this._expirationTime;
 			}
 		}
 		#endregion
