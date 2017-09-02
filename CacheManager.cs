@@ -358,7 +358,7 @@ namespace net.vieapps.Components.Caching
 
 #if DEBUG
 			Debug.WriteLine(debug + " (" + DateTime.Now.ToString("HH:mm:ss.fff") + ") <PULL>: Start to pull keys [" + this._RegionKey + "] from distributed cache");
-			Stopwatch stopwatch = new Stopwatch();
+			var stopwatch = new Stopwatch();
 			stopwatch.Start();
 #endif
 
@@ -722,7 +722,7 @@ namespace net.vieapps.Components.Caching
 			}
 
 #if DEBUG
-			Stopwatch stopwatch = new Stopwatch();
+			var stopwatch = new Stopwatch();
 			stopwatch.Start();
 #endif
 
@@ -830,7 +830,7 @@ namespace net.vieapps.Components.Caching
 		bool _Set(string key, object value, string expirationType = null, int expirationTime = 0, bool doPush = true, CacheItemPriority priority = CacheItemPriority.Default, StoreMode mode = StoreMode.Set)
 		{
 			// check key & value
-			if (string.IsNullOrWhiteSpace(key) || object.ReferenceEquals(value, null))
+			if (string.IsNullOrWhiteSpace(key) || value == null)
 				return false;
 
 			// prepare
@@ -893,10 +893,12 @@ namespace net.vieapps.Components.Caching
 							Priority = priority,
 							RemovedCallback = this._RemovedCallback
 						};
+
 						if (expirationType != null && expirationType.Equals("Absolute"))
 							policy.AbsoluteExpiration = DateTime.Now.AddMinutes(expirationTime);
 						else
 							policy.SlidingExpiration = TimeSpan.FromMinutes(expirationTime);
+
 						this._bag.Set(cacheKey, "", policy);
 					}
 				}
@@ -925,7 +927,7 @@ namespace net.vieapps.Components.Caching
 
 #if DEBUG
 			var debug = CacheManager.GetLogPrefix(this._name);
-			Stopwatch stopwatch = new Stopwatch();
+			var stopwatch = new Stopwatch();
 			stopwatch.Start();
 #endif
 
@@ -955,7 +957,7 @@ namespace net.vieapps.Components.Caching
 
 #if DEBUG
 			var debug = CacheManager.GetLogPrefix(this._name);
-			Stopwatch stopwatch = new Stopwatch();
+			var stopwatch = new Stopwatch();
 			stopwatch.Start();
 #endif
 
@@ -1002,8 +1004,8 @@ namespace net.vieapps.Components.Caching
 			if (isSetted)
 			{
 				var items = new Dictionary<string, object>();
-				for (int index = 0; index < fragments.Count; index++)
-					items.Add(this._GetFragmentKey(fragment.Key, index), fragments[index]);
+				for (var index = 0; index < fragments.Count; index++)
+					items.Add(this._GetFragmentKey(fragment.Key, index), new ArraySegment<byte>(fragments[index]));
 				this._Set(items, null, expirationType, expirationTime, priority, mode);
 			}
 
@@ -1034,7 +1036,9 @@ namespace net.vieapps.Components.Caching
 			// serialize the object to an array of bytes
 			var bytes = value is byte[]
 				? value as byte[]
-				: null;
+				: value is ArraySegment<byte>
+					? ((ArraySegment<byte>)value).Array
+					: null;
 
 			if (bytes == null)
 				bytes = CacheManager.SerializeAsBinary(value);
@@ -1110,7 +1114,7 @@ namespace net.vieapps.Components.Caching
 
 #if DEBUG
 			var debug = CacheManager.GetLogPrefix(this._name);
-			Stopwatch stopwatch = new Stopwatch();
+			var stopwatch = new Stopwatch();
 			stopwatch.Start();
 #endif
 
@@ -1156,7 +1160,7 @@ namespace net.vieapps.Components.Caching
 
 #if DEBUG
 			var debug = CacheManager.GetLogPrefix(this._name);
-			Stopwatch stopwatch = new Stopwatch();
+			var stopwatch = new Stopwatch();
 			stopwatch.Start();
 #endif
 
@@ -1244,12 +1248,12 @@ namespace net.vieapps.Components.Caching
 #endif
 
 			// get all fragments
-			byte[] fragments = new byte[0];
-			int length = 0;
-			for (int index = 0; index < fragment.TotalFragments; index++)
+			var fragments = new byte[0];
+			var length = 0;
+			for (var index = 0; index < fragment.TotalFragments; index++)
 			{
 				byte[] bytes = null;
-				string fragmentKey = this._GetFragmentKey(fragment.Key, index);
+				var fragmentKey = this._GetKey(this._GetFragmentKey(fragment.Key, index));
 				try
 				{
 					bytes = DistributedCache.Get<byte[]>(fragmentKey);
@@ -1514,7 +1518,7 @@ namespace net.vieapps.Components.Caching
 		void _Clear()
 		{
 #if DEBUG
-			Stopwatch stopwatch = new Stopwatch();
+			var stopwatch = new Stopwatch();
 			stopwatch.Start();
 			var debug = CacheManager.GetLogPrefix(this._name);
 #endif
@@ -1645,7 +1649,7 @@ namespace net.vieapps.Components.Caching
 			await Task.Delay(113);
 
 #if DEBUG
-			Stopwatch stopwatch = new Stopwatch();
+			var stopwatch = new Stopwatch();
 			stopwatch.Start();
 			var debug = CacheManager.GetLogPrefix(this._name);
 #endif
@@ -1685,7 +1689,7 @@ namespace net.vieapps.Components.Caching
 			await Task.Delay(213);
 
 #if DEBUG
-			Stopwatch stopwatch = new Stopwatch();
+			var stopwatch = new Stopwatch();
 			stopwatch.Start();
 			var debug = CacheManager.GetLogPrefix(this._name);
 #endif
@@ -1882,7 +1886,7 @@ namespace net.vieapps.Components.Caching
 		public T Get<T>(string key)
 		{
 			object @object = this.Get(key);
-			return !object.ReferenceEquals(@object, null) && @object is T
+			return @object != null && @object is T
 				? (T)@object
 				: default(T);
 		}
@@ -1909,8 +1913,8 @@ namespace net.vieapps.Components.Caching
 				fragment = this._Get(key, false);
 
 			return fragment == null
-						? new Fragment() { Key = key, TotalFragments = 0 }
-						: fragment is Fragment ? (Fragment)fragment : new Fragment() { Key = key, TotalFragments = 0 };
+				? new Fragment() { Key = key, TotalFragments = 0 }
+				: fragment is Fragment ? (Fragment)fragment : new Fragment() { Key = key, TotalFragments = 0 };
 		}
 
 		/// <summary>
@@ -1922,8 +1926,8 @@ namespace net.vieapps.Components.Caching
 		public List<byte[]> GetAsFragments(string key, List<int> indexes)
 		{
 			return string.IsNullOrWhiteSpace(key) || this._mode.Equals(Mode.Internal)
-							? null
-							: this._GetAsFragments(key, indexes);
+				? null
+				: this._GetAsFragments(key, indexes);
 		}
 
 		/// <summary>
@@ -2570,9 +2574,9 @@ namespace net.vieapps.Components.Caching
 				return new HashSet<string>();
 
 			// get all fragments
-			byte[] fragments = new byte[0];
-			int length = 0;
-			for (int index = 0; index < info.TotalFragments; index++)
+			var fragments = new byte[0];
+			var length = 0;
+			for (var index = 0; index < info.TotalFragments; index++)
 			{
 				byte[] bytes = null;
 				try
