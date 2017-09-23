@@ -66,14 +66,19 @@ namespace net.vieapps.Components.Caching
 		/// <returns>true if set successful</returns>
 		public static Task<bool> SetAsync(string key, object value, DateTime expiresAt, StoreMode mode = StoreMode.Set)
 		{
-			try
+			var tcs = new TaskCompletionSource<bool>();
+			ThreadPool.QueueUserWorkItem(_ =>
 			{
-				return Task.FromResult(DistributedCache.Set(key, value, expiresAt, mode));
-			}
-			catch (Exception ex)
-			{
-				return Task.FromException<bool>(ex);
-			}
+				try
+				{
+					tcs.SetResult(DistributedCache.Set(key, value, expiresAt, mode));
+				}
+				catch (Exception ex)
+				{
+					tcs.SetException(ex);
+				}
+			});
+			return tcs.Task;
 		}
 
 		/// <summary>
@@ -99,14 +104,19 @@ namespace net.vieapps.Components.Caching
 		/// <returns>true if set successful</returns>
 		public static Task<bool> SetAsync(string key, object value, long expiresAt, StoreMode mode = StoreMode.Set)
 		{
-			try
+			var tcs = new TaskCompletionSource<bool>();
+			ThreadPool.QueueUserWorkItem(_ =>
 			{
-				return Task.FromResult(DistributedCache.Set(key, value, expiresAt, mode));
-			}
-			catch (Exception ex) 
-			{
-				return Task.FromException<bool>(ex);
-			}
+				try
+				{
+					tcs.SetResult(DistributedCache.Set(key, value, expiresAt, mode));
+				}
+				catch (Exception ex)
+				{
+					tcs.SetException(ex);
+				}
+			});
+			return tcs.Task;
 		}
 
 		/// <summary>
@@ -134,14 +144,19 @@ namespace net.vieapps.Components.Caching
 		/// <returns>true if set successful</returns>
 		public static Task<bool> SetAsync(string key, object value, TimeSpan validFor, StoreMode mode = StoreMode.Set)
 		{
-			try
+			var tcs = new TaskCompletionSource<bool>();
+			ThreadPool.QueueUserWorkItem(_ =>
 			{
-				return Task.FromResult(DistributedCache.Set(key, value, validFor, mode));
-			}
-			catch (Exception ex)
-			{
-				return Task.FromException<bool>(ex);
-			}
+				try
+				{
+					tcs.SetResult(DistributedCache.Set(key, value, validFor, mode));
+				}
+				catch (Exception ex)
+				{
+					tcs.SetException(ex);
+				}
+			});
+			return tcs.Task;
 		}
 
 		/// <summary>
@@ -167,14 +182,19 @@ namespace net.vieapps.Components.Caching
 		/// <returns>true if set successful</returns>
 		public static Task<bool> SetAsync(string key, object value, int expiresAt, StoreMode mode = StoreMode.Set)
 		{
-			try
+			var tcs = new TaskCompletionSource<bool>();
+			ThreadPool.QueueUserWorkItem(_ =>
 			{
-				return Task.FromResult(DistributedCache.Set(key, value, expiresAt, mode));
-			}
-			catch (Exception ex)
-			{
-				return Task.FromException<bool>(ex);
-			}
+				try
+				{
+					tcs.SetResult(DistributedCache.Set(key, value, expiresAt, mode));
+				}
+				catch (Exception ex)
+				{
+					tcs.SetException(ex);
+				}
+			});
+			return tcs.Task;
 		}
 
 		/// <summary>
@@ -198,14 +218,19 @@ namespace net.vieapps.Components.Caching
 		/// <returns>true if set successful</returns>
 		public static Task<bool> SetAsync(string key, object value, StoreMode mode = StoreMode.Set)
 		{
-			try
+			var tcs = new TaskCompletionSource<bool>();
+			ThreadPool.QueueUserWorkItem(_ =>
 			{
-				return Task.FromResult(DistributedCache.Set(key, value, mode));
-			}
-			catch (Exception ex)
-			{
-				return Task.FromException<bool>(ex);
-			}
+				try
+				{
+					tcs.SetResult(DistributedCache.Set(key, value, mode));
+				}
+				catch (Exception ex)
+				{
+					tcs.SetException(ex);
+				}
+			});
+			return tcs.Task;
 		}
 		#endregion
 
@@ -229,14 +254,19 @@ namespace net.vieapps.Components.Caching
 		/// <returns></returns>
 		public static Task<object> GetAsync(string key)
 		{
-			try
+			var tcs = new TaskCompletionSource<object>();
+			ThreadPool.QueueUserWorkItem(_ =>
 			{
-				return Task.FromResult(DistributedCache.Get(key));
-			}
-			catch (Exception ex)
-			{
-				return Task.FromException<object>(ex);
-			}
+				try
+				{
+					tcs.SetResult(DistributedCache.Get(key));
+				}
+				catch (Exception ex)
+				{
+					tcs.SetException(ex);
+				}
+			});
+			return tcs.Task;
 		}
 
 		/// <summary>
@@ -260,14 +290,19 @@ namespace net.vieapps.Components.Caching
 		/// <returns></returns>
 		public static Task<T> GetAsync<T>(string key)
 		{
-			try
+			var tcs = new TaskCompletionSource<T>();
+			ThreadPool.QueueUserWorkItem(_ =>
 			{
-				return Task.FromResult(DistributedCache.Get<T>(key));
-			}
-			catch (Exception ex)
-			{
-				return Task.FromException<T>(ex);
-			}
+				try
+				{
+					tcs.SetResult(DistributedCache.Get<T>(key));
+				}
+				catch (Exception ex)
+				{
+					tcs.SetException(ex);
+				}
+			});
+			return tcs.Task;
 		}
 
 		/// <summary>
@@ -289,14 +324,19 @@ namespace net.vieapps.Components.Caching
 		/// <returns></returns>
 		public static Task<IDictionary<string, object>> GetAsync(IEnumerable<string> keys)
 		{
-			try
+			var tcs = new TaskCompletionSource<IDictionary<string, object>>();
+			ThreadPool.QueueUserWorkItem(_ =>
 			{
-				return Task.FromResult(DistributedCache.Get(keys));
-			}
-			catch (Exception ex)
-			{
-				return Task.FromException<IDictionary<string, object>>(ex);
-			}
+				try
+				{
+					tcs.SetResult(DistributedCache.Get(keys));
+				}
+				catch (Exception ex)
+				{
+					tcs.SetException(ex);
+				}
+			});
+			return tcs.Task;
 		}
 		#endregion
 
@@ -320,14 +360,19 @@ namespace net.vieapps.Components.Caching
 		/// <returns>true if item is found and removed from cache storage</returns>
 		public static Task<bool> RemoveAsync(string key)
 		{
-			try
+			var tcs = new TaskCompletionSource<bool>();
+			ThreadPool.QueueUserWorkItem(_ =>
 			{
-				return Task.FromResult(DistributedCache.Remove(key));
-			}
-			catch (Exception ex)
-			{
-				return Task.FromException<bool>(ex);
-			}
+				try
+				{
+					tcs.SetResult(DistributedCache.Remove(key));
+				}
+				catch (Exception ex)
+				{
+					tcs.SetException(ex);
+				}
+			});
+			return tcs.Task;
 		}
 
 		/// <summary>
@@ -350,15 +395,20 @@ namespace net.vieapps.Components.Caching
 		/// <param name="keys">The collection of string that presents key of cache items that be removed</param>
 		public static Task RemoveAsync(IEnumerable<string> keys)
 		{
-			try
+			var tcs = new TaskCompletionSource<object>();
+			ThreadPool.QueueUserWorkItem(_ =>
 			{
-				DistributedCache.Remove(keys);
-				return Task.CompletedTask;
-			}
-			catch (Exception ex)
-			{
-				return Task.FromException(ex);
-			}
+				try
+				{
+					DistributedCache.Remove(keys);
+					tcs.SetResult(null);
+				}
+				catch (Exception ex)
+				{
+					tcs.SetException(ex);
+				}
+			});
+			return tcs.Task;
 		}
 
 		/// <summary>
@@ -374,15 +424,20 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		public static Task RemoveAllAsync()
 		{
-			try
+			var tcs = new TaskCompletionSource<object>();
+			ThreadPool.QueueUserWorkItem(_ =>
 			{
-				DistributedCache.RemoveAll();
-				return Task.CompletedTask;
-			}
-			catch (Exception ex)
-			{
-				return Task.FromException(ex);
-			}
+				try
+				{
+					DistributedCache.RemoveAll();
+					tcs.SetResult(null);
+				}
+				catch (Exception ex)
+				{
+					tcs.SetException(ex);
+				}
+			});
+			return tcs.Task;
 		}
 		#endregion
 
@@ -409,14 +464,19 @@ namespace net.vieapps.Components.Caching
 		/// <returns>Returns a boolean value indicating if the object that associates with the key is cached or not</returns>
 		public static Task<bool> ExistsAsync(string key)
 		{
-			try
+			var tcs = new TaskCompletionSource<bool>();
+			ThreadPool.QueueUserWorkItem(_ =>
 			{
-				return Task.FromResult<bool>(DistributedCache.Exists(key));
-			}
-			catch (Exception ex)
-			{
-				return Task.FromException<bool>(ex);
-			}
+				try
+				{
+					tcs.SetResult(DistributedCache.Exists(key));
+				}
+				catch (Exception ex)
+				{
+					tcs.SetException(ex);
+				}
+			});
+			return tcs.Task;
 		}
 		#endregion
 

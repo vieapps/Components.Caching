@@ -331,7 +331,7 @@ namespace net.vieapps.Components.Caching
 			string distributedFlag = null;
 			try
 			{
-				distributedFlag = DistributedCache.Get<string>(this._RegionPushingFlag);
+				distributedFlag = await DistributedCache.GetAsync<string>(this._RegionPushingFlag);
 			}
 			catch (Exception ex)
 			{
@@ -347,7 +347,7 @@ namespace net.vieapps.Components.Caching
 				await Task.Delay(113);
 				try
 				{
-					distributedFlag = DistributedCache.Get<string>(this._RegionPushingFlag);
+					distributedFlag = await DistributedCache.GetAsync<string>(this._RegionPushingFlag);
 				}
 				catch (Exception ex)
 				{
@@ -393,8 +393,7 @@ namespace net.vieapps.Components.Caching
 #endif
 
 			// callback
-			if (!object.ReferenceEquals(callback, null))
-				callback();
+			callback?.Invoke();
 		}
 		#endregion
 
@@ -447,7 +446,7 @@ namespace net.vieapps.Components.Caching
 			string distributedFlag = null;
 			try
 			{
-				distributedFlag = DistributedCache.Get<string>(this._RegionPushingFlag);
+				distributedFlag = await DistributedCache.GetAsync<string>(this._RegionPushingFlag);
 			}
 			catch (Exception ex)
 			{
@@ -465,7 +464,7 @@ namespace net.vieapps.Components.Caching
 				await Task.Delay(113);
 				try
 				{
-					distributedFlag = DistributedCache.Get<string>(this._RegionPushingFlag);
+					distributedFlag = await DistributedCache.GetAsync<string>(this._RegionPushingFlag);
 				}
 				catch (Exception ex)
 				{
@@ -481,7 +480,7 @@ namespace net.vieapps.Components.Caching
 			// set flag (distributed)
 			try
 			{
-				DistributedCache.Set(this._RegionPushingFlag, Thread.CurrentThread.ManagedThreadId.ToString(), (long)5000);
+				await DistributedCache.SetAsync(this._RegionPushingFlag, Thread.CurrentThread.ManagedThreadId.ToString(), (long)5000);
 			}
 			catch (Exception ex)
 			{
@@ -694,13 +693,10 @@ namespace net.vieapps.Components.Caching
 #endif
 
 			// callback
-			if (!object.ReferenceEquals(callback, null))
-			{
 #if DEBUG
-				Debug.WriteLine(debug + " (" + DateTime.Now.ToString("HH:mm:ss.fff") + ") <" + label + ">:  -- And now run callback action");
+			Debug.WriteLine(debug + " (" + DateTime.Now.ToString("HH:mm:ss.fff") + ") <" + label + ">:  -- And now run callback action");
 #endif
-				callback();
-			}
+			callback?.Invoke();
 		}
 
 #if DEBUG
@@ -2028,14 +2024,19 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		public Task<HashSet<string>> GetKeysAsync()
 		{
-			try
+			var tcs = new TaskCompletionSource<HashSet<string>>();
+			ThreadPool.QueueUserWorkItem(_ =>
 			{
-				return Task.FromResult(this.GetKeys());
-			}
-			catch (Exception ex)
-			{
-				return Task.FromException<HashSet<string>>(ex);
-			}
+				try
+				{
+					tcs.SetResult(this.GetKeys());
+				}
+				catch (Exception ex)
+				{
+					tcs.SetException(ex);
+				}
+			});
+			return tcs.Task;
 		}
 		#endregion
 
@@ -2051,14 +2052,19 @@ namespace net.vieapps.Components.Caching
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
 		public Task<bool> SetAsync(string key, object value, string expirationType = null, int expirationTime = 0, CacheItemPriority priority = CacheItemPriority.Default)
 		{
-			try
+			var tcs = new TaskCompletionSource<bool>();
+			ThreadPool.QueueUserWorkItem(_ =>
 			{
-				return Task.FromResult(this.Set(key, value, expirationType, expirationTime, priority));
-			}
-			catch (Exception ex)
-			{
-				return Task.FromException<bool>(ex);
-			}
+				try
+				{
+					tcs.SetResult(this.Set(key, value, expirationType, expirationTime, priority));
+				}
+				catch (Exception ex)
+				{
+					tcs.SetException(ex);
+				}
+			});
+			return tcs.Task;
 		}
 
 		/// <summary>
@@ -2082,15 +2088,20 @@ namespace net.vieapps.Components.Caching
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
 		public Task SetAsync(IDictionary<string, object> items, string keyPrefix = null, string expirationType = null, int expirationTime = 0)
 		{
-			try
+			var tcs = new TaskCompletionSource<object>();
+			ThreadPool.QueueUserWorkItem(_ =>
 			{
-				this.Set(items, keyPrefix, expirationType, expirationTime);
-				return Task.CompletedTask;
-			}
-			catch (Exception ex)
-			{
-				return Task.FromException(ex);
-			}
+				try
+				{
+					this.Set(items, keyPrefix, expirationType, expirationTime);
+					tcs.SetResult(null);
+				}
+				catch (Exception ex)
+				{
+					tcs.SetException(ex);
+				}
+			});
+			return tcs.Task;
 		}
 
 		/// <summary>
@@ -2102,15 +2113,20 @@ namespace net.vieapps.Components.Caching
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
 		public Task SetAsync<T>(IDictionary<string, T> items, string keyPrefix = null, string expirationType = null, int expirationTime = 0)
 		{
-			try
+			var tcs = new TaskCompletionSource<object>();
+			ThreadPool.QueueUserWorkItem(_ =>
 			{
-				this.Set(items, keyPrefix, expirationType, expirationTime);
-				return Task.CompletedTask;
-			}
-			catch (Exception ex)
-			{
-				return Task.FromException(ex);
-			}
+				try
+				{
+					this.Set(items, keyPrefix, expirationType, expirationTime);
+					tcs.SetResult(null);
+				}
+				catch (Exception ex)
+				{
+					tcs.SetException(ex);
+				}
+			});
+			return tcs.Task;
 		}
 
 		/// <summary>
@@ -2147,14 +2163,19 @@ namespace net.vieapps.Components.Caching
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
 		public Task<bool> SetIfNotExistsAsync(string key, object value, string expirationType = null, int expirationTime = 0)
 		{
-			try
+			var tcs = new TaskCompletionSource<bool>();
+			ThreadPool.QueueUserWorkItem(_ =>
 			{
-				return Task.FromResult<bool>(this.SetIfNotExists(key, value, expirationType, expirationTime));
-			}
-			catch (Exception ex)
-			{
-				return Task.FromException<bool>(ex);
-			}
+				try
+				{
+					tcs.SetResult(this.SetIfNotExists(key, value, expirationType, expirationTime));
+				}
+				catch (Exception ex)
+				{
+					tcs.SetException(ex);
+				}
+			});
+			return tcs.Task;
 		}
 
 		/// <summary>
@@ -2167,14 +2188,19 @@ namespace net.vieapps.Components.Caching
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
 		public Task<bool> SetIfAlreadyExistsAsync(string key, object value, string expirationType = null, int expirationTime = 0)
 		{
-			try
+			var tcs = new TaskCompletionSource<bool>();
+			ThreadPool.QueueUserWorkItem(_ =>
 			{
-				return Task.FromResult<bool>(this.SetIfAlreadyExists(key, value, expirationType, expirationTime));				
-			}
-			catch (Exception ex)
-			{
-				return Task.FromException<bool>(ex);
-			}
+				try
+				{
+					tcs.SetResult(this.SetIfAlreadyExists(key, value, expirationType, expirationTime));
+				}
+				catch (Exception ex)
+				{
+					tcs.SetException(ex);
+				}
+			});
+			return tcs.Task;
 		}
 
 		/// <summary>
@@ -2188,14 +2214,19 @@ namespace net.vieapps.Components.Caching
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
 		public Task<bool> SetFragmentsAsync(string key, Type type, List<byte[]> fragments, string expirationType = null, int expirationTime = 0)
 		{
-			try
+			var tcs = new TaskCompletionSource<bool>();
+			ThreadPool.QueueUserWorkItem(_ =>
 			{
-				return Task.FromResult(this.SetFragments(key, type, fragments, expirationType, expirationTime));
-			}
-			catch (Exception ex)
-			{
-				return Task.FromException<bool>(ex);
-			}
+				try
+				{
+					tcs.SetResult(this.SetFragments(key, type, fragments, expirationType, expirationTime));
+				}
+				catch (Exception ex)
+				{
+					tcs.SetException(ex);
+				}
+			});
+			return tcs.Task;
 		}
 
 		/// <summary>
@@ -2209,14 +2240,19 @@ namespace net.vieapps.Components.Caching
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
 		public Task<bool> SetAsFragmentsAsync(string key, object value, string expirationType = null, int expirationTime = 0, bool setSecondary = false)
 		{
-			try
+			var tcs = new TaskCompletionSource<bool>();
+			ThreadPool.QueueUserWorkItem(_ =>
 			{
-				return Task.FromResult(this.SetAsFragments(key, value, expirationType, expirationTime, setSecondary));
-			}
-			catch (Exception ex)
-			{
-				return Task.FromException<bool>(ex);
-			}
+				try
+				{
+					tcs.SetResult(this.SetAsFragments(key, value, expirationType, expirationTime, setSecondary));
+				}
+				catch (Exception ex)
+				{
+					tcs.SetException(ex);
+				}
+			});
+			return tcs.Task;
 		}
 		#endregion
 
@@ -2229,14 +2265,19 @@ namespace net.vieapps.Components.Caching
 		/// <exception cref="System.ArgumentNullException">If the <paramref name="key">key</paramref> parameter is null</exception>
 		public Task<object> GetAsync(string key)
 		{
-			try
+			var tcs = new TaskCompletionSource<object>();
+			ThreadPool.QueueUserWorkItem(_ =>
 			{
-				return Task.FromResult(this.Get(key));
-			}
-			catch (Exception ex)
-			{
-				return Task.FromException<object>(ex);
-			}
+				try
+				{
+					tcs.SetResult(this.Get(key));
+				}
+				catch (Exception ex)
+				{
+					tcs.SetException(ex);
+				}
+			});
+			return tcs.Task;
 		}
 
 		/// <summary>
@@ -2248,14 +2289,19 @@ namespace net.vieapps.Components.Caching
 		/// <exception cref="System.ArgumentNullException">If the <paramref name="key">key</paramref> parameter is null</exception>
 		public Task<T> GetAsync<T>(string key)
 		{
-			try
+			var tcs = new TaskCompletionSource<T>();
+			ThreadPool.QueueUserWorkItem(_ =>
 			{
-				return Task.FromResult(this.Get<T>(key));
-			}
-			catch (Exception ex)
-			{
-				return Task.FromException<T>(ex);
-			}
+				try
+				{
+					tcs.SetResult(this.Get<T>(key));
+				}
+				catch (Exception ex)
+				{
+					tcs.SetException(ex);
+				}
+			});
+			return tcs.Task;
 		}
 
 		/// <summary>
@@ -2265,14 +2311,19 @@ namespace net.vieapps.Components.Caching
 		/// <returns>The collection of cache items</returns>
 		public Task<IDictionary<string, object>> GetAsync(IEnumerable<string> keys)
 		{
-			try
+			var tcs = new TaskCompletionSource<IDictionary<string, object>>();
+			ThreadPool.QueueUserWorkItem(_ =>
 			{
-				return Task.FromResult(this.Get(keys));
-			}
-			catch (Exception ex)
-			{
-				return Task.FromException<IDictionary<string, object>>(ex);
-			}
+				try
+				{
+					tcs.SetResult(this.Get(keys));
+				}
+				catch (Exception ex)
+				{
+					tcs.SetException(ex);
+				}
+			});
+			return tcs.Task;
 		}
 
 		/// <summary>
@@ -2282,14 +2333,19 @@ namespace net.vieapps.Components.Caching
 		/// <returns>The <see cref="Fragment">Fragment</see> object that presents information of all fragmented items in the cache storage</returns>
 		public Task<Fragment> GetFragmentAsync(string key)
 		{
-			try
+			var tcs = new TaskCompletionSource<Fragment>();
+			ThreadPool.QueueUserWorkItem(_ =>
 			{
-				return Task.FromResult(this.GetFragment(key));
-			}
-			catch (Exception ex)
-			{
-				return Task.FromException<Fragment>(ex);
-			}
+				try
+				{
+					tcs.SetResult(this.GetFragment(key));
+				}
+				catch (Exception ex)
+				{
+					tcs.SetException(ex);
+				}
+			});
+			return tcs.Task;
 		}
 
 		/// <summary>
@@ -2300,14 +2356,19 @@ namespace net.vieapps.Components.Caching
 		/// <returns>The collection of array of bytes that presents serialized information of fragmented items</returns>
 		public Task<List<byte[]>> GetAsFragmentsAsync(string key, List<int> indexes)
 		{
-			try
+			var tcs = new TaskCompletionSource<List<byte[]>>();
+			ThreadPool.QueueUserWorkItem(_ =>
 			{
-				return Task.FromResult(this.GetAsFragments(key, indexes));
-			}
-			catch (Exception ex)
-			{
-				return Task.FromException< List<byte[]>>(ex);
-			}
+				try
+				{
+					tcs.SetResult(this.GetAsFragments(key, indexes));
+				}
+				catch (Exception ex)
+				{
+					tcs.SetException(ex);
+				}
+			});
+			return tcs.Task;
 		}
 		#endregion
 
@@ -2319,14 +2380,19 @@ namespace net.vieapps.Components.Caching
 		/// <returns>Returns a boolean value indicating if the item is removed or not</returns>
 		public Task<bool> RemoveAsync(string key)
 		{
-			try
+			var tcs = new TaskCompletionSource<bool>();
+			ThreadPool.QueueUserWorkItem(_ =>
 			{
-				return Task.FromResult(this.Remove(key));
-			}
-			catch (Exception ex)
-			{
-				return Task.FromException<bool>(ex);
-			}
+				try
+				{
+					tcs.SetResult(this.Remove(key));
+				}
+				catch (Exception ex)
+				{
+					tcs.SetException(ex);
+				}
+			});
+			return tcs.Task;
 		}
 
 		/// <summary>
@@ -2336,15 +2402,20 @@ namespace net.vieapps.Components.Caching
 		/// <param name="keyPrefix">The string that presents prefix of all keys</param>
 		public Task RemoveAsync(IEnumerable<string> keys, string keyPrefix = null)
 		{
-			try
+			var tcs = new TaskCompletionSource<object>();
+			ThreadPool.QueueUserWorkItem(_ =>
 			{
-				this.Remove(keys, keyPrefix);
-				return Task.CompletedTask;
-			}
-			catch (Exception ex)
-			{
-				return Task.FromException(ex);
-			}
+				try
+				{
+					this.Remove(keys, keyPrefix);
+					tcs.SetResult(null);
+				}
+				catch (Exception ex)
+				{
+					tcs.SetException(ex);
+				}
+			});
+			return tcs.Task;
 		}
 
 		/// <summary>
@@ -2353,15 +2424,20 @@ namespace net.vieapps.Components.Caching
 		/// <param name="key">The string that presents key of fragmented items need to be removed</param>
 		public Task RemoveFragmentsAsync(string key)
 		{
-			try
+			var tcs = new TaskCompletionSource<object>();
+			ThreadPool.QueueUserWorkItem(_ =>
 			{
-				this.RemoveFragments(key);
-				return Task.CompletedTask;
-			}
-			catch (Exception ex)
-			{
-				return Task.FromException(ex);
-			}
+				try
+				{
+					this.RemoveFragments(key);
+					tcs.SetResult(null);
+				}
+				catch (Exception ex)
+				{
+					tcs.SetException(ex);
+				}
+			});
+			return tcs.Task;
 		}
 
 		/// <summary>
@@ -2370,15 +2446,20 @@ namespace net.vieapps.Components.Caching
 		/// <param name="fragment">The <see cref="Fragment">Fragment</see> object that presents information of all fragmented items in the cache storage need to be removed</param>
 		public Task RemoveFragmentsAsync(Fragment fragment)
 		{
-			try
+			var tcs = new TaskCompletionSource<object>();
+			ThreadPool.QueueUserWorkItem(_ =>
 			{
-				this.RemoveFragments(fragment);
-				return Task.CompletedTask;
-			}
-			catch (Exception ex)
-			{
-				return Task.FromException(ex);
-			}
+				try
+				{
+					this.RemoveFragments(fragment);
+					tcs.SetResult(null);
+				}
+				catch (Exception ex)
+				{
+					tcs.SetException(ex);
+				}
+			});
+			return tcs.Task;
 		}
 		#endregion
 
@@ -2390,14 +2471,19 @@ namespace net.vieapps.Components.Caching
 		/// <returns>Returns a boolean value indicating if the object that associates with the key is cached or not</returns>
 		public Task<bool> ExistsAsync(string key)
 		{
-			try
+			var tcs = new TaskCompletionSource<bool>();
+			ThreadPool.QueueUserWorkItem(_ =>
 			{
-				return Task.FromResult(this.Exists(key));
-			}
-			catch (Exception ex)
-			{
-				return Task.FromException<bool>(ex);
-			}
+				try
+				{
+					tcs.SetResult(this.Exists(key));
+				}
+				catch (Exception ex)
+				{
+					tcs.SetException(ex);
+				}
+			});
+			return tcs.Task;
 		}
 		#endregion
 
@@ -2407,15 +2493,20 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		public Task ClearAsync()
 		{
-			try
+			var tcs = new TaskCompletionSource<object>();
+			ThreadPool.QueueUserWorkItem(_ =>
 			{
-				this.Clear();
-				return Task.CompletedTask;
-			}
-			catch (Exception ex)
-			{
-				return Task.FromException(ex);
-			}
+				try
+				{
+					this.Clear();
+					tcs.SetResult(null);
+				}
+				catch (Exception ex)
+				{
+					tcs.SetException(ex);
+				}
+			});
+			return tcs.Task;
 		}
 
 		/// <summary>
