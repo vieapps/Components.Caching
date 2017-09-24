@@ -63,22 +63,11 @@ namespace net.vieapps.Components.Caching
 		/// <param name="value">The object that presents value of cache item</param>
 		/// <param name="expiresAt">The time that presents absolute expired time</param>
 		/// <param name="mode">Inidicates the mode how the items are stored in Memcached (default is Set, means override if the item is existed)</param>
+		/// <param name="cancellationToken">The cancellation token</param>
 		/// <returns>true if set successful</returns>
-		public static Task<bool> SetAsync(string key, object value, DateTime expiresAt, StoreMode mode = StoreMode.Set)
+		public static Task<bool> SetAsync(string key, object value, DateTime expiresAt, StoreMode mode = StoreMode.Set, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			var tcs = new TaskCompletionSource<bool>();
-			ThreadPool.QueueUserWorkItem(_ =>
-			{
-				try
-				{
-					tcs.SetResult(DistributedCache.Set(key, value, expiresAt, mode));
-				}
-				catch (Exception ex)
-				{
-					tcs.SetException(ex);
-				}
-			});
-			return tcs.Task;
+			return CacheManager.ExecuteTask<bool>(() => DistributedCache.Set(key, value, expiresAt, mode), cancellationToken);
 		}
 
 		/// <summary>
@@ -101,22 +90,11 @@ namespace net.vieapps.Components.Caching
 		/// <param name="value">The object that presents value of cache item</param>
 		/// <param name="expiresAt">The number that presents absolute expired time (in mili-seconds)</param>
 		/// <param name="mode">Inidicates the mode how the items are stored in Memcached (default is Set, means override if the item is existed)</param>
+		/// <param name="cancellationToken">The cancellation token</param>
 		/// <returns>true if set successful</returns>
-		public static Task<bool> SetAsync(string key, object value, long expiresAt, StoreMode mode = StoreMode.Set)
+		public static Task<bool> SetAsync(string key, object value, long expiresAt, StoreMode mode = StoreMode.Set, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			var tcs = new TaskCompletionSource<bool>();
-			ThreadPool.QueueUserWorkItem(_ =>
-			{
-				try
-				{
-					tcs.SetResult(DistributedCache.Set(key, value, expiresAt, mode));
-				}
-				catch (Exception ex)
-				{
-					tcs.SetException(ex);
-				}
-			});
-			return tcs.Task;
+			return CacheManager.ExecuteTask<bool>(() => DistributedCache.Set(key, value, expiresAt, mode), cancellationToken);
 		}
 
 		/// <summary>
@@ -141,22 +119,11 @@ namespace net.vieapps.Components.Caching
 		/// <param name="value">The object that presents value of cache item</param>
 		/// <param name="validFor">The TimeSpan that presents sliding expiration time</param>
 		/// <param name="mode">Inidicates the mode how the items are stored in Memcached (default is Set, means override if the item is existed)</param>
+		/// <param name="cancellationToken">The cancellation token</param>
 		/// <returns>true if set successful</returns>
-		public static Task<bool> SetAsync(string key, object value, TimeSpan validFor, StoreMode mode = StoreMode.Set)
+		public static Task<bool> SetAsync(string key, object value, TimeSpan validFor, StoreMode mode = StoreMode.Set, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			var tcs = new TaskCompletionSource<bool>();
-			ThreadPool.QueueUserWorkItem(_ =>
-			{
-				try
-				{
-					tcs.SetResult(DistributedCache.Set(key, value, validFor, mode));
-				}
-				catch (Exception ex)
-				{
-					tcs.SetException(ex);
-				}
-			});
-			return tcs.Task;
+			return CacheManager.ExecuteTask<bool>(() => DistributedCache.Set(key, value, validFor, mode), cancellationToken);
 		}
 
 		/// <summary>
@@ -179,22 +146,11 @@ namespace net.vieapps.Components.Caching
 		/// <param name="value">The object that presents value of cache item</param>
 		/// <param name="expiresAt">The number that presents absolute expired time (in minutes)</param>
 		/// <param name="mode">Inidicates the mode how the items are stored in Memcached (default is Set, means override if the item is existed)</param>
+		/// <param name="cancellationToken">The cancellation token</param>
 		/// <returns>true if set successful</returns>
-		public static Task<bool> SetAsync(string key, object value, int expiresAt, StoreMode mode = StoreMode.Set)
+		public static Task<bool> SetAsync(string key, object value, int expiresAt, StoreMode mode = StoreMode.Set, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			var tcs = new TaskCompletionSource<bool>();
-			ThreadPool.QueueUserWorkItem(_ =>
-			{
-				try
-				{
-					tcs.SetResult(DistributedCache.Set(key, value, expiresAt, mode));
-				}
-				catch (Exception ex)
-				{
-					tcs.SetException(ex);
-				}
-			});
-			return tcs.Task;
+			return CacheManager.ExecuteTask<bool>(() => DistributedCache.Set(key, value, expiresAt, mode), cancellationToken);
 		}
 
 		/// <summary>
@@ -215,22 +171,11 @@ namespace net.vieapps.Components.Caching
 		/// <param name="key">The string that presents key of cache item</param>
 		/// <param name="value">The object that presents value of cache item</param>
 		/// <param name="mode">Inidicates the mode how the items are stored in Memcached (default is Set, means override if the item is existed)</param>
+		/// <param name="cancellationToken">The cancellation token</param>
 		/// <returns>true if set successful</returns>
-		public static Task<bool> SetAsync(string key, object value, StoreMode mode = StoreMode.Set)
+		public static Task<bool> SetAsync(string key, object value, StoreMode mode = StoreMode.Set, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			var tcs = new TaskCompletionSource<bool>();
-			ThreadPool.QueueUserWorkItem(_ =>
-			{
-				try
-				{
-					tcs.SetResult(DistributedCache.Set(key, value, mode));
-				}
-				catch (Exception ex)
-				{
-					tcs.SetException(ex);
-				}
-			});
-			return tcs.Task;
+			return CacheManager.ExecuteTask<bool>(() => DistributedCache.Set(key, value, mode), cancellationToken);
 		}
 		#endregion
 
@@ -251,22 +196,11 @@ namespace net.vieapps.Components.Caching
 		/// Gets the specified item from cache storage
 		/// </summary>
 		/// <param name="key">The string that presents key of cache item</param>
+		/// <param name="cancellationToken">The cancellation token</param>
 		/// <returns></returns>
-		public static Task<object> GetAsync(string key)
+		public static Task<object> GetAsync(string key, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			var tcs = new TaskCompletionSource<object>();
-			ThreadPool.QueueUserWorkItem(_ =>
-			{
-				try
-				{
-					tcs.SetResult(DistributedCache.Get(key));
-				}
-				catch (Exception ex)
-				{
-					tcs.SetException(ex);
-				}
-			});
-			return tcs.Task;
+			return CacheManager.ExecuteTask<object>(() => DistributedCache.Get(key), cancellationToken);
 		}
 
 		/// <summary>
@@ -287,22 +221,11 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		/// <typeparam name="T">Type for casting</typeparam>
 		/// <param name="key">The string that presents key of cache item</param>
+		/// <param name="cancellationToken">The cancellation token</param>
 		/// <returns></returns>
-		public static Task<T> GetAsync<T>(string key)
+		public static Task<T> GetAsync<T>(string key, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			var tcs = new TaskCompletionSource<T>();
-			ThreadPool.QueueUserWorkItem(_ =>
-			{
-				try
-				{
-					tcs.SetResult(DistributedCache.Get<T>(key));
-				}
-				catch (Exception ex)
-				{
-					tcs.SetException(ex);
-				}
-			});
-			return tcs.Task;
+			return CacheManager.ExecuteTask<T>(() => DistributedCache.Get<T>(key), cancellationToken);
 		}
 
 		/// <summary>
@@ -321,22 +244,11 @@ namespace net.vieapps.Components.Caching
 		/// Gets the collection of items from cache storage
 		/// </summary>
 		/// <param name="keys">The collection of items' keys</param>
+		/// <param name="cancellationToken">The cancellation token</param>
 		/// <returns></returns>
-		public static Task<IDictionary<string, object>> GetAsync(IEnumerable<string> keys)
+		public static Task<IDictionary<string, object>> GetAsync(IEnumerable<string> keys, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			var tcs = new TaskCompletionSource<IDictionary<string, object>>();
-			ThreadPool.QueueUserWorkItem(_ =>
-			{
-				try
-				{
-					tcs.SetResult(DistributedCache.Get(keys));
-				}
-				catch (Exception ex)
-				{
-					tcs.SetException(ex);
-				}
-			});
-			return tcs.Task;
+			return CacheManager.ExecuteTask<IDictionary<string, object>>(() => DistributedCache.Get(keys), cancellationToken);
 		}
 		#endregion
 
@@ -357,22 +269,11 @@ namespace net.vieapps.Components.Caching
 		/// Removes an item from cache storage
 		/// </summary>
 		/// <param name="key">The string that presents key of cache item that be removed</param>
+		/// <param name="cancellationToken">The cancellation token</param>
 		/// <returns>true if item is found and removed from cache storage</returns>
-		public static Task<bool> RemoveAsync(string key)
+		public static Task<bool> RemoveAsync(string key, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			var tcs = new TaskCompletionSource<bool>();
-			ThreadPool.QueueUserWorkItem(_ =>
-			{
-				try
-				{
-					tcs.SetResult(DistributedCache.Remove(key));
-				}
-				catch (Exception ex)
-				{
-					tcs.SetException(ex);
-				}
-			});
-			return tcs.Task;
+			return CacheManager.ExecuteTask<bool>(() => DistributedCache.Remove(key), cancellationToken);
 		}
 
 		/// <summary>
@@ -393,22 +294,11 @@ namespace net.vieapps.Components.Caching
 		/// Removes the collection of items from cache storage
 		/// </summary>
 		/// <param name="keys">The collection of string that presents key of cache items that be removed</param>
-		public static Task RemoveAsync(IEnumerable<string> keys)
+		/// <param name="cancellationToken">The cancellation token</param>
+		/// <returns></returns>
+		public static Task RemoveAsync(IEnumerable<string> keys, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			var tcs = new TaskCompletionSource<object>();
-			ThreadPool.QueueUserWorkItem(_ =>
-			{
-				try
-				{
-					DistributedCache.Remove(keys);
-					tcs.SetResult(null);
-				}
-				catch (Exception ex)
-				{
-					tcs.SetException(ex);
-				}
-			});
-			return tcs.Task;
+			return CacheManager.ExecuteTask(() => DistributedCache.Remove(keys), cancellationToken);
 		}
 
 		/// <summary>
@@ -422,22 +312,11 @@ namespace net.vieapps.Components.Caching
 		/// <summary>
 		/// Removes all items from cache storage
 		/// </summary>
-		public static Task RemoveAllAsync()
+		/// <param name="cancellationToken">The cancellation token</param>
+		/// <returns></returns>
+		public static Task RemoveAllAsync(CancellationToken cancellationToken = default(CancellationToken))
 		{
-			var tcs = new TaskCompletionSource<object>();
-			ThreadPool.QueueUserWorkItem(_ =>
-			{
-				try
-				{
-					DistributedCache.RemoveAll();
-					tcs.SetResult(null);
-				}
-				catch (Exception ex)
-				{
-					tcs.SetException(ex);
-				}
-			});
-			return tcs.Task;
+			return CacheManager.ExecuteTask(() => DistributedCache.RemoveAll(), cancellationToken);
 		}
 		#endregion
 
@@ -461,22 +340,11 @@ namespace net.vieapps.Components.Caching
 		/// Determines whether a key is exists or not
 		/// </summary>
 		/// <param name="key">The string that presents key of cached item need to check</param>
+		/// <param name="cancellationToken">The cancellation token</param>
 		/// <returns>Returns a boolean value indicating if the object that associates with the key is cached or not</returns>
-		public static Task<bool> ExistsAsync(string key)
+		public static Task<bool> ExistsAsync(string key, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			var tcs = new TaskCompletionSource<bool>();
-			ThreadPool.QueueUserWorkItem(_ =>
-			{
-				try
-				{
-					tcs.SetResult(DistributedCache.Exists(key));
-				}
-				catch (Exception ex)
-				{
-					tcs.SetException(ex);
-				}
-			});
-			return tcs.Task;
+			return CacheManager.ExecuteTask<bool>(() => DistributedCache.Exists(key), cancellationToken);
 		}
 		#endregion
 
