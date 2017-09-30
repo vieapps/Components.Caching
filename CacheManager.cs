@@ -2501,16 +2501,16 @@ namespace net.vieapps.Components.Caching
 			var tcs = new TaskCompletionSource<object>();
 			ThreadPool.QueueUserWorkItem(_ =>
 			{
+				if (cancellationToken == null)
+					cancellationToken = default(CancellationToken);
+				cancellationToken.Register(() =>
+				{
+					tcs.SetCanceled();
+					return;
+				});
+
 				try
 				{
-					if (cancellationToken == null)
-						cancellationToken = default(CancellationToken);
-					cancellationToken.Register(() =>
-					{
-						tcs.SetCanceled();
-						return;
-					});
-
 					action?.Invoke();
 					tcs.SetResult(null);
 				}
@@ -2527,16 +2527,16 @@ namespace net.vieapps.Components.Caching
 			var tcs = new TaskCompletionSource<TResult>();
 			ThreadPool.QueueUserWorkItem(_ =>
 			{
+				if (cancellationToken == null)
+					cancellationToken = default(CancellationToken);
+				cancellationToken.Register(() =>
+				{
+					tcs.SetCanceled();
+					return;
+				});
+
 				try
 				{
-					if (cancellationToken == null)
-						cancellationToken = default(CancellationToken);
-					cancellationToken.Register(() =>
-					{
-						tcs.SetCanceled();
-						return;
-					});
-
 					var result = func != null ? func.Invoke() : default(TResult);
 					tcs.SetResult(result);
 				}
