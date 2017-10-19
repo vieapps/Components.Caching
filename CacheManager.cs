@@ -2424,8 +2424,7 @@ namespace net.vieapps.Components.Caching
 					using (var output = new MemoryStream())
 					{
 						var buffer = new byte[64];
-						int readBytes = -1;
-						readBytes = deflate.Read(buffer, 0, buffer.Length);
+						var readBytes = deflate.Read(buffer, 0, buffer.Length);
 						while (readBytes > 0)
 						{
 							output.Write(buffer, 0, readBytes);
@@ -2537,7 +2536,9 @@ namespace net.vieapps.Components.Caching
 
 				try
 				{
-					var result = func != null ? func.Invoke() : default(TResult);
+					var result = func != null
+						? func.Invoke()
+						: default(TResult);
 					tcs.SetResult(result);
 				}
 				catch (Exception ex)
@@ -2690,7 +2691,7 @@ namespace net.vieapps.Components.Caching
 			// write logs into file
 			try
 			{
-				using (var stream =  new FileStream(filePath, System.IO.FileMode.Append, System.IO.FileAccess.Write, System.IO.FileShare.ReadWrite, 4096, true))
+				using (var stream =  new FileStream(filePath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite, 4096, true))
 				{
 					using (var writer =  new StreamWriter(stream, System.Text.Encoding.UTF8))
 					{

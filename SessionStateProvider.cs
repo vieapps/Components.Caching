@@ -47,16 +47,16 @@ namespace net.vieapps.Components.Caching.Web
 		{
 			var data = this.Get(context, false, id, out locked, out lockAge, out lockId, out actions);
 			return (data == null)
-					? null
-					: data.ToStoreData(context);
+				? null
+				: data.ToStoreData(context);
 		}
 
 		public override SessionStateStoreData GetItemExclusive(HttpContext context, string id, out bool locked, out TimeSpan lockAge, out object lockId, out SessionStateActions actions)
 		{
 			var data = this.Get(context, true, id, out locked, out lockAge, out lockId, out actions);
 			return (data == null)
-					? null
-					: data.ToStoreData(context);
+				? null
+				: data.ToStoreData(context);
 		}
 
 		SessionStateItem Get(HttpContext context, bool acquireLock, string id, out bool locked, out TimeSpan lockAge, out object lockId, out SessionStateActions actions)
@@ -286,8 +286,8 @@ namespace net.vieapps.Components.Caching.Web
 
 			public static void Remove(string id)
 			{
-				DistributedCache.Client.Remove(SessionStateProvider.Prefixs.Item2 + id);
 				DistributedCache.Client.Remove(SessionStateProvider.Prefixs.Item1 + id);
+				DistributedCache.Client.Remove(SessionStateProvider.Prefixs.Item2 + id);
 			}
 		}
 
