@@ -61,7 +61,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Helper.cs" />
-    <Compile Include="CacheManager.cs" />
+    <Compile Include="Cache.cs" />
     <Compile Include="Memcached.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
