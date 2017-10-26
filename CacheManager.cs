@@ -298,7 +298,7 @@ namespace net.vieapps.Components.Caching
 				{
 					await Task.Delay(13);
 #if DEBUG
-					var debug = CacheManager.GetLogPrefix(this._name);
+					var debug = Helper.GetLogPrefix(this._name);
 					Debug.WriteLine(debug + " (" + DateTime.Now.ToString("HH:mm:ss.fff") + ") <PULL>: Start to pull keys [" + this._RegionKey + "] from distributed cache");
 #endif
 					await this._PullKeysAsync().ConfigureAwait(false);
@@ -308,7 +308,7 @@ namespace net.vieapps.Components.Caching
 		async Task _PullKeysAsync(Action callback = null)
 		{
 #if DEBUG
-			var debug = CacheManager.GetLogPrefix(this._name);
+			var debug = Helper.GetLogPrefix(this._name);
 #endif
 			// stop if other task is process pulling/pushing
 			if (this._bag.Contains(this._RegionPullingFlag))
@@ -405,7 +405,7 @@ namespace net.vieapps.Components.Caching
 #endif
 		{
 #if DEBUG
-			var debug = CacheManager.GetLogPrefix(this._name);
+			var debug = Helper.GetLogPrefix(this._name);
 #endif
 
 			// stop if other task is pushing
@@ -706,7 +706,7 @@ namespace net.vieapps.Components.Caching
 #endif
 		{
 #if DEBUG
-			var debug = CacheManager.GetLogPrefix(this._name);
+			var debug = Helper.GetLogPrefix(this._name);
 #endif
 
 			if (this._bag.Contains(this._RegionUpdatingFlag))
@@ -922,7 +922,7 @@ namespace net.vieapps.Components.Caching
 				return;
 
 #if DEBUG
-			var debug = CacheManager.GetLogPrefix(this._name);
+			var debug = Helper.GetLogPrefix(this._name);
 			var stopwatch = new Stopwatch();
 			stopwatch.Start();
 #endif
@@ -952,7 +952,7 @@ namespace net.vieapps.Components.Caching
 				return;
 
 #if DEBUG
-			var debug = CacheManager.GetLogPrefix(this._name);
+			var debug = Helper.GetLogPrefix(this._name);
 			var stopwatch = new Stopwatch();
 			stopwatch.Start();
 #endif
@@ -1017,7 +1017,7 @@ namespace net.vieapps.Components.Caching
 				return this._Set(key, value, expirationType, expirationTime, true, priority, mode);
 
 #if DEBUG
-			var debug = CacheManager.GetLogPrefix("FRAGMENTS", " > ");
+			var debug = Helper.GetLogPrefix("FRAGMENTS", " > ");
 #endif
 
 			// check to see the object is serializable
@@ -1109,7 +1109,7 @@ namespace net.vieapps.Components.Caching
 				throw new ArgumentNullException(key);
 
 #if DEBUG
-			var debug = CacheManager.GetLogPrefix(this._name);
+			var debug = Helper.GetLogPrefix(this._name);
 			var stopwatch = new Stopwatch();
 			stopwatch.Start();
 #endif
@@ -1155,7 +1155,7 @@ namespace net.vieapps.Components.Caching
 				return null;
 
 #if DEBUG
-			var debug = CacheManager.GetLogPrefix(this._name);
+			var debug = Helper.GetLogPrefix(this._name);
 			var stopwatch = new Stopwatch();
 			stopwatch.Start();
 #endif
@@ -1516,7 +1516,7 @@ namespace net.vieapps.Components.Caching
 #if DEBUG
 			var stopwatch = new Stopwatch();
 			stopwatch.Start();
-			var debug = CacheManager.GetLogPrefix(this._name);
+			var debug = Helper.GetLogPrefix(this._name);
 #endif
 
 			// get keys
@@ -1647,7 +1647,7 @@ namespace net.vieapps.Components.Caching
 #if DEBUG
 			var stopwatch = new Stopwatch();
 			stopwatch.Start();
-			var debug = CacheManager.GetLogPrefix(this._name);
+			var debug = Helper.GetLogPrefix(this._name);
 #endif
 
 			cancellationToken.Register(() =>
@@ -1692,7 +1692,7 @@ namespace net.vieapps.Components.Caching
 #if DEBUG
 			var stopwatch = new Stopwatch();
 			stopwatch.Start();
-			var debug = CacheManager.GetLogPrefix(this._name);
+			var debug = Helper.GetLogPrefix(this._name);
 #endif
 
 			// remove all
