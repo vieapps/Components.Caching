@@ -1,5 +1,6 @@
 ﻿using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 
 // General Information about an assembly is controlled through the following set of attributes.
 // Change these attribute values to modify the information associated with an assembly.
@@ -22,6 +23,6 @@ using System.Runtime.InteropServices;
 //      Minor Version 
 //      Build Number
 //      Revision
-[assembly: AssemblyVersion("10.1")]
-[assembly: AssemblyFileVersion("10.1")]
-[assembly: AssemblyInformationalVersion("10.1.tcsc-2017.10.01")]
+[assembly: AssemblyVersion("10.1.0.2")]
+[assembly: AssemblyFileVersion("10.1.0.2")]
+[assembly: AssemblyInformationalVersion("10.1.nalc-2017.10.24")]

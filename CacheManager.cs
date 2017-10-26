@@ -17,7 +17,7 @@ using Enyim.Caching.Memcached;
 namespace net.vieapps.Components.Caching
 {
 	/// <summary>
-	/// Manipulates objects in isolated regions with distributed cache (memcached)
+	/// Manipulates objects in isolated regions with distributed cache
 	/// </summary>
 	[DebuggerDisplay("Name = {_name}, Type = {_expirationType}, Time = {_expirationTime}")]
 	public sealed class CacheManager
@@ -331,11 +331,11 @@ namespace net.vieapps.Components.Caching
 			string distributedFlag = null;
 			try
 			{
-				distributedFlag = await DistributedCache.GetAsync<string>(this._RegionPushingFlag);
+				distributedFlag = await Memcached.GetAsync<string>(this._RegionPushingFlag);
 			}
 			catch (Exception ex)
 			{
-				CacheManager.WriteLogs(this._name, "Error occurred while updating flag when pull keys of the region", ex);
+				Helper.WriteLogs(this._name, "Error occurred while updating flag when pull keys of the region", ex);
 			}
 
 			while (distributedFlag != null && attempt < 3)
@@ -347,11 +347,11 @@ namespace net.vieapps.Components.Caching
 				await Task.Delay(113);
 				try
 				{
-					distributedFlag = await DistributedCache.GetAsync<string>(this._RegionPushingFlag);
+					distributedFlag = await Memcached.GetAsync<string>(this._RegionPushingFlag);
 				}
 				catch (Exception ex)
 				{
-					CacheManager.WriteLogs(this._name, "Error occurred while updating flag when pull keys of the region", ex);
+					Helper.WriteLogs(this._name, "Error occurred while updating flag when pull keys of the region", ex);
 					distributedFlag = null;
 				}
 			}
@@ -372,11 +372,11 @@ namespace net.vieapps.Components.Caching
 			try
 			{
 				this._lock.EnterWriteLock();
-				this._activeKeys = CacheManager.Merge(false, this._activeKeys, keys);
+				this._activeKeys = Helper.Merge(false, this._activeKeys, keys);
 			}
 			catch (Exception ex)
 			{
-				CacheManager.WriteLogs(this._name, "Error occurred while updating the active keys of the region (while pulling)", ex);
+				Helper.WriteLogs(this._name, "Error occurred while updating the active keys of the region (while pulling)", ex);
 			}
 			finally
 			{
@@ -446,11 +446,11 @@ namespace net.vieapps.Components.Caching
 			string distributedFlag = null;
 			try
 			{
-				distributedFlag = await DistributedCache.GetAsync<string>(this._RegionPushingFlag);
+				distributedFlag = await Memcached.GetAsync<string>(this._RegionPushingFlag);
 			}
 			catch (Exception ex)
 			{
-				CacheManager.WriteLogs(this._name, "Error occurred while updating flag when push keys of the region", ex);
+				Helper.WriteLogs(this._name, "Error occurred while updating flag when push keys of the region", ex);
 			}
 
 			while (distributedFlag != null && attempt < 3)
@@ -464,11 +464,11 @@ namespace net.vieapps.Components.Caching
 				await Task.Delay(113);
 				try
 				{
-					distributedFlag = await DistributedCache.GetAsync<string>(this._RegionPushingFlag);
+					distributedFlag = await Memcached.GetAsync<string>(this._RegionPushingFlag);
 				}
 				catch (Exception ex)
 				{
-					CacheManager.WriteLogs(this._name, "Error occurred while updating flag when push keys of the region", ex);
+					Helper.WriteLogs(this._name, "Error occurred while updating flag when push keys of the region", ex);
 					distributedFlag = null;
 				}
 			}
@@ -480,11 +480,11 @@ namespace net.vieapps.Components.Caching
 			// set flag (distributed)
 			try
 			{
-				await DistributedCache.SetAsync(this._RegionPushingFlag, Thread.CurrentThread.ManagedThreadId.ToString(), (long)5000);
+				await Memcached.SetAsync(this._RegionPushingFlag, Thread.CurrentThread.ManagedThreadId.ToString(), (long)5000);
 			}
 			catch (Exception ex)
 			{
-				CacheManager.WriteLogs(this._name, "Error occurred while updating flag when push keys of the region", ex);
+				Helper.WriteLogs(this._name, "Error occurred while updating flag when push keys of the region", ex);
 			}
 
 #if DEBUG
@@ -514,13 +514,13 @@ namespace net.vieapps.Components.Caching
 
 			// prepare keys for synchronizing
 			var syncKeys = this._activeSynchronize
-				? CacheManager.Merge(false, this._activeKeys, distributedKeys)
+				? Helper.Merge(false, this._activeKeys, distributedKeys)
 				: distributedKeys;
 
 			// update removed keys
 			if (totalRemovedKeys > 0)
 			{
-				var removedKeys = CacheManager.Clone(this._removedKeys);
+				var removedKeys = Helper.Clone(this._removedKeys);
 				foreach (string key in removedKeys)
 					if (syncKeys.Contains(key))
 						syncKeys.Remove(key);
@@ -528,7 +528,7 @@ namespace net.vieapps.Components.Caching
 
 			// update added keys
 			if (totalAddedKeys > 0)
-				syncKeys = CacheManager.Merge(syncKeys, this._addedKeys);
+				syncKeys = Helper.Merge(syncKeys, this._addedKeys);
 
 #if DEBUG
 			watch.Stop();
@@ -544,7 +544,7 @@ namespace net.vieapps.Components.Caching
 			}
 			catch (Exception ex)
 			{
-				CacheManager.WriteLogs(this._name, "Error occurred while pushing keys of the region", ex);
+				Helper.WriteLogs(this._name, "Error occurred while pushing keys of the region", ex);
 			}
 
 #if DEBUG
@@ -573,7 +573,7 @@ namespace net.vieapps.Components.Caching
 
 					rePush = true;
 					totalRemovedKeys = this._removedKeys.Count;
-					var removedKeys = CacheManager.Clone(this._removedKeys);
+					var removedKeys = Helper.Clone(this._removedKeys);
 					foreach (var key in removedKeys)
 						if (syncKeys.Contains(key))
 							syncKeys.Remove(key);
@@ -593,7 +593,7 @@ namespace net.vieapps.Components.Caching
 
 					rePush = true;
 					totalAddedKeys = this._addedKeys.Count;
-					syncKeys = CacheManager.Merge(syncKeys, this._addedKeys);
+					syncKeys = Helper.Merge(syncKeys, this._addedKeys);
 
 #if DEBUG
 					watch.Stop();
@@ -614,7 +614,7 @@ namespace net.vieapps.Components.Caching
 					}
 					catch (Exception ex)
 					{
-						CacheManager.WriteLogs(this._name, "Error occurred while (re)pushing keys of the region", ex);
+						Helper.WriteLogs(this._name, "Error occurred while (re)pushing keys of the region", ex);
 					}
 
 #if DEBUG
@@ -637,7 +637,7 @@ namespace net.vieapps.Components.Caching
 				}
 				catch (Exception ex)
 				{
-					CacheManager.WriteLogs(this._name, "Error occurred while removes added keys (after pushing process)", ex);
+					Helper.WriteLogs(this._name, "Error occurred while removes added keys (after pushing process)", ex);
 				}
 				finally
 				{
@@ -657,7 +657,7 @@ namespace net.vieapps.Components.Caching
 				}
 				catch (Exception ex)
 				{
-					CacheManager.WriteLogs(this._name, "Error occurred while removes removed keys (after pushing process)", ex);
+					Helper.WriteLogs(this._name, "Error occurred while removes removed keys (after pushing process)", ex);
 				}
 				finally
 				{
@@ -678,11 +678,11 @@ namespace net.vieapps.Components.Caching
 			this._bag.Remove(this._RegionPushingFlag);
 			try
 			{
-				DistributedCache.Remove(this._RegionPushingFlag);
+				Memcached.Remove(this._RegionPushingFlag);
 			}
 			catch (Exception ex)
 			{
-				CacheManager.WriteLogs(this._name, "Error occurred while updating flag when push keys of the region", ex);
+				Helper.WriteLogs(this._name, "Error occurred while updating flag when push keys of the region", ex);
 			}
 
 #if DEBUG
@@ -762,7 +762,7 @@ namespace net.vieapps.Components.Caching
 				}
 				catch (Exception ex)
 				{
-					CacheManager.WriteLogs(this._name, "Error occurred while updating the active keys of the region (for pushing)", ex);
+					Helper.WriteLogs(this._name, "Error occurred while updating the active keys of the region (for pushing)", ex);
 				}
 				finally
 				{
@@ -781,7 +781,7 @@ namespace net.vieapps.Components.Caching
 					}
 					catch (Exception ex)
 					{
-						CacheManager.WriteLogs(this._name, "Error occurred while updating the added keys of the region (for pushing)", ex);
+						Helper.WriteLogs(this._name, "Error occurred while updating the added keys of the region (for pushing)", ex);
 					}
 					finally
 					{
@@ -811,13 +811,13 @@ namespace net.vieapps.Components.Caching
 			}
 			catch (Exception ex)
 			{
-				CacheManager.WriteLogs(this._name, "Error occurred while fetching the collection of keys", ex);
+				Helper.WriteLogs(this._name, "Error occurred while fetching the collection of keys", ex);
 			}
 
 			return keys == null
 				? new HashSet<string>()
 				: doClone && this._mode.Equals(Mode.Internal)
-					? CacheManager.Clone(keys)
+					? Helper.Clone(keys)
 					: keys;
 		}
 		#endregion
@@ -871,8 +871,8 @@ namespace net.vieapps.Components.Caching
 				try
 				{
 					isSetted = expirationType.Equals("Absolute")
-						? DistributedCache.Set(cacheKey, value, DateTime.Now.AddMinutes(expirationTime), mode)
-						: DistributedCache.Set(cacheKey, value, TimeSpan.FromMinutes(expirationTime), mode);
+						? Memcached.Set(cacheKey, value, DateTime.Now.AddMinutes(expirationTime), mode)
+						: Memcached.Set(cacheKey, value, TimeSpan.FromMinutes(expirationTime), mode);
 
 					// not success
 					if (!isSetted)
@@ -904,7 +904,7 @@ namespace net.vieapps.Components.Caching
 				}
 				catch (Exception ex)
 				{
-					CacheManager.WriteLogs(this._name, "Error occurred while updating an object into cache [" + value.GetType().ToString() + "#" + key + "]", ex);
+					Helper.WriteLogs(this._name, "Error occurred while updating an object into cache [" + value.GetType().ToString() + "#" + key + "]", ex);
 				}
 
 			// update mapping key when added successful
@@ -1025,7 +1025,7 @@ namespace net.vieapps.Components.Caching
 			if (!type.IsSerializable)
 			{
 				var ex = new ArgumentException("The object (" + type.ToString() + ") must be serializable");
-				CacheManager.WriteLogs(this._name, "Error occurred while trying to serialize an object [" + key + "]", ex);
+				Helper.WriteLogs(this._name, "Error occurred while trying to serialize an object [" + key + "]", ex);
 				throw ex;
 			}
 
@@ -1037,18 +1037,18 @@ namespace net.vieapps.Components.Caching
 					: null;
 
 			if (bytes == null)
-				bytes = CacheManager.SerializeAsBinary(value);
+				bytes = Helper.SerializeAsBinary(value);
 
 			// compress
 			if (bytes != null)
-				bytes = CacheManager.Compress(bytes);
+				bytes = Helper.Compress(bytes);
 
 			// check
 			if (bytes == null || bytes.Length < 1)
 				return false;
 
 			// split into fragments
-			var fragments = CacheManager.SplitIntoFragments(bytes, this._fragmentSize);
+			var fragments = Helper.SplitIntoFragments(bytes, this._fragmentSize);
 
 #if DEBUG
 			Debug.WriteLine(debug + " (" + DateTime.Now.ToString("HH:mm:ss.fff") + ") Serialize object and split into fragments successful [" + key + "]. Total of fragments: " + fragments.Count.ToString());
@@ -1083,7 +1083,7 @@ namespace net.vieapps.Components.Caching
 					}
 					catch (Exception ex)
 					{
-						CacheManager.WriteLogs(this._name, "Error occurred while updating an object into cache (pure object of fragments) [" + key + ":(Secondary-Pure-Object)" + "]", ex);
+						Helper.WriteLogs(this._name, "Error occurred while updating an object into cache (pure object of fragments) [" + key + ":(Secondary-Pure-Object)" + "]", ex);
 					}
 
 				// update key
@@ -1120,11 +1120,11 @@ namespace net.vieapps.Components.Caching
 			{
 				value = this._mode.Equals(Mode.Internal)
 					? this._bag.Get(this._GetKey(key))
-					: DistributedCache.Get(this._GetKey(key));
+					: Memcached.Get(this._GetKey(key));
 			}
 			catch (Exception ex)
 			{
-				CacheManager.WriteLogs(this._name, "Error occurred while fetching an object from cache storage [" + key + "]", ex);
+				Helper.WriteLogs(this._name, "Error occurred while fetching an object from cache storage [" + key + "]", ex);
 			}
 
 			// get object as merged of all fragments
@@ -1135,7 +1135,7 @@ namespace net.vieapps.Components.Caching
 				}
 				catch (Exception ex)
 				{
-					CacheManager.WriteLogs(this._name, "Error occurred while fetching an objects' fragments from cache storage [" + key + "]", ex);
+					Helper.WriteLogs(this._name, "Error occurred while fetching an objects' fragments from cache storage [" + key + "]", ex);
 					value = null;
 				}
 
@@ -1172,11 +1172,11 @@ namespace net.vieapps.Components.Caching
 				IDictionary<string, object> items = null;
 				try
 				{
-					items = DistributedCache.Get(realKeys);
+					items = Memcached.Get(realKeys);
 				}
 				catch (Exception ex)
 				{
-					CacheManager.WriteLogs(this._name, "Error occurred while fetch a collection of objects from cache storage", ex);
+					Helper.WriteLogs(this._name, "Error occurred while fetch a collection of objects from cache storage", ex);
 				}
 
 				if (items != null && items.Count > 0)
@@ -1252,11 +1252,11 @@ namespace net.vieapps.Components.Caching
 				var fragmentKey = this._GetKey(this._GetFragmentKey(fragment.Key, index));
 				try
 				{
-					bytes = DistributedCache.Get<byte[]>(fragmentKey);
+					bytes = Memcached.Get<byte[]>(fragmentKey);
 				}
 				catch (Exception ex)
 				{
-					CacheManager.WriteLogs(this._name, "Error occurred while fetching fragments from cache [" + fragmentKey + "]", ex);
+					Helper.WriteLogs(this._name, "Error occurred while fetching fragments from cache [" + fragmentKey + "]", ex);
 				}
 
 				if (bytes != null && bytes.Length > 0)
@@ -1271,7 +1271,7 @@ namespace net.vieapps.Components.Caching
 			if (fragments.Length > 0)
 				try
 				{
-					fragments = CacheManager.Decompress(fragments);
+					fragments = Helper.Decompress(fragments);
 				}
 				catch { }
 
@@ -1283,11 +1283,11 @@ namespace net.vieapps.Components.Caching
 			if (@object == null && fragments.Length > 0)
 				try
 				{
-					@object = CacheManager.DeserializeFromBinary(fragments);
+					@object = Helper.DeserializeFromBinary(fragments);
 				}
 				catch (Exception ex)
 				{
-					CacheManager.WriteLogs(this._name, "Error occurred while trying to get fragmented object (error occured while serializing the object from an array of bytes) [" + fragment.Key + "]", ex);
+					Helper.WriteLogs(this._name, "Error occurred while trying to get fragmented object (error occured while serializing the object from an array of bytes) [" + fragment.Key + "]", ex);
 					if (!type.Equals(typeof(byte[])))
 					{
 						@object = this._Get(fragment.Key + ":(Secondary-Pure-Object)", false);
@@ -1309,11 +1309,11 @@ namespace net.vieapps.Components.Caching
 			object fragment = null;
 			try
 			{
-				fragment = DistributedCache.Get(key);
+				fragment = Memcached.Get(key);
 			}
 			catch (Exception ex)
 			{
-				CacheManager.WriteLogs(this._name, "Error occurred while fetching fragments from cache [" + key + "]", ex);
+				Helper.WriteLogs(this._name, "Error occurred while fetching fragments from cache [" + key + "]", ex);
 			}
 
 			return fragment != null && fragment is Fragment && ((Fragment)fragment).TotalFragments > 0
@@ -1335,11 +1335,11 @@ namespace net.vieapps.Components.Caching
 			{
 				isRemoved = this._mode.Equals(Mode.Internal)
 					? this._bag.Remove(this._GetKey(key)) != null
-					: DistributedCache.Remove(this._GetKey(key));
+					: Memcached.Remove(this._GetKey(key));
 			}
 			catch (Exception ex)
 			{
-				CacheManager.WriteLogs(this._name, "Error occurred while removing an object from cache storage [" + key + "]", ex);
+				Helper.WriteLogs(this._name, "Error occurred while removing an object from cache storage [" + key + "]", ex);
 			}
 
 			// update mapping key when removed successful
@@ -1354,7 +1354,7 @@ namespace net.vieapps.Components.Caching
 					}
 					catch (Exception ex)
 					{
-						CacheManager.WriteLogs(this._name, "Error occurred while updating the active keys (for pushing)", ex);
+						Helper.WriteLogs(this._name, "Error occurred while updating the active keys (for pushing)", ex);
 					}
 					finally
 					{
@@ -1373,7 +1373,7 @@ namespace net.vieapps.Components.Caching
 						}
 						catch (Exception ex)
 						{
-							CacheManager.WriteLogs(this._name, "Error occurred while updating the removed keys (for pushing)", ex);
+							Helper.WriteLogs(this._name, "Error occurred while updating the removed keys (for pushing)", ex);
 						}
 						finally
 						{
@@ -1445,7 +1445,7 @@ namespace net.vieapps.Components.Caching
 					}
 					catch (Exception ex)
 					{
-						CacheManager.WriteLogs(this._name, "Error occurred while updating the active keys (RemovedCallback)", ex);
+						Helper.WriteLogs(this._name, "Error occurred while updating the active keys (RemovedCallback)", ex);
 					}
 					finally
 					{
@@ -1463,7 +1463,7 @@ namespace net.vieapps.Components.Caching
 				}
 				catch (Exception ex)
 				{
-					CacheManager.WriteLogs(this._name, "Error occurred while updating the removed keys (RemovedCallback)", ex);
+					Helper.WriteLogs(this._name, "Error occurred while updating the removed keys (RemovedCallback)", ex);
 				}
 				finally
 				{
@@ -1482,11 +1482,11 @@ namespace net.vieapps.Components.Caching
 			if (this._mode.Equals(Mode.Distributed) && this._monitorKeys)
 				try
 				{
-					DistributedCache.Remove(args.CacheItem.Key);
+					Memcached.Remove(args.CacheItem.Key);
 				}
 				catch (Exception ex)
 				{
-					CacheManager.WriteLogs(this._name, "Error occurred while removing an object from cache storage (RemovedCallback)", ex);
+					Helper.WriteLogs(this._name, "Error occurred while removing an object from cache storage (RemovedCallback)", ex);
 				}
 		}
 		#endregion
@@ -1500,11 +1500,11 @@ namespace net.vieapps.Components.Caching
 				{
 					exist = this._mode.Equals(Mode.Internal)
 						? this._bag.Contains(this._GetKey(key))
-						: DistributedCache.Exists(this._GetKey(key));
+						: Memcached.Exists(this._GetKey(key));
 				}
 				catch (Exception ex)
 				{
-					CacheManager.WriteLogs(this._name, "Error occurred while checking existing state of an object [" + key + "]", ex);
+					Helper.WriteLogs(this._name, "Error occurred while checking existing state of an object [" + key + "]", ex);
 				}
 			return exist;
 		}
@@ -1537,11 +1537,11 @@ namespace net.vieapps.Components.Caching
 				{
 					try
 					{
-						DistributedCache.Remove(this._GetKey(key));
+						Memcached.Remove(this._GetKey(key));
 					}
 					catch (Exception ex)
 					{
-						CacheManager.WriteLogs(this._name, "Error occurred while performing clear process", ex);
+						Helper.WriteLogs(this._name, "Error occurred while performing clear process", ex);
 					}
 
 					if (this._monitorKeys)
@@ -1557,7 +1557,7 @@ namespace net.vieapps.Components.Caching
 				}
 				catch (Exception ex)
 				{
-					CacheManager.WriteLogs(this._name, "Error occurred while updating the active keys (after clear)", ex);
+					Helper.WriteLogs(this._name, "Error occurred while updating the active keys (after clear)", ex);
 				}
 				finally
 				{
@@ -1571,21 +1571,21 @@ namespace net.vieapps.Components.Caching
 				var isRemoved = false;
 				try
 				{
-					isRemoved = DistributedCache.Remove(this._RegionKey);
+					isRemoved = Memcached.Remove(this._RegionKey);
 				}
 				catch (Exception ex)
 				{
-					CacheManager.WriteLogs(this._name, "Error occurred while updating the region keys (after clear)", ex);
+					Helper.WriteLogs(this._name, "Error occurred while updating the region keys (after clear)", ex);
 				}
 
 				if (!isRemoved)
 					try
 					{
-						DistributedCache.Set(this._RegionKey, new HashSet<string>(), TimeSpan.FromMinutes(this._expirationTime + 15));
+						Memcached.Set(this._RegionKey, new HashSet<string>(), TimeSpan.FromMinutes(this._expirationTime + 15));
 					}
 					catch (Exception ex)
 					{
-						CacheManager.WriteLogs(this._name, "Error occurred while trying to set the region keys (after clear)", ex);
+						Helper.WriteLogs(this._name, "Error occurred while trying to set the region keys (after clear)", ex);
 					}
 
 				try
@@ -1596,7 +1596,7 @@ namespace net.vieapps.Components.Caching
 				}
 				catch (Exception ex)
 				{
-					CacheManager.WriteLogs(this._name, "Error occurred while updating the added/removed keys (after clear)", ex);
+					Helper.WriteLogs(this._name, "Error occurred while updating the added/removed keys (after clear)", ex);
 				}
 				finally
 				{
@@ -1609,11 +1609,11 @@ namespace net.vieapps.Components.Caching
 				this._bag.Remove(this._RegionPushingFlag);
 				try
 				{
-					DistributedCache.Remove(this._RegionPushingFlag);
+					Memcached.Remove(this._RegionPushingFlag);
 				}
 				catch (Exception ex)
 				{
-					CacheManager.WriteLogs(this._name, "Error occurred while updating the flag (after clear)", ex);
+					Helper.WriteLogs(this._name, "Error occurred while updating the flag (after clear)", ex);
 				}
 			}
 
@@ -1664,7 +1664,7 @@ namespace net.vieapps.Components.Caching
 			}
 			catch (Exception ex)
 			{
-				CacheManager.WriteLogs(this._name, "Error occurred while fetching the keys of memory cache for cleaning (clear all)", ex);
+				Helper.WriteLogs(this._name, "Error occurred while fetching the keys of memory cache for cleaning (clear all)", ex);
 			}
 
 			// remove all
@@ -1675,7 +1675,7 @@ namespace net.vieapps.Components.Caching
 				}
 				catch (Exception ex)
 				{
-					CacheManager.WriteLogs(this._name, "Error occurred while removing an object from memory cache (clear all)", ex);
+					Helper.WriteLogs(this._name, "Error occurred while removing an object from memory cache (clear all)", ex);
 				}
 
 #if DEBUG
@@ -1698,11 +1698,11 @@ namespace net.vieapps.Components.Caching
 			// remove all
 			try
 			{
-				await DistributedCache.RemoveAllAsync(cancellationToken);
+				await Memcached.RemoveAllAsync(cancellationToken);
 			}
 			catch (Exception ex)
 			{
-				CacheManager.WriteLogs(this._name, "Error occurred while performing remove all objects from distributed cache (clear all)", ex);
+				Helper.WriteLogs(this._name, "Error occurred while performing remove all objects from distributed cache (clear all)", ex);
 			}
 
 #if DEBUG
@@ -2031,7 +2031,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns></returns>
 		public Task<HashSet<string>> GetKeysAsync(CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return CacheManager.ExecuteTask<HashSet<string>>(() => this.GetKeys(), cancellationToken);
+			return Helper.ExecuteTask<HashSet<string>>(() => this.GetKeys(), cancellationToken);
 		}
 		#endregion
 
@@ -2048,7 +2048,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
 		public Task<bool> SetAsync(string key, object value, string expirationType = null, int expirationTime = 0, CacheItemPriority priority = CacheItemPriority.Default, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return CacheManager.ExecuteTask<bool>(() => this.Set(key, value, expirationType, expirationTime, priority), cancellationToken);
+			return Helper.ExecuteTask<bool>(() => this.Set(key, value, expirationType, expirationTime, priority), cancellationToken);
 		}
 
 		/// <summary>
@@ -2075,7 +2075,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns></returns>
 		public Task SetAsync(IDictionary<string, object> items, string keyPrefix = null, string expirationType = null, int expirationTime = 0, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return CacheManager.ExecuteTask(() => this.Set(items, keyPrefix, expirationType, expirationTime), cancellationToken);
+			return Helper.ExecuteTask(() => this.Set(items, keyPrefix, expirationType, expirationTime), cancellationToken);
 		}
 
 		/// <summary>
@@ -2089,7 +2089,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns></returns>
 		public Task SetAsync<T>(IDictionary<string, T> items, string keyPrefix = null, string expirationType = null, int expirationTime = 0, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return CacheManager.ExecuteTask(() => this.Set(items, keyPrefix, expirationType, expirationTime), cancellationToken);
+			return Helper.ExecuteTask(() => this.Set(items, keyPrefix, expirationType, expirationTime), cancellationToken);
 		}
 
 		/// <summary>
@@ -2129,7 +2129,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
 		public Task<bool> SetIfNotExistsAsync(string key, object value, string expirationType = null, int expirationTime = 0, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return CacheManager.ExecuteTask<bool>(() => this.SetIfNotExists(key, value, expirationType, expirationTime), cancellationToken);
+			return Helper.ExecuteTask<bool>(() => this.SetIfNotExists(key, value, expirationType, expirationTime), cancellationToken);
 		}
 
 		/// <summary>
@@ -2143,7 +2143,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
 		public Task<bool> SetIfAlreadyExistsAsync(string key, object value, string expirationType = null, int expirationTime = 0, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return CacheManager.ExecuteTask<bool>(() => this.SetIfAlreadyExists(key, value, expirationType, expirationTime), cancellationToken);
+			return Helper.ExecuteTask<bool>(() => this.SetIfAlreadyExists(key, value, expirationType, expirationTime), cancellationToken);
 		}
 
 		/// <summary>
@@ -2158,7 +2158,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
 		public Task<bool> SetFragmentsAsync(string key, Type type, List<byte[]> fragments, string expirationType = null, int expirationTime = 0, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return CacheManager.ExecuteTask<bool>(() => this.SetFragments(key, type, fragments, expirationType, expirationTime), cancellationToken);
+			return Helper.ExecuteTask<bool>(() => this.SetFragments(key, type, fragments, expirationType, expirationTime), cancellationToken);
 		}
 
 		/// <summary>
@@ -2173,7 +2173,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
 		public Task<bool> SetAsFragmentsAsync(string key, object value, string expirationType = null, int expirationTime = 0, bool setSecondary = false, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return CacheManager.ExecuteTask<bool>(() => this.SetAsFragments(key, value, expirationType, expirationTime, setSecondary), cancellationToken);
+			return Helper.ExecuteTask<bool>(() => this.SetAsFragments(key, value, expirationType, expirationTime, setSecondary), cancellationToken);
 		}
 		#endregion
 
@@ -2187,7 +2187,7 @@ namespace net.vieapps.Components.Caching
 		/// <exception cref="System.ArgumentNullException">If the <paramref name="key">key</paramref> parameter is null</exception>
 		public Task<object> GetAsync(string key, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return CacheManager.ExecuteTask<object>(() => this.Get(key), cancellationToken);
+			return Helper.ExecuteTask<object>(() => this.Get(key), cancellationToken);
 		}
 
 		/// <summary>
@@ -2200,7 +2200,7 @@ namespace net.vieapps.Components.Caching
 		/// <exception cref="System.ArgumentNullException">If the <paramref name="key">key</paramref> parameter is null</exception>
 		public Task<T> GetAsync<T>(string key, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return CacheManager.ExecuteTask<T>(() => this.Get<T>(key), cancellationToken);
+			return Helper.ExecuteTask<T>(() => this.Get<T>(key), cancellationToken);
 		}
 
 		/// <summary>
@@ -2211,7 +2211,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns>The collection of cache items</returns>
 		public Task<IDictionary<string, object>> GetAsync(IEnumerable<string> keys, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return CacheManager.ExecuteTask<IDictionary<string, object>>(() => this.Get(keys), cancellationToken);
+			return Helper.ExecuteTask<IDictionary<string, object>>(() => this.Get(keys), cancellationToken);
 		}
 
 		/// <summary>
@@ -2223,7 +2223,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns></returns>
 		public Task<Fragment> GetFragmentAsync(string key, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return CacheManager.ExecuteTask<Fragment>(() => this.GetFragment(key), cancellationToken);
+			return Helper.ExecuteTask<Fragment>(() => this.GetFragment(key), cancellationToken);
 		}
 
 		/// <summary>
@@ -2235,7 +2235,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns>The collection of array of bytes that presents serialized information of fragmented items</returns>
 		public Task<List<byte[]>> GetAsFragmentsAsync(string key, List<int> indexes, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return CacheManager.ExecuteTask<List<byte[]>>(() => this.GetAsFragments(key, indexes), cancellationToken);
+			return Helper.ExecuteTask<List<byte[]>>(() => this.GetAsFragments(key, indexes), cancellationToken);
 		}
 		#endregion
 
@@ -2248,7 +2248,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns>Returns a boolean value indicating if the item is removed or not</returns>
 		public Task<bool> RemoveAsync(string key, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return CacheManager.ExecuteTask<bool>(() => this.Remove(key), cancellationToken);
+			return Helper.ExecuteTask<bool>(() => this.Remove(key), cancellationToken);
 		}
 
 		/// <summary>
@@ -2260,7 +2260,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns></returns>
 		public Task RemoveAsync(IEnumerable<string> keys, string keyPrefix = null, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return CacheManager.ExecuteTask(() => this.Remove(keys, keyPrefix), cancellationToken);
+			return Helper.ExecuteTask(() => this.Remove(keys, keyPrefix), cancellationToken);
 		}
 
 		/// <summary>
@@ -2271,7 +2271,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns></returns>
 		public Task RemoveFragmentsAsync(string key, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return CacheManager.ExecuteTask(() => this.RemoveFragments(key), cancellationToken);
+			return Helper.ExecuteTask(() => this.RemoveFragments(key), cancellationToken);
 		}
 
 		/// <summary>
@@ -2282,7 +2282,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns></returns>
 		public Task RemoveFragmentsAsync(Fragment fragment, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return CacheManager.ExecuteTask(() => this.RemoveFragments(fragment), cancellationToken);
+			return Helper.ExecuteTask(() => this.RemoveFragments(fragment), cancellationToken);
 		}
 		#endregion
 
@@ -2295,7 +2295,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns>Returns a boolean value indicating if the object that associates with the key is cached or not</returns>
 		public Task<bool> ExistsAsync(string key, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return CacheManager.ExecuteTask<bool>(() => this.Exists(key), cancellationToken);
+			return Helper.ExecuteTask<bool>(() => this.Exists(key), cancellationToken);
 		}
 		#endregion
 
@@ -2307,7 +2307,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns></returns>
 		public Task ClearAsync(CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return CacheManager.ExecuteTask(() => this.Clear(), cancellationToken);
+			return Helper.ExecuteTask(() => this.Clear(), cancellationToken);
 		}
 
 		/// <summary>
@@ -2324,123 +2324,10 @@ namespace net.vieapps.Components.Caching
 		// -----------------------------------------------------
 
 		#region [Static] Helper methods
-		internal static HashSet<string> Merge(params HashSet<string>[] sets)
-		{
-			return CacheManager.Merge(true, sets);
-		}
-
-		internal static HashSet<string> Merge(bool doClone, params HashSet<string>[] sets)
-		{
-			if (sets == null || sets.Length < 1)
-				return null;
-
-			else if (sets.Length < 2)
-				return doClone
-					? CacheManager.Clone(sets[0])
-					: sets[0];
-
-			var @object = doClone
-				? CacheManager.Clone(sets[0])
-				: sets[0];
-
-			for (int index = 1; index < sets.Length; index++)
-			{
-				var set = doClone
-					? CacheManager.Clone(sets[index])
-					: sets[index];
-
-				if (set == null || set.Count < 1)
-					continue;
-
-				foreach (var @string in set)
-					if (!string.IsNullOrWhiteSpace(@string) && !@object.Contains(@string))
-						@object.Add(@string);
-			}
-
-			return @object;
-		}
-
-		internal static List<byte[]> SplitIntoFragments(byte[] data, int sizeOfOneFragment)
-		{
-			var fragments = new List<byte[]>();
-			int index = 0, length = data.Length;
-			while (index < data.Length)
-			{
-				var size = sizeOfOneFragment > length
-					? length
-					: sizeOfOneFragment;
-
-				var fragment = new byte[size];
-				Array.Copy(data, index, fragment, 0, size);
-				fragments.Add(fragment);
-
-				index += size;
-				length -= size;
-			}
-			return fragments;
-		}
-
-		internal static byte[] SerializeAsBinary(object @object)
-		{
-			using (var stream = new MemoryStream())
-			{
-				(new BinaryFormatter()).Serialize(stream, @object);
-				return stream.GetBuffer();
-			}
-		}
-
-		internal static object DeserializeFromBinary(byte[] data)
-		{
-			using (var stream = new MemoryStream(data))
-			{
-				return (new BinaryFormatter()).Deserialize(stream);
-			}
-		}
-
-		internal static T Clone<T>(T @object)
-		{
-			return (T)CacheManager.DeserializeFromBinary(CacheManager.SerializeAsBinary(@object));
-		}
-
-		internal static byte[] Compress(byte[] data)
-		{
-			using (var stream = new MemoryStream())
-			{
-				using (var deflate = new DeflateStream(stream, CompressionMode.Compress))
-				{
-					deflate.Write(data, 0, data.Length);
-					deflate.Close();
-					return stream.ToArray();
-				}
-			}
-		}
-
-		internal static byte[] Decompress(byte[] data)
-		{
-			using (var input = new MemoryStream(data))
-			{
-				using (var deflate = new DeflateStream(input, CompressionMode.Decompress))
-				{
-					using (var output = new MemoryStream())
-					{
-						var buffer = new byte[64];
-						var readBytes = deflate.Read(buffer, 0, buffer.Length);
-						while (readBytes > 0)
-						{
-							output.Write(buffer, 0, readBytes);
-							readBytes = deflate.Read(buffer, 0, buffer.Length);
-						}
-						deflate.Close();
-						return output.ToArray();
-					}
-				}
-			}
-		}
-
 		internal static bool UpdateDistributedKeys(string key, HashSet<string> keys)
 		{
-			var fragments = CacheManager.SplitIntoFragments(CacheManager.SerializeAsBinary(keys), CacheManager.DefaultFragmentSize);
-			if (DistributedCache.Client.Store(
+			var fragments = Helper.SplitIntoFragments(Helper.SerializeAsBinary(keys), CacheManager.DefaultFragmentSize);
+			if (Memcached.Client.Store(
 					StoreMode.Set,
 					CacheManager.RegionsKey,
 					new Fragment()
@@ -2454,7 +2341,7 @@ namespace net.vieapps.Components.Caching
 			)
 			{
 				for (int index = 0; index < fragments.Count; index++)
-					DistributedCache.Client.Store(StoreMode.Set, key + ":" + index, fragments[index], TimeSpan.Zero);
+					Memcached.Client.Store(StoreMode.Set, key + ":" + index, fragments[index], TimeSpan.Zero);
 				return true;
 			}
 			return false;
@@ -2462,7 +2349,7 @@ namespace net.vieapps.Components.Caching
 
 		internal static HashSet<string> FetchDistributedKeys(string key)
 		{
-			var info = DistributedCache.Client.Get<Fragment>(key);
+			var info = Memcached.Client.Get<Fragment>(key);
 			if (object.ReferenceEquals(info, null))
 				return new HashSet<string>();
 
@@ -2474,7 +2361,7 @@ namespace net.vieapps.Components.Caching
 				byte[] bytes = null;
 				try
 				{
-					bytes = DistributedCache.Get<byte[]>(key + ":" + index);
+					bytes = Memcached.Get<byte[]>(key + ":" + index);
 				}
 				catch { }
 				if (bytes != null && bytes.Length > 0)
@@ -2487,70 +2374,14 @@ namespace net.vieapps.Components.Caching
 
 			try
 			{
-				return CacheManager.DeserializeFromBinary(fragments) as HashSet<string>;
+				return Helper.DeserializeFromBinary(fragments) as HashSet<string>;
 			}
 			catch
 			{
 				return new HashSet<string>();
 			}
 		}
-
-		internal static Task ExecuteTask(Action action, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			var tcs = new TaskCompletionSource<object>();
-			ThreadPool.QueueUserWorkItem(_ =>
-			{
-				if (cancellationToken == null)
-					cancellationToken = default(CancellationToken);
-				cancellationToken.Register(() =>
-				{
-					tcs.SetCanceled();
-					return;
-				});
-
-				try
-				{
-					action?.Invoke();
-					tcs.SetResult(null);
-				}
-				catch (Exception ex)
-				{
-					tcs.SetException(ex);
-				}
-			});
-			return tcs.Task;
-		}
-
-		internal static Task<TResult> ExecuteTask<TResult>(Func<TResult> func, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			var tcs = new TaskCompletionSource<TResult>();
-			ThreadPool.QueueUserWorkItem(_ =>
-			{
-				if (cancellationToken == null)
-					cancellationToken = default(CancellationToken);
-				cancellationToken.Register(() =>
-				{
-					tcs.SetCanceled();
-					return;
-				});
-
-				try
-				{
-					var result = func != null
-						? func.Invoke()
-						: default(TResult);
-					tcs.SetResult(result);
-				}
-				catch (Exception ex)
-				{
-					tcs.SetException(ex);
-				}
-			});
-			return tcs.Task;
-		}
 		#endregion
-
-		// -----------------------------------------------------
 
 		#region [Static] Region properties & methods
 		static readonly string RegionsKey = "VIEApps-Caching-Regions";
@@ -2573,7 +2404,7 @@ namespace net.vieapps.Components.Caching
 			string distributedFlag = null;
 			try
 			{
-				distributedFlag = await DistributedCache.GetAsync<string>(CacheManager.RegionsKey + "-Registering");
+				distributedFlag = await Memcached.GetAsync<string>(CacheManager.RegionsKey + "-Registering");
 			}
 			catch { }
 
@@ -2583,22 +2414,22 @@ namespace net.vieapps.Components.Caching
 				await Task.Delay(313);
 				try
 				{
-					distributedFlag = await DistributedCache.GetAsync<string>(CacheManager.RegionsKey + "-Registering");
+					distributedFlag = await Memcached.GetAsync<string>(CacheManager.RegionsKey + "-Registering");
 				}
 				catch (Exception ex)
 				{
-					CacheManager.WriteLogs(name, "Error occurred while fetching flag to register new region", ex);
+					Helper.WriteLogs(name, "Error occurred while fetching flag to register new region", ex);
 					distributedFlag = null;
 				}
 			}
 
 			try
 			{
-				await DistributedCache.SetAsync(CacheManager.RegionsKey + "-Registering", "v");
+				await Memcached.SetAsync(CacheManager.RegionsKey + "-Registering", "v");
 			}
 			catch (Exception ex)
 			{
-				CacheManager.WriteLogs(name, "Error occurred while updating flag when register new region", ex);
+				Helper.WriteLogs(name, "Error occurred while updating flag when register new region", ex);
 			}
 
 			// fetch region-keys
@@ -2620,7 +2451,7 @@ namespace net.vieapps.Components.Caching
 						Debug.WriteLine(debug + " (" + DateTime.Now.ToString("HH:mm:ss.fff") + ") <INIT>: Cannot update regions into cache storage");
 #endif
 
-						CacheManager.WriteLogs(name, "Cannot update regions into cache storage", null);
+						Helper.WriteLogs(name, "Cannot update regions into cache storage", null);
 					}
 #if DEBUG
 					else
@@ -2629,126 +2460,19 @@ namespace net.vieapps.Components.Caching
 				}
 				catch (Exception ex)
 				{
-					CacheManager.WriteLogs(name, "Error occurred while updating regions", ex);
+					Helper.WriteLogs(name, "Error occurred while updating regions", ex);
 				}
 			}
 
 			// remove flag
 			try
 			{
-				await DistributedCache.RemoveAsync(CacheManager.RegionsKey + "-Registering");
+				await Memcached.RemoveAsync(CacheManager.RegionsKey + "-Registering");
 			}
 			catch (Exception ex)
 			{
-				CacheManager.WriteLogs(name, "Error occurred while removing flag when register new region", ex);
+				Helper.WriteLogs(name, "Error occurred while removing flag when register new region", ex);
 			}
-		}
-		#endregion
-
-		// -----------------------------------------------------
-
-		#region [Static] Working with logs
-		static string GetLogPrefix(string label, string seperator = ":")
-		{
-			return label + seperator + "[" + Process.GetCurrentProcess().Id.ToString() + " : " + AppDomain.CurrentDomain.Id.ToString() + " : " + Thread.CurrentThread.ManagedThreadId.ToString() + "]";
-		}
-
-		static string LogsPath = null;
-
-		static async Task WriteLogs(string filePath, string region, List<string> logs, Exception ex)
-		{
-			// prepare
-			var info = CacheManager.GetLogPrefix(DateTime.Now.ToString("HH:mm:ss.fff"), "\t") + "\t" + region + "\t";
-
-			var content = "";
-			if (logs != null)
-				logs.ForEach(log =>
-				{
-					if (!string.IsNullOrWhiteSpace(log))
-						content += info + log + "\r\n";
-				});
-
-			if (ex != null)
-			{
-				content += info + "- " + (ex.Message != null ? ex.Message : "No error message") + " [" + ex.GetType().ToString() + "]" + "\r\n"
-					+ info + "- " + (ex.StackTrace != null ? ex.StackTrace : "No stack trace");
-
-				ex = ex.InnerException;
-				var counter = 1;
-				while (ex != null)
-				{
-					content += info + "- Inner (" + counter.ToString() + "): ----------------------------------" + "\r\n"
-						+ info + "- " + (ex.Message != null ? ex.Message : "No error message") + " [" + ex.GetType().ToString() + "]" + "\r\n"
-						+ info + "- " + (ex.StackTrace != null ? ex.StackTrace : "No stack trace");
-
-					counter++;
-					ex = ex.InnerException;
-				}
-
-				content += "\r\n";
-			}
-
-			// write logs into file
-			try
-			{
-				using (var stream =  new FileStream(filePath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite, 4096, true))
-				{
-					using (var writer =  new StreamWriter(stream, System.Text.Encoding.UTF8))
-					{
-						await writer.WriteLineAsync(content + "\r\n");
-					}
-				}
-			}
-			catch { }
-		}
-
-		static void WriteLogs(string region, List<string> logs, Exception ex)
-		{
-			// prepare path of all log files
-			if (string.IsNullOrWhiteSpace(CacheManager.LogsPath))
-				try
-				{
-					CacheManager.LogsPath = ConfigurationManager.AppSettings["vieapps:LogsPath"];
-					if (!CacheManager.LogsPath.EndsWith(@"\"))
-						CacheManager.LogsPath += @"\";
-				}
-				catch { }
-
-			if (string.IsNullOrWhiteSpace(CacheManager.LogsPath))
-				try
-				{
-					CacheManager.LogsPath = !string.IsNullOrWhiteSpace(System.Web.HttpRuntime.AppDomainAppPath)
-						? System.Web.HttpRuntime.AppDomainAppPath + @"\Logs\"
-						: null;
-				}
-				catch { }
-
-			if (string.IsNullOrWhiteSpace(CacheManager.LogsPath))
-				try
-				{
-					CacheManager.LogsPath = Directory.GetCurrentDirectory() + @"\Logs\";
-				}
-				catch { }
-
-			// stop if a valid path is not found
-			if (string.IsNullOrWhiteSpace(CacheManager.LogsPath))
-				return;
-
-			// build file path and write logs via other thread
-			var filePath = CacheManager.LogsPath + DateTime.Now.ToString("yyyy-MM-dd") + ".CacheManager.txt";
-			Task.Run(async () =>
-			{
-				try
-				{
-					await CacheManager.WriteLogs(filePath, region, logs, ex).ConfigureAwait(false);
-				}
-				catch { }
-			}).ConfigureAwait(false);
-		}
-
-		static void WriteLogs(string region, string log, Exception ex)
-		{
-			CacheManager.WriteLogs(region, string.IsNullOrWhiteSpace(log) ? null : new List<string>() { log }, ex);
 		}
 		#endregion
 
