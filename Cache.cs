@@ -2116,7 +2116,9 @@ namespace net.vieapps.Components.Caching
 
 			try
 			{
-				return Helper.DeserializeFromBinary(fragments) as HashSet<string>;
+				return fragments.Length > 0
+					? Helper.DeserializeFromBinary(fragments) as HashSet<string>
+					: new HashSet<string>();
 			}
 			catch
 			{
