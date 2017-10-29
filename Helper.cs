@@ -1,11 +1,9 @@
 #region Related components
 using System;
+using System.IO;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using System.IO;
-using System.IO.Compression;
-using System.Runtime.Serialization.Formatters.Binary;
 using System.Diagnostics;
 using System.Configuration;
 #endregion
@@ -55,7 +53,7 @@ namespace net.vieapps.Components.Caching
 			return @object;
 		}
 
-		internal static List<byte[]> SplitIntoFragments(byte[] data, int sizeOfOneFragment)
+		internal static List<byte[]> Split(byte[] data, int sizeOfOneFragment)
 		{
 			var fragments = new List<byte[]>();
 			int index = 0, length = data.Length;
@@ -79,59 +77,17 @@ namespace net.vieapps.Components.Caching
 		#region Serialize/Deserialize
 		internal static byte[] SerializeAsBinary(object @object)
 		{
-			using (var stream = new MemoryStream())
-			{
-				(new BinaryFormatter()).Serialize(stream, @object);
-				return stream.GetBuffer();
-			}
+			return (new Enyim.Caching.Memcached.DefaultTranscoder()).SerializeObject(@object).Array;
 		}
 
 		internal static object DeserializeFromBinary(byte[] data)
 		{
-			using (var stream = new MemoryStream(data))
-			{
-				return (new BinaryFormatter()).Deserialize(stream);
-			}
+			return (new Enyim.Caching.Memcached.DefaultTranscoder()).DeserializeObject(new ArraySegment<byte>(data));
 		}
 
 		internal static T Clone<T>(T @object)
 		{
 			return (T)Helper.DeserializeFromBinary(Helper.SerializeAsBinary(@object));
-		}
-
-		internal static byte[] Compress(byte[] data)
-		{
-			using (var stream = new MemoryStream())
-			{
-				using (var deflate = new DeflateStream(stream, CompressionMode.Compress))
-				{
-					deflate.Write(data, 0, data.Length);
-					deflate.Close();
-					return stream.ToArray();
-				}
-			}
-		}
-
-		internal static byte[] Decompress(byte[] data)
-		{
-			using (var input = new MemoryStream(data))
-			{
-				using (var deflate = new DeflateStream(input, CompressionMode.Decompress))
-				{
-					using (var output = new MemoryStream())
-					{
-						var buffer = new byte[64];
-						var readBytes = deflate.Read(buffer, 0, buffer.Length);
-						while (readBytes > 0)
-						{
-							output.Write(buffer, 0, readBytes);
-							readBytes = deflate.Read(buffer, 0, buffer.Length);
-						}
-						deflate.Close();
-						return output.ToArray();
-					}
-				}
-			}
 		}
 		#endregion
 
