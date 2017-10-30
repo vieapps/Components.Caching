@@ -4,7 +4,7 @@
 		<TargetFramework>netstandard2.0</TargetFramework>
 		<AllowUnsafeBlocks>false</AllowUnsafeBlocks>
 		<AssemblyName>VIEApps.Components.Caching</AssemblyName>
-		<Description>The .NET Standard 2.0 client library for working with cache in the VIEApps NGX</Description>
+		<Description>The .NET Standard 2.0 library wrapper for working with distribute cache</Description>
 		<Authors>VIEApps.net</Authors>
 		<Company>VIEApps.net</Company>
 		<Product>VIEApps NGX</Product>
