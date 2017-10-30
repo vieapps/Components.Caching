@@ -5,14 +5,12 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using System.IO;
-using System.IO.Compression;
-using System.Runtime.Serialization.Formatters.Binary;
-using System.Diagnostics;
 using System.Configuration;
+using System.Diagnostics;
 
 using Enyim.Caching;
-using Enyim.Caching.Configuration;
 using Enyim.Caching.Memcached;
+using Enyim.Caching.Configuration;
 #endregion
 
 namespace net.vieapps.Components.Caching
@@ -20,10 +18,11 @@ namespace net.vieapps.Components.Caching
 	/// <summary>
 	/// Manipulates cached objects in isolated regions
 	/// </summary>
-	[DebuggerDisplay("Name: {_name}, Caching Time (minutes): {_expirationTime}")]
+	[DebuggerDisplay("Region: {_name}, Time for caching: {_expirationTime} minutes")]
 	public sealed class Cache
 	{
 
+		#region Data
 		[Serializable]
 		public struct Fragment
 		{
@@ -32,7 +31,6 @@ namespace net.vieapps.Components.Caching
 			public int TotalFragments;
 		}
 
-		#region Default
 		static MemcachedClient _MemcachedClient = null;
 
 		/// <summary>
@@ -42,9 +40,7 @@ namespace net.vieapps.Components.Caching
 		{
 			get
 			{
-				if (Cache._MemcachedClient == null)
-					Cache._MemcachedClient = new MemcachedClient(ConfigurationManager.GetSection("memcached") as MemcachedClientConfigurationSectionHandler);
-				return Cache._MemcachedClient;
+				return Cache._MemcachedClient ?? (Cache._MemcachedClient = new MemcachedClient(ConfigurationManager.GetSection("memcached") as MemcachedClientConfigurationSectionHandler));
 			}
 		}
 
@@ -57,15 +53,12 @@ namespace net.vieapps.Components.Caching
 		/// Gets default size of one fragment (1 MBytes)
 		/// </summary>
 		public static readonly int DefaultFragmentSize = (1024 * 1024) - 512;
-		#endregion
 
-		#region Attributes
 		string _name = "";
-		int _expirationTime = Cache.DefaultExpirationTime;
-		int _fragmentSize = Cache.DefaultFragmentSize;
-		bool _updateKeys = false;
+		int _expirationTime = Cache.DefaultExpirationTime, _fragmentSize = Cache.DefaultFragmentSize;
+		bool _updateKeys = false, _isUpdating = false;
 		HashSet<string> _addedKeys = null, _removedKeys = null;
-		ReaderWriterLockSlim _lock = new ReaderWriterLockSlim(LockRecursionPolicy.SupportsRecursion);
+		ReaderWriterLockSlim _locker = new ReaderWriterLockSlim(LockRecursionPolicy.SupportsRecursion);
 
 		/// <summary>
 		/// Gets the expiration time (in minutes)
@@ -80,21 +73,16 @@ namespace net.vieapps.Components.Caching
 		#endregion
 
 		/// <summary>
-		/// Create instance of cache storage with default isolated region
+		/// Create new instance of isolated region cache storage
 		/// </summary>
-		public Cache() : this(null) { }
-
-		/// <summary>
-		/// Create instance of cache storage with isolated region
-		/// </summary>
-		/// <param name="name">The string that presents name of isolated region that the cache manager will work with</param>
-		/// <param name="expirationTime">Time in minutes to cache any item</param>
-		/// <param name="updateKeys">true to active update keys when working mode is Distributed</param>
-		public Cache(string name, int expirationTime = 0, bool updateKeys = false)
+		/// <param name="name">The string that presents name of isolated region of the cache</param>
+		/// <param name="expirationTime">Time to cache an item (in minutes)</param>
+		/// <param name="updateKeys">true to active update keys of the region (to clear or using with other purpose further)</param>
+		public Cache(string name = null, int expirationTime = 0, bool updateKeys = false)
 		{
 			// region name
 			this._name = string.IsNullOrWhiteSpace(name)
-				? "VIEApps-Cache-Storage"
+				? "VIEApps-NGX-Cache"
 				: System.Text.RegularExpressions.Regex.Replace(name, "[^0-9a-zA-Z:-]+", "");
 
 			// expiration time
@@ -115,279 +103,80 @@ namespace net.vieapps.Components.Caching
 			{
 				await Cache.RegisterRegionAsync(this._name).ConfigureAwait(false);
 			}).ConfigureAwait(false);
-
-#if DEBUG
-			Task.Run(async () =>
-			{
-				await Task.Delay(345);
-				Debug.WriteLine("The cache storage is initialized successful...");
-				Debug.WriteLine("- Region name: " + this._name);
-				Debug.WriteLine("- Expiration time: " + this._expirationTime + " minutes");
-			}).ConfigureAwait(false);
-#endif
 		}
 
 		#region Keys
-#if DEBUG
-		async Task _PushKeysAsync(string label, bool checkUpdatedKeys = true, Action callback = null)
-#else
-		async Task _PushKeysAsync(bool checkUpdatedKeys = true, Action callback = null)
-#endif
+		async Task _UpdateKeysAsync(bool checkUpdatedKeys = true, Action callback = null)
 		{
-#if DEBUG
-			var debug = Helper.GetLogPrefix(this._name);
-#endif
-
+			// no key need to update, then stop
 			if (checkUpdatedKeys && this._addedKeys.Count < 1 && this._removedKeys.Count < 1)
-			{
-#if DEBUG
-				Debug.WriteLine(debug + " (" + DateTime.Now.ToString("HH:mm:ss.fff") + ") <" + label + ">: Stop the pushing process because no key need to update [" + this._RegionUpdatingFlag + "]");
-#endif
-				return;
-			}
-
-			// stop if task/thread complete update distributed cache
-			if (await Cache.Memcached.ExistsAsync(this._RegionPushingFlag))
 				return;
 
-#if DEBUG
-			var stopwatch = new Stopwatch();
-			stopwatch.Start();
-			var watch = new Stopwatch();
-			watch.Start();
-#endif
+			// if other task/thread is processing, then stop
+			if (this._isUpdating)
+				return;
 
 			// set flag
-			await Cache.Memcached.StoreAsync(StoreMode.Set, this._RegionPushingFlag, Thread.CurrentThread.ManagedThreadId.ToString(), TimeSpan.FromMilliseconds(5000));
+			this._isUpdating = true;
 
-#if DEBUG
-			watch.Stop();
-			Debug.WriteLine(debug + " (" + DateTime.Now.ToString("HH:mm:ss.fff") + ") <" + label + ">: Set pushing flag [" + this._RegionPushingFlag + ":" + Thread.CurrentThread.ManagedThreadId.ToString() + "] (distributed) is completed in " + watch.ElapsedMilliseconds.ToString() + " miliseconds");
-			watch.Restart();
-#endif
+			// prepare
+			var syncKeys = await Cache.FetchKeysAsync(this._RegionKey);
 
-			// get keys
-			var distributedKeys = Cache.GetRemoteKeys(this._RegionKey);
-
-#if DEBUG
-			watch.Stop();
-			Debug.WriteLine(debug + " (" + DateTime.Now.ToString("HH:mm:ss.fff") + ") <" + label + ">: Get keys [" + this._RegionKey + "] from distributed cache is completed in " + watch.ElapsedMilliseconds.ToString() + " miliseconds");
-			Debug.WriteLine(debug + " (" + DateTime.Now.ToString("HH:mm:ss.fff") + ") <" + label + ">: Total of distributed-keys: " + distributedKeys.Count.ToString());
-#endif
-
-			var totalAddedKeys = this._addedKeys.Count;
 			var totalRemovedKeys = this._removedKeys.Count;
-
-#if DEBUG
-			Debug.WriteLine(debug + " (" + DateTime.Now.ToString("HH:mm:ss.fff") + ") <" + label + ">: Start to merge distributed-keys with added/removed-keys [" + this._RegionKey + "]");
-			Debug.WriteLine(debug + " (" + DateTime.Now.ToString("HH:mm:ss.fff") + ") <" + label + ">: Total of added-keys [" + this._RegionKey + "]: " + totalAddedKeys.ToString());
-			Debug.WriteLine(debug + " (" + DateTime.Now.ToString("HH:mm:ss.fff") + ") <" + label + ">: Total of removed-keys [" + this._RegionKey + "]: " + this._removedKeys.Count.ToString());
-			watch.Restart();
-#endif
-
-			// prepare keys for synchronizing
-			var syncKeys = distributedKeys;
+			var totalAddedKeys = this._addedKeys.Count;
 
 			// update removed keys
 			if (totalRemovedKeys > 0)
-			{
-				var removedKeys = Helper.Clone(this._removedKeys);
-				foreach (string key in removedKeys)
-					if (syncKeys.Contains(key))
-						syncKeys.Remove(key);
-			}
+				syncKeys = new HashSet<string>(syncKeys.Except(this._removedKeys));
 
 			// update added keys
 			if (totalAddedKeys > 0)
-				syncKeys = Helper.Merge(syncKeys, this._addedKeys);
+				syncKeys = new HashSet<string>(syncKeys.Union(this._addedKeys));
 
-#if DEBUG
-			watch.Stop();
-			Debug.WriteLine(debug + " (" + DateTime.Now.ToString("HH:mm:ss.fff") + ") <" + label + ">: Merge keys [" + this._RegionKey + "] is completed in " + watch.ElapsedMilliseconds.ToString() + " miliseconds");
-			Debug.WriteLine(debug + " (" + DateTime.Now.ToString("HH:mm:ss.fff") + ") <" + label + ">: Total of merged-keys [" + this._RegionKey + "]: " + syncKeys.Count.ToString());
-			watch.Restart();
-#endif
-
-			// update mapping keys at distributed cache
-			try
-			{
-				await Cache.SetRemoteKeysAsync(this._RegionKey, syncKeys);
-			}
-			catch (Exception ex)
-			{
-				Helper.WriteLogs(this._name, "Error occurred while pushing keys of the region", ex);
-			}
-
-#if DEBUG
-			watch.Stop();
-			Debug.WriteLine(debug + " (" + DateTime.Now.ToString("HH:mm:ss.fff") + ") <" + label + ">: Push merged-keys [" + this._RegionKey + "] to distributed cache is completed in " + watch.ElapsedMilliseconds.ToString() + " miliseconds");
-#endif
+			// update keys
+			await Cache.SetKeysAsync(this._RegionKey, syncKeys);
 
 			// check to see new updated keys
 			if (!totalAddedKeys.Equals(this._addedKeys.Count) || !totalRemovedKeys.Equals(this._removedKeys.Count))
 			{
-#if DEBUG
-				Debug.WriteLine(debug + " (" + DateTime.Now.ToString("HH:mm:ss.fff") + ") <" + label + ">: Wait other task complete before re-merging/re-pushing");
-#endif
+				// delay a moment before re-updating
+				await Task.Delay(345);
 
-				// delay a moment before re-merging/re-pushing
-				await Task.Delay(313);
-
-				var rePush = false;
-
-				// re-merge
-				if (!totalRemovedKeys.Equals(this._removedKeys.Count) && this._removedKeys.Count > 0)
-				{
-#if DEBUG
-					watch.Restart();
-#endif
-
-					rePush = true;
-					totalRemovedKeys = this._removedKeys.Count;
-					var removedKeys = Helper.Clone(this._removedKeys);
-					foreach (var key in removedKeys)
-						if (syncKeys.Contains(key))
-							syncKeys.Remove(key);
-
-#if DEBUG
-					watch.Stop();
-					Debug.WriteLine(debug + " (" + DateTime.Now.ToString("HH:mm:ss.fff") + ") <" + label + ">: Re-Merge with removed-keys [" + this._RegionKey + "] is completed in " + watch.ElapsedMilliseconds.ToString() + " miliseconds");
-					Debug.WriteLine(debug + " (" + DateTime.Now.ToString("HH:mm:ss.fff") + ") <" + label + ">: Total of merged-keys [" + this._RegionKey + "]: " + syncKeys.Count.ToString());
-#endif
-				}
-
-				if (!totalAddedKeys.Equals(this._addedKeys.Count))
-				{
-#if DEBUG
-					watch.Restart();
-#endif
-
-					rePush = true;
-					totalAddedKeys = this._addedKeys.Count;
-					syncKeys = Helper.Merge(syncKeys, this._addedKeys);
-
-#if DEBUG
-					watch.Stop();
-					Debug.WriteLine(debug + " (" + DateTime.Now.ToString("HH:mm:ss.fff") + ") <" + label + ">: Re-Merge with added-keys [" + this._RegionKey + "] is completed in " + watch.ElapsedMilliseconds.ToString() + " miliseconds");
-					Debug.WriteLine(debug + " (" + DateTime.Now.ToString("HH:mm:ss.fff") + ") <" + label + ">: Total of merged-keys [" + this._RegionKey + "]: " + syncKeys.Count.ToString());
-#endif
-				}
-
-				// re-push
-				if (rePush)
-				{
-#if DEBUG
-					watch.Restart();
-#endif
-					try
-					{
-						Cache.SetRemoteKeys(this._RegionKey, syncKeys);
-					}
-					catch (Exception ex)
-					{
-						Helper.WriteLogs(this._name, "Error occurred while (re)pushing keys of the region", ex);
-					}
-
-#if DEBUG
-					watch.Stop();
-					Debug.WriteLine(debug + " (" + DateTime.Now.ToString("HH:mm:ss.fff") + ") <" + label + ">: Re-Push merged-keys [" + this._RegionKey + "] to distributed cache is completed in " + watch.ElapsedMilliseconds.ToString() + " miliseconds");
-#endif
-				}
+				// update keys
+				await Cache.SetKeysAsync(this._RegionKey, new HashSet<string>(syncKeys.Except(this._removedKeys).Union(this._addedKeys)));
 			}
 
-			// clear added/removed keys
+			// clear keys
 			if (totalAddedKeys.Equals(this._addedKeys.Count))
 				try
 				{
-					this._lock.EnterWriteLock();
+					this._locker.EnterWriteLock();
 					this._addedKeys.Clear();
-				}
-				catch (Exception ex)
-				{
-					Helper.WriteLogs(this._name, "Error occurred while removes added keys (after pushing process)", ex);
-				}
-				finally
-				{
-					if (this._lock.IsWriteLockHeld)
-						this._lock.ExitWriteLock();
-				}
-#if DEBUG
-			else
-				Debug.WriteLine(debug + " (" + DateTime.Now.ToString("HH:mm:ss.fff") + ") <" + label + ">: By-pass to clear added-keys [" + this._RegionKey + "], current total of added-keys: " + this._addedKeys.Count.ToString());
-#endif
-
-			if (totalRemovedKeys.Equals(this._removedKeys.Count))
-				try
-				{
-					this._lock.EnterWriteLock();
 					this._removedKeys.Clear();
 				}
 				catch (Exception ex)
 				{
-					Helper.WriteLogs(this._name, "Error occurred while removes removed keys (after pushing process)", ex);
+					Helper.WriteLogs(this._name, "Error occurred while removes keys (after pushing process)", ex);
 				}
 				finally
 				{
-					if (this._lock.IsWriteLockHeld)
-						this._lock.ExitWriteLock();
+					if (this._locker.IsWriteLockHeld)
+						this._locker.ExitWriteLock();
 				}
-#if DEBUG
-			else
-				Debug.WriteLine(debug + " (" + DateTime.Now.ToString("HH:mm:ss.fff") + ") <" + label + ">: By-pass to clear removed-keys [" + this._RegionKey + "], current total of removed-keys: " + this._removedKeys.Count.ToString());
-#endif
-
-#if DEBUG
-			watch.Restart();
-#endif
 
 			// remove flags
-			try
-			{
-				await Cache.Memcached.RemoveAsync(this._RegionPushingFlag);
-			}
-			catch (Exception ex)
-			{
-				Helper.WriteLogs(this._name, "Error occurred while updating flag when push keys of the region", ex);
-			}
-
-#if DEBUG
-			watch.Stop();
-			Debug.WriteLine(debug + " (" + DateTime.Now.ToString("HH:mm:ss.fff") + ") <" + label + ">: Remove flags of updating/pushing [" + this._RegionUpdatingFlag + "/" + this._RegionPushingFlag + "] is completed in " + watch.ElapsedMilliseconds.ToString() + " miliseconds");
-			stopwatch.Stop();
-			Debug.WriteLine(debug + " (" + DateTime.Now.ToString("HH:mm:ss.fff") + ") <" + label + ">: Push all cached keys [" + this._RegionKey + "] to distributed cache is completed in " + stopwatch.ElapsedMilliseconds.ToString() + " miliseconds. Total of pushed-keys: " + syncKeys.Count.ToString());
-#endif
+			this._isUpdating = false;
 
 			// callback
-#if DEBUG
-			Debug.WriteLine(debug + " (" + DateTime.Now.ToString("HH:mm:ss.fff") + ") <" + label + ">:  -- And now run callback action");
-#endif
 			callback?.Invoke();
 		}
 
-#if DEBUG
-		void _UpdateKeys(string label, int delay = 13, bool checkUpdatedKeys = true, Action callback = null)
-#else
 		void _UpdateKeys(int delay = 13, bool checkUpdatedKeys = true, Action callback = null)
-#endif
 		{
-#if DEBUG
-			var debug = Helper.GetLogPrefix(this._name);
-#endif
 			Task.Run(async () =>
 			{
 				await Task.Delay(delay);
-#if DEBUG
-				debug = "[" + this._name + " > " + Process.GetCurrentProcess().Id.ToString() + " : " + AppDomain.CurrentDomain.Id.ToString() + " : " + Thread.CurrentThread.ManagedThreadId.ToString() + "]";
-				Debug.WriteLine(debug + " (" + DateTime.Now.ToString("HH:mm:ss.fff") + ") <" + label + ">: Start to push keys [" + this._RegionKey + "] to distributed cache");
-				if (this._addedKeys != null)
-					Debug.WriteLine(debug + " (" + DateTime.Now.ToString("HH:mm:ss.fff") + ") <" + label + ">: -- Total of added-keys: " + this._addedKeys.Count.ToString());
-				if (this._removedKeys != null)
-					Debug.WriteLine(debug + " (" + DateTime.Now.ToString("HH:mm:ss.fff") + ") <" + label + ">: -- Total of removed-keys: " + this._removedKeys.Count.ToString());
-
-				await this._PushKeysAsync(label, checkUpdatedKeys, callback).ConfigureAwait(false);
-#else
-				await this._PushKeysAsync(checkUpdatedKeys, callback).ConfigureAwait(false);
-#endif
+				await this._UpdateKeysAsync(checkUpdatedKeys, callback).ConfigureAwait(false);
 			}).ConfigureAwait(false);
 		}
 
@@ -400,7 +189,7 @@ namespace net.vieapps.Components.Caching
 			if (!this._addedKeys.Contains(key))
 				try
 				{
-					this._lock.EnterWriteLock();
+					this._locker.EnterWriteLock();
 					this._addedKeys.Add(key);
 				}
 				catch (Exception ex)
@@ -409,26 +198,22 @@ namespace net.vieapps.Components.Caching
 				}
 				finally
 				{
-					if (this._lock.IsWriteLockHeld)
-						this._lock.ExitWriteLock();
+					if (this._locker.IsWriteLockHeld)
+						this._locker.ExitWriteLock();
 				}
 
 			if (doPush && this._addedKeys.Count > 0)
-#if DEBUG
-				this._UpdateKeys("SET", 113);
-#else
 				this._UpdateKeys(113);
-#endif
 		}
 
 		HashSet<string> _GetKeys()
 		{
-			return Cache.GetRemoteKeys(this._RegionKey);
+			return Cache.FetchKeys(this._RegionKey);
 		}
 
 		Task<HashSet<string>> _GetKeysAsync()
 		{
-			return Cache.GetRemoteKeysAsync(this._RegionKey);
+			return Cache.FetchKeysAsync(this._RegionKey);
 		}
 		#endregion
 
@@ -455,7 +240,65 @@ namespace net.vieapps.Components.Caching
 			}
 
 			// update mapping key when added successful
-			if (success)
+			if (success && this._updateKeys)
+				this._UpdateKeys(key, doPush);
+
+			// return state
+			return success;
+		}
+
+		bool _Set(string key, object value, TimeSpan validFor, bool doPush = true, StoreMode mode = StoreMode.Set)
+		{
+			// check key & value
+			if (string.IsNullOrWhiteSpace(key) || value == null)
+				return false;
+
+			// store
+			var success = false;
+			try
+			{
+				success = Cache.Memcached.Store(mode, this._GetKey(key), value, validFor);
+			}
+			catch (ArgumentException)
+			{
+				throw;
+			}
+			catch (Exception ex)
+			{
+				Helper.WriteLogs(this._name, "Error occurred while updating an object into cache [" + value.GetType().ToString() + "#" + key + "]", ex);
+			}
+
+			// update mapping key when added successful
+			if (success && this._updateKeys)
+				this._UpdateKeys(key, doPush);
+
+			// return state
+			return success;
+		}
+
+		bool _Set(string key, object value, DateTime expiresAt, bool doPush = true, StoreMode mode = StoreMode.Set)
+		{
+			// check key & value
+			if (string.IsNullOrWhiteSpace(key) || value == null)
+				return false;
+
+			// store
+			var success = false;
+			try
+			{
+				success = Cache.Memcached.Store(mode, this._GetKey(key), value, expiresAt);
+			}
+			catch (ArgumentException)
+			{
+				throw;
+			}
+			catch (Exception ex)
+			{
+				Helper.WriteLogs(this._name, "Error occurred while updating an object into cache [" + value.GetType().ToString() + "#" + key + "]", ex);
+			}
+
+			// update mapping key when added successful
+			if (success && this._updateKeys)
 				this._UpdateKeys(key, doPush);
 
 			// return state
@@ -484,7 +327,65 @@ namespace net.vieapps.Components.Caching
 			}
 
 			// update mapping key when added successful
-			if (success)
+			if (success && this._updateKeys)
+				this._UpdateKeys(key, doPush);
+
+			// return state
+			return success;
+		}
+
+		async Task<bool> _SetAsync(string key, object value, TimeSpan validFor, bool doPush = true, StoreMode mode = StoreMode.Set)
+		{
+			// check key & value
+			if (string.IsNullOrWhiteSpace(key) || value == null)
+				return false;
+
+			// store
+			var success = false;
+			try
+			{
+				success = await Cache.Memcached.StoreAsync(mode, this._GetKey(key), value, validFor);
+			}
+			catch (ArgumentException)
+			{
+				throw;
+			}
+			catch (Exception ex)
+			{
+				Helper.WriteLogs(this._name, "Error occurred while updating an object into cache [" + value.GetType().ToString() + "#" + key + "]", ex);
+			}
+
+			// update mapping key when added successful
+			if (success && this._updateKeys)
+				this._UpdateKeys(key, doPush);
+
+			// return state
+			return success;
+		}
+
+		async Task<bool> _SetAsync(string key, object value, DateTime expiresAt, bool doPush = true, StoreMode mode = StoreMode.Set)
+		{
+			// check key & value
+			if (string.IsNullOrWhiteSpace(key) || value == null)
+				return false;
+
+			// store
+			var success = false;
+			try
+			{
+				success = await Cache.Memcached.StoreAsync(mode, this._GetKey(key), value, expiresAt);
+			}
+			catch (ArgumentException)
+			{
+				throw;
+			}
+			catch (Exception ex)
+			{
+				Helper.WriteLogs(this._name, "Error occurred while updating an object into cache [" + value.GetType().ToString() + "#" + key + "]", ex);
+			}
+
+			// update mapping key when added successful
+			if (success && this._updateKeys)
 				this._UpdateKeys(key, doPush);
 
 			// return state
@@ -499,28 +400,13 @@ namespace net.vieapps.Components.Caching
 			if (items == null || items.Count < 1)
 				return;
 
-#if DEBUG
-			var debug = Helper.GetLogPrefix(this._name);
-			var stopwatch = new Stopwatch();
-			stopwatch.Start();
-#endif
-
 			// set items
 			foreach (var item in items)
 				this._Set((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + item.Key, item.Value, expirationTime, false, mode);
 
-#if DEBUG
-			stopwatch.Stop();
-			Debug.WriteLine(debug + " (" + DateTime.Now.ToString("HH:mm:ss.fff") + "): " + "Set multiple items (" + items.Count.ToString() + ") is completed in " + stopwatch.ElapsedMilliseconds.ToString() + " miliseconds");
-#endif
-
-			// push keys
+			// update keys
 			if (this._updateKeys && this._addedKeys.Count > 0)
-#if DEBUG
-				this._UpdateKeys("SET-MULTIPLE", 113);
-#else
-				this._UpdateKeys(113);
-#endif
+				this._UpdateKeys(123);
 		}
 
 		void _Set(IDictionary<string, object> items, string keyPrefix = null, int expirationTime = 0, StoreMode mode = StoreMode.Set)
@@ -534,28 +420,13 @@ namespace net.vieapps.Components.Caching
 			if (items == null || items.Count < 1)
 				return;
 
-#if DEBUG
-			var debug = Helper.GetLogPrefix(this._name);
-			var stopwatch = new Stopwatch();
-			stopwatch.Start();
-#endif
-
 			// set items
 			var tasks = items.Select(item => this._SetAsync((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + item.Key, item.Value, expirationTime, false, mode));
 			await Task.WhenAll(tasks);
 
-#if DEBUG
-			stopwatch.Stop();
-			Debug.WriteLine(debug + " (" + DateTime.Now.ToString("HH:mm:ss.fff") + "): " + "Set multiple items (" + items.Count.ToString() + ") is completed in " + stopwatch.ElapsedMilliseconds.ToString() + " miliseconds");
-#endif
-
-			// push keys
+			// update keys
 			if (this._updateKeys && this._addedKeys.Count > 0)
-#if DEBUG
-				this._UpdateKeys("SET-MULTIPLE", 113);
-#else
-				this._UpdateKeys(113);
-#endif
+				this._UpdateKeys(123);
 		}
 
 		Task _SetAsync(IDictionary<string, object> items, string keyPrefix = null, int expirationTime = 0, StoreMode mode = StoreMode.Set)
@@ -595,19 +466,6 @@ namespace net.vieapps.Components.Caching
 			if (value == null)
 				return false;
 
-#if DEBUG
-			var debug = Helper.GetLogPrefix("FRAGMENTS", " > ");
-#endif
-
-			// check to see the object is serializable
-			var type = value.GetType();
-			if (!type.IsSerializable)
-			{
-				var ex = new ArgumentException("The object (" + type.ToString() + ") must be serializable");
-				Helper.WriteLogs(this._name, "Error occurred while trying to serialize an object [" + key + "]", ex);
-				throw ex;
-			}
-
 			// serialize the object to an array of bytes
 			var bytes = value is byte[]
 				? value as byte[]
@@ -616,7 +474,7 @@ namespace net.vieapps.Components.Caching
 					: null;
 
 			if (bytes == null)
-				bytes = Helper.SerializeAsBinary(value);
+				bytes = Helper.Serialize(value);
 
 			// check
 			if (bytes == null || bytes.Length < 1)
@@ -625,12 +483,8 @@ namespace net.vieapps.Components.Caching
 			// split into fragments
 			var fragments = Helper.Split(bytes, this._fragmentSize);
 
-#if DEBUG
-			Debug.WriteLine(debug + " (" + DateTime.Now.ToString("HH:mm:ss.fff") + ") Serialize object and split into fragments successful [" + key + "]. Total of fragments: " + fragments.Count.ToString());
-#endif
-
 			// update into cache storage
-			var success = this._SetAsFragments(key, type, fragments, expirationTime, mode);
+			var success = this._SetAsFragments(key, value.GetType(), fragments, expirationTime, mode);
 
 			// post-process when setted
 			if (success)
@@ -646,16 +500,9 @@ namespace net.vieapps.Components.Caching
 						Helper.WriteLogs(this._name, "Error occurred while updating an object into cache (pure object of fragments) [" + key + ":(Secondary-Pure-Object)" + "]", ex);
 					}
 
-				// update key
+				// update keys
 				this._UpdateKeys(key, true);
 			}
-
-#if DEBUG
-			if (!success)
-				Debug.WriteLine(debug + " (" + DateTime.Now.ToString("HH:mm:ss.fff") + ") Set as fragments failed [" + key + " - " + (type.ToString() + "," + type.Assembly.FullName) + "]");
-			else
-				Debug.WriteLine(debug + " (" + DateTime.Now.ToString("HH:mm:ss.fff") + ") Set as fragments successful [" + key + " - " + (type.ToString() + "," + type.Assembly.FullName) + "]. Total of fragments: " + fragments.Count.ToString());
-#endif
 
 			// return result
 			return success;
@@ -691,19 +538,6 @@ namespace net.vieapps.Components.Caching
 			if (value == null)
 				return false;
 
-#if DEBUG
-			var debug = Helper.GetLogPrefix("FRAGMENTS", " > ");
-#endif
-
-			// check to see the object is serializable
-			var type = value.GetType();
-			if (!type.IsSerializable)
-			{
-				var ex = new ArgumentException("The object (" + type.ToString() + ") must be serializable");
-				Helper.WriteLogs(this._name, "Error occurred while trying to serialize an object [" + key + "]", ex);
-				throw ex;
-			}
-
 			// serialize the object to an array of bytes
 			var bytes = value is byte[]
 				? value as byte[]
@@ -712,7 +546,7 @@ namespace net.vieapps.Components.Caching
 					: null;
 
 			if (bytes == null)
-				bytes = Helper.SerializeAsBinary(value);
+				bytes = Helper.Serialize(value);
 
 			// check
 			if (bytes == null || bytes.Length < 1)
@@ -721,12 +555,8 @@ namespace net.vieapps.Components.Caching
 			// split into fragments
 			var fragments = Helper.Split(bytes, this._fragmentSize);
 
-#if DEBUG
-			Debug.WriteLine(debug + " (" + DateTime.Now.ToString("HH:mm:ss.fff") + ") Serialize object and split into fragments successful [" + key + "]. Total of fragments: " + fragments.Count.ToString());
-#endif
-
 			// update into cache storage
-			var success = await this._SetAsFragmentsAsync(key, type, fragments, expirationTime, mode);
+			var success = await this._SetAsFragmentsAsync(key, value.GetType(), fragments, expirationTime, mode);
 
 			// post-process when setted
 			if (success)
@@ -742,16 +572,9 @@ namespace net.vieapps.Components.Caching
 						Helper.WriteLogs(this._name, "Error occurred while updating an object into cache (pure object of fragments) [" + key + ":(Secondary-Pure-Object)" + "]", ex);
 					}
 
-				// update key
+				// update keys
 				this._UpdateKeys(key, true);
 			}
-
-#if DEBUG
-			if (!success)
-				Debug.WriteLine(debug + " (" + DateTime.Now.ToString("HH:mm:ss.fff") + ") Set as fragments failed [" + key + " - " + (type.ToString() + "," + type.Assembly.FullName) + "]");
-			else
-				Debug.WriteLine(debug + " (" + DateTime.Now.ToString("HH:mm:ss.fff") + ") Set as fragments successful [" + key + " - " + (type.ToString() + "," + type.Assembly.FullName) + "]. Total of fragments: " + fragments.Count.ToString());
-#endif
 
 			// return result
 			return success;
@@ -786,12 +609,6 @@ namespace net.vieapps.Components.Caching
 			if (string.IsNullOrWhiteSpace(key))
 				throw new ArgumentNullException(key);
 
-#if DEBUG
-			var debug = Helper.GetLogPrefix(this._name);
-			var stopwatch = new Stopwatch();
-			stopwatch.Start();
-#endif
-
 			// get cached item
 			object value = null;
 			try
@@ -815,11 +632,6 @@ namespace net.vieapps.Components.Caching
 					value = null;
 				}
 
-#if DEBUG
-			stopwatch.Stop();
-			Debug.WriteLine(debug + " (" + DateTime.Now.ToString("HH:mm:ss.fff") + "): " + "Get single cache item [" + key + "] is completed in " + stopwatch.ElapsedMilliseconds.ToString() + " miliseconds");
-#endif
-
 			// return object
 			return value;
 		}
@@ -828,12 +640,6 @@ namespace net.vieapps.Components.Caching
 		{
 			if (string.IsNullOrWhiteSpace(key))
 				throw new ArgumentNullException(key);
-
-#if DEBUG
-			var debug = Helper.GetLogPrefix(this._name);
-			var stopwatch = new Stopwatch();
-			stopwatch.Start();
-#endif
 
 			// get cached item
 			object value = null;
@@ -850,18 +656,13 @@ namespace net.vieapps.Components.Caching
 			if (autoGetFragments && value != null && value is Fragment)
 				try
 				{
-					value = this._GetAsFragments((Fragment)value);
+					value = await this._GetAsFragmentsAsync((Fragment)value);
 				}
 				catch (Exception ex)
 				{
 					Helper.WriteLogs(this._name, "Error occurred while fetching an objects' fragments from cache storage [" + key + "]", ex);
 					value = null;
 				}
-
-#if DEBUG
-			stopwatch.Stop();
-			Debug.WriteLine(debug + " (" + DateTime.Now.ToString("HH:mm:ss.fff") + "): " + "Get single cache item [" + key + "] is completed in " + stopwatch.ElapsedMilliseconds.ToString() + " miliseconds");
-#endif
 
 			// return object
 			return value;
@@ -874,12 +675,6 @@ namespace net.vieapps.Components.Caching
 			// check keys
 			if (object.ReferenceEquals(keys, null))
 				return null;
-
-#if DEBUG
-			var debug = Helper.GetLogPrefix(this._name);
-			var stopwatch = new Stopwatch();
-			stopwatch.Start();
-#endif
 
 			// get collection of cached objects
 			var realKeys = new List<string>();
@@ -902,22 +697,16 @@ namespace net.vieapps.Components.Caching
 				try
 				{
 					objects = items.ToDictionary(
-							item => item.Key.Remove(0, this._name.Length + 1),
-							item => item.Value != null && item.Value is Fragment ? this._GetAsFragments((Fragment)item.Value) : item.Value
+							kvp => kvp.Key.Remove(0, this._name.Length + 1),
+							kvp => kvp.Value != null && kvp.Value is Fragment ? this._GetAsFragments((Fragment)kvp.Value) : kvp.Value
 						);
 				}
 				catch { }
 
-			if (objects != null && objects.Count < 1)
-				objects = null;
-
-#if DEBUG
-			stopwatch.Stop();
-			Debug.WriteLine(debug + " (" + DateTime.Now.ToString("HH:mm:ss.fff") + "): " + "Get multiple cache items process is completed in " + stopwatch.ElapsedMilliseconds.ToString() + " miliseconds");
-#endif
-
 			// return collection of cached objects
-			return objects;
+			return objects != null && objects.Count > 0
+				? objects
+				: null;
 		}
 
 		IDictionary<string, T> _Get<T>(IEnumerable<string> keys)
@@ -933,12 +722,6 @@ namespace net.vieapps.Components.Caching
 			// check keys
 			if (object.ReferenceEquals(keys, null))
 				return null;
-
-#if DEBUG
-			var debug = Helper.GetLogPrefix(this._name);
-			var stopwatch = new Stopwatch();
-			stopwatch.Start();
-#endif
 
 			// get collection of cached objects
 			var realKeys = new List<string>();
@@ -957,33 +740,27 @@ namespace net.vieapps.Components.Caching
 			}
 
 			var objects = new Dictionary<string, object>();
-			Func<KeyValuePair<string, object>, Task> func = async (kvp) =>
-			{
-				var key = kvp.Key.Remove(0, this._name.Length + 1);
-				var value = kvp.Value != null && kvp.Value is Fragment
-					? await this._GetAsFragmentsAsync((Fragment)kvp.Value)
-					: kvp.Value;
-				objects.Add(key, value);
-			};
-
 			if (items != null && items.Count > 0)
 			{
+				Func<KeyValuePair<string, object>, Task> func = async (kvp) =>
+				{
+					var key = kvp.Key.Remove(0, this._name.Length + 1);
+					var value = kvp.Value != null && kvp.Value is Fragment
+						? await this._GetAsFragmentsAsync((Fragment)kvp.Value)
+						: kvp.Value;
+					objects.Add(key, value);
+				};
+
 				var tasks = new List<Task>();
 				foreach (var kvp in items)
 					tasks.Add(func(kvp));
 				await Task.WhenAll(tasks);
 			}
 
-			if (objects != null && objects.Count < 1)
-				objects = null;
-
-#if DEBUG
-			stopwatch.Stop();
-			Debug.WriteLine(debug + " (" + DateTime.Now.ToString("HH:mm:ss.fff") + "): " + "Get multiple cache items process is completed in " + stopwatch.ElapsedMilliseconds.ToString() + " miliseconds");
-#endif
-
 			// return collection of cached objects
-			return objects;
+			return objects != null && objects.Count >0
+				? objects
+				: null;
 		}
 
 		async Task<IDictionary<string, T>> _GetAsync<T>(IEnumerable<string> keys)
@@ -1024,10 +801,6 @@ namespace net.vieapps.Components.Caching
 			if (type == null)
 				return null;
 
-#if DEBUG
-			string debug = "[FRAGMENTS > " + Process.GetCurrentProcess().Id.ToString() + " : " + AppDomain.CurrentDomain.Id.ToString() + " : " + Thread.CurrentThread.ManagedThreadId.ToString() + "]";
-#endif
-
 			// get all fragments
 			var fragments = new byte[0];
 			var length = 0;
@@ -1053,14 +826,14 @@ namespace net.vieapps.Components.Caching
 			}
 
 			// deserialize object
-			object @object = Type.GetType(fragment.Type).Equals(typeof(byte[])) && fragments.Length > 0
+			object @object = type.Equals(typeof(byte[])) && fragments.Length > 0
 				? fragments
 				: null;
 
 			if (@object == null && fragments.Length > 0)
 				try
 				{
-					@object = Helper.DeserializeFromBinary(fragments);
+					@object = Helper.Deserialize(fragments);
 				}
 				catch (Exception ex)
 				{
@@ -1073,29 +846,8 @@ namespace net.vieapps.Components.Caching
 					}
 				}
 
-#if DEBUG
-			Debug.WriteLine(debug + " (" + DateTime.Now.ToString("HH:mm:ss.fff") + ") Get as fragments successful [" + fragment.Key + " - " + fragment.Type + "]. Total of fragments: " + fragment.TotalFragments.ToString());
-#endif
-
 			// return object
 			return @object;
-		}
-
-		object _GetAsFragments(string key)
-		{
-			object fragment = null;
-			try
-			{
-				fragment = Cache.Memcached.Get(key);
-			}
-			catch (Exception ex)
-			{
-				Helper.WriteLogs(this._name, "Error occurred while fetching fragments from cache [" + key + "]", ex);
-			}
-
-			return fragment != null && fragment is Fragment && ((Fragment)fragment).TotalFragments > 0
-				? this._GetAsFragments((Fragment)fragment)
-				: null;
 		}
 
 		async Task<List<byte[]>> _GetAsFragmentsAsync(string key, List<int> indexes)
@@ -1103,20 +855,19 @@ namespace net.vieapps.Components.Caching
 			if (string.IsNullOrWhiteSpace(key))
 				return null;
 
-			var fragments = new List<byte[]>(indexes.Count);
-			Func<int, Task> actionAsync = async (index) =>
+			var fragments = Enumerable.Repeat(new byte[0], indexes.Count).ToList();
+			Func<int, Task> func = async (index) =>
 			{
 				var bytes = indexes[index] < 0
 					? null
 					: await this._GetAsync(this._GetFragmentKey(key, indexes[index]), false) as byte[];
-
 				if (bytes != null && bytes.Length > 0)
 					fragments[index] = bytes;
 			};
 
 			var tasks = new List<Task>();
 			for (var index = 0; index < indexes.Count; index++)
-				tasks.Add(actionAsync(index));
+				tasks.Add(func(index));
 			await Task.WhenAll(tasks);
 
 			return fragments;
@@ -1133,13 +884,9 @@ namespace net.vieapps.Components.Caching
 			if (type == null)
 				return null;
 
-#if DEBUG
-			string debug = "[FRAGMENTS > " + Process.GetCurrentProcess().Id.ToString() + " : " + AppDomain.CurrentDomain.Id.ToString() + " : " + Thread.CurrentThread.ManagedThreadId.ToString() + "]";
-#endif
-
 			// get all fragments
-			var fragments = new List<byte[]>(fragment.TotalFragments);
-			Func<int, Task> actionAsync = async (index) =>
+			var fragments = Enumerable.Repeat(new byte[0], fragment.TotalFragments).ToList();
+			Func<int, Task> func = async (index) =>
 			{
 				var fragmentKey = this._GetKey(this._GetFragmentKey(fragment.Key, index));
 				try
@@ -1154,7 +901,7 @@ namespace net.vieapps.Components.Caching
 
 			var tasks = new List<Task>();
 			for (var index = 0; index < fragment.TotalFragments; index++)
-				tasks.Add(actionAsync(index));
+				tasks.Add(func(index));
 			await Task.WhenAll(tasks);
 
 			// merge
@@ -1169,14 +916,14 @@ namespace net.vieapps.Components.Caching
 				}
 
 			// deserialize object
-			object @object = Type.GetType(fragment.Type).Equals(typeof(byte[])) && data.Length > 0
+			object @object = type.Equals(typeof(byte[])) && data.Length > 0
 				? data
 				: null;
 
 			if (@object == null && data.Length > 0)
 				try
 				{
-					@object = Helper.DeserializeFromBinary(data);
+					@object = Helper.Deserialize(data);
 				}
 				catch (Exception ex)
 				{
@@ -1189,29 +936,8 @@ namespace net.vieapps.Components.Caching
 					}
 				}
 
-#if DEBUG
-			Debug.WriteLine(debug + " (" + DateTime.Now.ToString("HH:mm:ss.fff") + ") Get as fragments successful [" + fragment.Key + " - " + fragment.Type + "]. Total of fragments: " + fragment.TotalFragments.ToString());
-#endif
-
 			// return object
 			return @object;
-		}
-
-		async Task<object> _GetAsFragmentsAsync(string key)
-		{
-			object fragment = null;
-			try
-			{
-				fragment = await Cache.Memcached.GetAsync(key);
-			}
-			catch (Exception ex)
-			{
-				Helper.WriteLogs(this._name, "Error occurred while fetching fragments from cache [" + key + "]", ex);
-			}
-
-			return fragment != null && fragment is Fragment && ((Fragment)fragment).TotalFragments > 0
-				? await this._GetAsFragmentsAsync((Fragment)fragment)
-				: null;
 		}
 		#endregion
 
@@ -1242,7 +968,7 @@ namespace net.vieapps.Components.Caching
 					if (!this._removedKeys.Contains(key))
 						try
 						{
-							this._lock.EnterWriteLock();
+							this._locker.EnterWriteLock();
 							this._removedKeys.Add(key);
 						}
 						catch (Exception ex)
@@ -1251,16 +977,12 @@ namespace net.vieapps.Components.Caching
 						}
 						finally
 						{
-							if (this._lock.IsWriteLockHeld)
-								this._lock.ExitWriteLock();
+							if (this._locker.IsWriteLockHeld)
+								this._locker.ExitWriteLock();
 						}
 
 					if (doPush && this._removedKeys.Count > 0)
-#if DEBUG
-						this._UpdateKeys("REMOVE", 213);
-#else
-						this._UpdateKeys(213);
-#endif
+						this._UpdateKeys(123);
 				}
 			}
 
@@ -1294,7 +1016,7 @@ namespace net.vieapps.Components.Caching
 					if (!this._removedKeys.Contains(key))
 						try
 						{
-							this._lock.EnterWriteLock();
+							this._locker.EnterWriteLock();
 							this._removedKeys.Add(key);
 						}
 						catch (Exception ex)
@@ -1303,16 +1025,12 @@ namespace net.vieapps.Components.Caching
 						}
 						finally
 						{
-							if (this._lock.IsWriteLockHeld)
-								this._lock.ExitWriteLock();
+							if (this._locker.IsWriteLockHeld)
+								this._locker.ExitWriteLock();
 						}
 
 					if (doPush && this._removedKeys.Count > 0)
-#if DEBUG
-						this._UpdateKeys("REMOVE", 213);
-#else
-						this._UpdateKeys(213);
-#endif
+						this._UpdateKeys(123);
 				}
 			}
 
@@ -1333,13 +1051,9 @@ namespace net.vieapps.Components.Caching
 				if (!string.IsNullOrWhiteSpace(key))
 					this._Remove((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + key, false);
 
-			// push keys
+			// update keys
 			if (this._updateKeys && this._removedKeys.Count > 0)
-#if DEBUG
-				this._UpdateKeys("REMOVE-MULTIPLE", 213);
-#else
-				this._UpdateKeys(213);
-#endif
+				this._UpdateKeys(123);
 		}
 
 		async Task _RemoveAsync(IEnumerable<string> keys, string keyPrefix = null)
@@ -1355,13 +1069,9 @@ namespace net.vieapps.Components.Caching
 					tasks.Add(this._RemoveAsync((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + key, false));
 			await Task.WhenAll(tasks);
 
-			// push keys
+			// update keys
 			if (this._updateKeys && this._removedKeys.Count > 0)
-#if DEBUG
-				this._UpdateKeys("REMOVE-MULTIPLE", 213);
-#else
-				this._UpdateKeys(213);
-#endif
+				this._UpdateKeys(123);
 		}
 		#endregion
 
@@ -1410,67 +1120,28 @@ namespace net.vieapps.Components.Caching
 		#region Clear
 		void _Clear()
 		{
-#if DEBUG
-			var stopwatch = new Stopwatch();
-			stopwatch.Start();
-			var debug = Helper.GetLogPrefix(this._name);
-#endif
-
-			// get keys
-			var keys = this._GetKeys();
-
-#if DEBUG
-			stopwatch.Stop();
-			Debug.WriteLine(debug + " (" + DateTime.Now.ToString("HH:mm:ss.fff") + ") <CLEAR>: Get keys to clear [" + this._RegionKey + "] is completed in " + stopwatch.ElapsedMilliseconds.ToString() + " miliseconds");
-			stopwatch.Restart();
-#endif
-
-			// remove cached items
-			this._Remove(keys);
-
-			// remove mapping keys
+			// remove
+			this._Remove(this._GetKeys());
 			Cache.Memcached.Remove(this._RegionKey);
 
 			try
 			{
-				this._lock.EnterWriteLock();
+				this._locker.EnterWriteLock();
 				this._addedKeys.Clear();
 				this._removedKeys.Clear();
 			}
-			catch (Exception ex)
-			{
-				Helper.WriteLogs(this._name, "Error occurred while updating the added/removed keys (after clear)", ex);
-			}
+			catch { }
 			finally
 			{
-				if (this._lock.IsWriteLockHeld)
-					this._lock.ExitWriteLock();
+				if (this._locker.IsWriteLockHeld)
+					this._locker.ExitWriteLock();
 			}
-
-#if DEBUG
-			stopwatch.Stop();
-			Debug.WriteLine(debug + " (" + DateTime.Now.ToString("HH:mm:ss.fff") + ") <CLEAR>: Clear all cached items [" + this._RegionKey + "] is completed in " + stopwatch.ElapsedMilliseconds.ToString() + " miliseconds");
-#endif
 		}
 
 		async Task _ClearAsync()
 		{
-#if DEBUG
-			var stopwatch = new Stopwatch();
-			stopwatch.Start();
-			var debug = Helper.GetLogPrefix(this._name);
-#endif
-
-			// get keys
-			var keys = await this._GetKeysAsync();
-
-#if DEBUG
-			stopwatch.Stop();
-			Debug.WriteLine(debug + " (" + DateTime.Now.ToString("HH:mm:ss.fff") + ") <CLEAR>: Get keys to clear [" + this._RegionKey + "] is completed in " + stopwatch.ElapsedMilliseconds.ToString() + " miliseconds");
-			stopwatch.Restart();
-#endif
-
 			// remove
+			var keys = await this._GetKeysAsync();
 			await Task.WhenAll(
 				this._RemoveAsync(keys),
 				Cache.Memcached.RemoveAsync(this._RegionKey)
@@ -1478,24 +1149,210 @@ namespace net.vieapps.Components.Caching
 
 			try
 			{
-				this._lock.EnterWriteLock();
+				this._locker.EnterWriteLock();
 				this._addedKeys.Clear();
 				this._removedKeys.Clear();
 			}
-			catch (Exception ex)
-			{
-				Helper.WriteLogs(this._name, "Error occurred while updating the added/removed keys (after clear)", ex);
-			}
+			catch { }
 			finally
 			{
-				if (this._lock.IsWriteLockHeld)
-					this._lock.ExitWriteLock();
+				if (this._locker.IsWriteLockHeld)
+					this._locker.ExitWriteLock();
+			}
+		}
+		#endregion
+
+		// -----------------------------------------------------
+
+		#region [Helper]
+		string _GetKey(string key)
+		{
+			return this._name + "@" + key.Replace(" ", "-");
+		}
+
+		string _GetFragmentKey(string key, int index)
+		{
+			return key.Replace(" ", "-") + "$[Fragment<" + index.ToString() + ">]";
+		}
+
+		string _RegionKey
+		{
+			get
+			{
+				return this._GetKey("<Region-Keys>");
+			}
+		}
+		#endregion
+
+		#region [Static]
+		internal static bool SetKeys(string key, HashSet<string> keys)
+		{
+			var fragments = Helper.Split(Helper.Serialize(keys), Cache.DefaultFragmentSize);
+			var fragmentsInfo = new Fragment()
+			{
+				Key = key,
+				Type = keys.GetType().ToString() + "," + keys.GetType().Assembly.FullName,
+				TotalFragments = fragments.Count
+			};
+
+			if (Cache.Memcached.Store(StoreMode.Set, key, fragmentsInfo))
+			{
+				for (int index = 0; index < fragments.Count; index++)
+					Cache.Memcached.Store(StoreMode.Set, key + ":" + index, fragments[index]);
+				return true;
 			}
 
-#if DEBUG
-			stopwatch.Stop();
-			Debug.WriteLine(debug + " (" + DateTime.Now.ToString("HH:mm:ss.fff") + ") <CLEAR>: Clear all cached items [" + this._RegionKey + "] is completed in " + stopwatch.ElapsedMilliseconds.ToString() + " miliseconds");
-#endif
+			return false;
+		}
+
+		internal static async Task<bool> SetKeysAsync(string key, HashSet<string> keys)
+		{
+			var fragments = Helper.Split(Helper.Serialize(keys), Cache.DefaultFragmentSize);
+			var fragmentsInfo = new Fragment()
+			{
+				Key = key,
+				Type = keys.GetType().ToString() + "," + keys.GetType().Assembly.FullName,
+				TotalFragments = fragments.Count
+			};
+
+			if (await Cache.Memcached.StoreAsync(StoreMode.Set, key, fragmentsInfo))
+			{
+				var tasks = new List<Task>();
+				for (int index = 0; index < fragments.Count; index++)
+					tasks.Add(Cache.Memcached.StoreAsync(StoreMode.Set, key + ":" + index, fragments[index]));
+				await Task.WhenAll(tasks);
+
+				return true;
+			}
+
+			return false;
+		}
+
+		internal static HashSet<string> FetchKeys(string key)
+		{
+			// get info
+			var info = Cache.Memcached.Get<Fragment>(key);
+			if (object.ReferenceEquals(info, null))
+				return new HashSet<string>();
+
+			// get all fragments
+			var fragments = new byte[0];
+			var length = 0;
+			for (var index = 0; index < info.TotalFragments; index++)
+			{
+				byte[] bytes = null;
+				try
+				{
+					bytes = Cache.Memcached.Get<byte[]>(key + ":" + index);
+				}
+				catch { }
+
+				if (bytes != null && bytes.Length > 0)
+				{
+					Array.Resize<byte>(ref fragments, length + bytes.Length);
+					Array.Copy(bytes, 0, fragments, length, bytes.Length);
+					length += bytes.Length;
+				}
+			}
+
+			// deserialize
+			try
+			{
+				return fragments.Length > 0
+					? Helper.Deserialize(fragments) as HashSet<string>
+					: new HashSet<string>();
+			}
+			catch
+			{
+				return new HashSet<string>();
+			}
+		}
+
+		internal static async Task<HashSet<string>> FetchKeysAsync(string key)
+		{
+			// get info
+			var info = await Cache.Memcached.GetAsync<Fragment>(key);
+			if (object.ReferenceEquals(info, null))
+				return new HashSet<string>();
+
+			// get all fragments
+			var fragments = Enumerable.Repeat(new byte[0], info.TotalFragments).ToList();
+			Func<int, Task> func = async (index) =>
+			{
+				fragments[index] = await Cache.Memcached.GetAsync<byte[]>(key + ":" + index);
+			};
+
+			var tasks = new List<Task>();
+			for (var index = 0; index < info.TotalFragments; index++)
+				tasks.Add(func(index));
+			await Task.WhenAll(tasks);
+
+			var data = new byte[0];
+			var length = 0;
+			foreach (var bytes in fragments)
+				if (bytes != null && bytes.Length > 0)
+				{
+					Array.Resize<byte>(ref data, length + bytes.Length);
+					Array.Copy(bytes, 0, data, length, bytes.Length);
+					length += bytes.Length;
+				}
+
+			// deserialize
+			try
+			{
+				return data.Length > 0
+					? Helper.Deserialize(data) as HashSet<string>
+					: new HashSet<string>();
+			}
+			catch
+			{
+				return new HashSet<string>();
+			}
+		}
+
+		static readonly string RegionsKey = "VIEApps-NGX-Regions";
+
+		/// <summary>
+		/// Gets the collection of all registered regions (in distributed cache)
+		/// </summary>
+		public static HashSet<string> GetRegions()
+		{
+			return Cache.FetchKeys(Cache.RegionsKey);
+		}
+
+		/// <summary>
+		/// Gets the collection of all registered regions (in distributed cache)
+		/// </summary>
+		public static Task<HashSet<string>> GetRegionsAsync()
+		{
+			return Cache.FetchKeysAsync(Cache.RegionsKey);
+		}
+
+		static async Task RegisterRegionAsync(string name)
+		{
+			// wait for other
+			var attempt = 0;
+			while (attempt < 123 && await Cache.Memcached.ExistsAsync(Cache.RegionsKey + "-Registering"))
+			{
+				await Task.Delay(234);
+				attempt++;
+			}
+
+			// set flag
+			await Cache.Memcached.StoreAsync(StoreMode.Set, Cache.RegionsKey + "-Registering", "v", TimeSpan.FromSeconds(13));
+
+			// fetch regions
+			var regions = await Cache.FetchKeysAsync(Cache.RegionsKey);
+
+			// register
+			if (!regions.Contains(name))
+			{
+				regions.Add(name);
+				await Cache.SetKeysAsync(Cache.RegionsKey, regions);
+			}
+
+			// remove flag
+			await Cache.Memcached.RemoveAsync(Cache.RegionsKey + "-Registering");
 		}
 		#endregion
 
@@ -1540,7 +1397,31 @@ namespace net.vieapps.Components.Caching
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
 		public bool Set(string key, object value, int expirationTime = 0)
 		{
-			return this._Set(key, value, expirationTime, true);
+			return this._Set(key, value, expirationTime);
+		}
+
+		/// <summary>
+		/// Adds an item into cache with a specified key (if the key is already existed, then old cached item will be overriden)
+		/// </summary>
+		/// <param name="key">The string that presents key of item</param>
+		/// <param name="value">The object that is to be cached</param>
+		/// <param name="validFor">The time when the item is invalidated in the cache</param>
+		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
+		public bool Set(string key, object value, TimeSpan validFor)
+		{
+			return this._Set(key, value, validFor);
+		}
+
+		/// <summary>
+		/// Adds an item into cache with a specified key (if the key is already existed, then old cached item will be overriden)
+		/// </summary>
+		/// <param name="key">The string that presents key of item</param>
+		/// <param name="value">The object that is to be cached</param>
+		/// <param name="expiresAt">The time when the item is invalidated in the cache</param>
+		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
+		public bool Set(string key, object value, DateTime expiresAt)
+		{
+			return this._Set(key, value, expiresAt);
 		}
 
 		/// <summary>
@@ -1553,6 +1434,30 @@ namespace net.vieapps.Components.Caching
 		public Task<bool> SetAsync(string key, object value, int expirationTime = 0)
 		{
 			return this._SetAsync(key, value, expirationTime, true);
+		}
+
+		/// <summary>
+		/// Adds an item into cache with a specified key (if the key is already existed, then old cached item will be overriden)
+		/// </summary>
+		/// <param name="key">The string that presents key of item</param>
+		/// <param name="value">The object that is to be cached</param>
+		/// <param name="validFor">The time when the item is invalidated in the cache</param>
+		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
+		public Task<bool> SetAsync(string key, object value, TimeSpan validFor)
+		{
+			return this._SetAsync(key, value, validFor);
+		}
+
+		/// <summary>
+		/// Adds an item into cache with a specified key (if the key is already existed, then old cached item will be overriden)
+		/// </summary>
+		/// <param name="key">The string that presents key of item</param>
+		/// <param name="value">The object that is to be cached</param>
+		/// <param name="expiresAt">The time when the item is invalidated in the cache</param>
+		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
+		public Task<bool> SetAsync(string key, object value, DateTime expiresAt)
+		{
+			return this._SetAsync(key, value, expiresAt);
 		}
 		#endregion
 
@@ -2021,181 +1926,6 @@ namespace net.vieapps.Components.Caching
 		public Task ClearAsync()
 		{
 			return this._ClearAsync();
-		}
-		#endregion
-
-		// -----------------------------------------------------
-
-		#region [Helper]
-		string _RegionKey
-		{
-			get
-			{
-				return this._GetKey("Isolated-Region-Keys");
-			}
-		}
-
-		string _RegionUpdatingFlag
-		{
-			get
-			{
-				return this._RegionKey + "<Updating-Flag>";
-			}
-		}
-
-		string _RegionPushingFlag
-		{
-			get
-			{
-				return this._RegionKey + "<Pushing-Flag>";
-			}
-		}
-
-		string _GetKey(string key)
-		{
-			return this._name + "@" + key.Replace(" ", "-");
-		}
-
-		string _GetFragmentKey(string key, int index)
-		{
-			return key.Replace(" ", "-") + "$[Fragment<" + index.ToString() + ">]";
-		}
-		#endregion
-
-		#region [Static]
-		internal static bool SetRemoteKeys(string key, HashSet<string> keys)
-		{
-			var fragments = Helper.Split(Helper.SerializeAsBinary(keys), Cache.DefaultFragmentSize);
-			var fragmentsInfo = new Fragment()
-			{
-				Key = key,
-				Type = keys.GetType().ToString() + "," + keys.GetType().Assembly.FullName,
-				TotalFragments = fragments.Count
-			};
-
-			if (Cache.Memcached.Store(StoreMode.Set, Cache.RegionsKey, fragmentsInfo))
-			{
-				for (int index = 0; index < fragments.Count; index++)
-					Cache.Memcached.Store(StoreMode.Set, key + ":" + index, fragments[index]);
-				return true;
-			}
-
-			return false;
-		}
-
-		internal static Task<bool> SetRemoteKeysAsync(string key, HashSet<string> keys)
-		{
-			return Helper.ExecuteTask<bool>(() => Cache.SetRemoteKeys(key, keys));
-		}
-
-		internal static HashSet<string> GetRemoteKeys(string key)
-		{
-			var info = Cache.Memcached.Get<Fragment>(key);
-			if (object.ReferenceEquals(info, null))
-				return new HashSet<string>();
-
-			// get all fragments
-			var fragments = new byte[0];
-			var length = 0;
-			for (var index = 0; index < info.TotalFragments; index++)
-			{
-				byte[] bytes = null;
-				try
-				{
-					bytes = Cache.Memcached.Get<byte[]>(key + ":" + index);
-				}
-				catch { }
-
-				if (bytes != null && bytes.Length > 0)
-				{
-					Array.Resize<byte>(ref fragments, length + bytes.Length);
-					Array.Copy(bytes, 0, fragments, length, bytes.Length);
-					length += bytes.Length;
-				}
-			}
-
-			try
-			{
-				return fragments.Length > 0
-					? Helper.DeserializeFromBinary(fragments) as HashSet<string>
-					: new HashSet<string>();
-			}
-			catch
-			{
-				return new HashSet<string>();
-			}
-		}
-
-		internal static Task<HashSet<string>> GetRemoteKeysAsync(string key)
-		{
-			return Helper.ExecuteTask<HashSet<string>>(() => Cache.GetRemoteKeys(key));
-		}
-
-		static readonly string RegionsKey = "VIEApps-Caching-Regions";
-
-		/// <summary>
-		/// Gets the collection of all registered regions (in distributed cache)
-		/// </summary>
-		public static HashSet<string> GetAllRegions()
-		{
-			return Cache.GetRemoteKeys(Cache.RegionsKey);
-		}
-
-		/// <summary>
-		/// Gets the collection of all registered regions (in distributed cache)
-		/// </summary>
-		public static Task<HashSet<string>> GetAllRegionsAsync()
-		{
-			return Cache.GetRemoteKeysAsync(Cache.RegionsKey);
-		}
-
-		static async Task RegisterRegionAsync(string name)
-		{
-			// wait for other
-			var attempt = 0;
-			while (attempt < 123 && await Cache.Memcached.ExistsAsync(Cache.RegionsKey + "-Registering"))
-			{
-				await Task.Delay(123);
-				attempt++;
-			}
-
-			// set flag
-			await Cache.Memcached.StoreAsync(StoreMode.Set, Cache.RegionsKey + "-Registering", "v", TimeSpan.FromSeconds(30));
-
-			// fetch region-keys
-			var regions = await Cache.GetRemoteKeysAsync(Cache.RegionsKey);
-
-			// register new region
-			if (!regions.Contains(name))
-			{
-				regions.Add(name);
-				try
-				{
-#if DEBUG
-					string debug = "[" + name + " > " + Process.GetCurrentProcess().Id.ToString() + " : " + AppDomain.CurrentDomain.Id.ToString() + " : " + Thread.CurrentThread.ManagedThreadId.ToString() + "]";
-#endif
-
-					if (!await Cache.SetRemoteKeysAsync(Cache.RegionsKey, regions))
-					{
-#if DEBUG
-						Debug.WriteLine(debug + " (" + DateTime.Now.ToString("HH:mm:ss.fff") + ") <INIT>: Cannot update regions into cache storage");
-#endif
-
-						Helper.WriteLogs(name, "Cannot update regions into cache storage", null);
-					}
-#if DEBUG
-					else
-						Debug.WriteLine(debug + " (" + DateTime.Now.ToString("HH:mm:ss.fff") + ") <INIT>: Update regions into cache storage successful");
-#endif
-				}
-				catch (Exception ex)
-				{
-					Helper.WriteLogs(name, "Error occurred while updating regions", ex);
-				}
-			}
-
-			// remove flag
-			await Cache.Memcached.RemoveAsync(Cache.RegionsKey + "-Registering");
 		}
 		#endregion
 

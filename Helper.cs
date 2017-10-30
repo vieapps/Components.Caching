@@ -10,49 +10,10 @@ using System.Configuration;
 
 namespace net.vieapps.Components.Caching
 {
-	/// <summary>
-	/// Helper methods for working with distributed cache
-	/// </summary>
-	public static class Helper
+	internal static class Helper
 	{
 
-		#region Merge & Split
-		internal static HashSet<string> Merge(params HashSet<string>[] sets)
-		{
-			return Helper.Merge(true, sets);
-		}
-
-		internal static HashSet<string> Merge(bool doClone, params HashSet<string>[] sets)
-		{
-			if (sets == null || sets.Length < 1)
-				return null;
-
-			else if (sets.Length < 2)
-				return doClone
-					? Helper.Clone(sets[0])
-					: sets[0];
-
-			var @object = doClone
-				? Helper.Clone(sets[0])
-				: sets[0];
-
-			for (int index = 1; index < sets.Length; index++)
-			{
-				var set = doClone
-					? Helper.Clone(sets[index])
-					: sets[index];
-
-				if (set == null || set.Count < 1)
-					continue;
-
-				foreach (var @string in set)
-					if (!string.IsNullOrWhiteSpace(@string) && !@object.Contains(@string))
-						@object.Add(@string);
-			}
-
-			return @object;
-		}
-
+		#region Split & Serialize
 		internal static List<byte[]> Split(byte[] data, int sizeOfOneFragment)
 		{
 			var fragments = new List<byte[]>();
@@ -72,78 +33,20 @@ namespace net.vieapps.Components.Caching
 			}
 			return fragments;
 		}
-		#endregion
 
-		#region Serialize/Deserialize
-		internal static byte[] SerializeAsBinary(object @object)
+		internal static byte[] Serialize(object @object)
 		{
 			return (new Enyim.Caching.Memcached.DefaultTranscoder()).SerializeObject(@object).Array;
 		}
 
-		internal static object DeserializeFromBinary(byte[] data)
+		internal static object Deserialize(byte[] data)
 		{
 			return (new Enyim.Caching.Memcached.DefaultTranscoder()).DeserializeObject(new ArraySegment<byte>(data));
 		}
 
 		internal static T Clone<T>(T @object)
 		{
-			return (T)Helper.DeserializeFromBinary(Helper.SerializeAsBinary(@object));
-		}
-		#endregion
-
-		#region Task executions
-		internal static Task ExecuteTask(Action action, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			var tcs = new TaskCompletionSource<object>();
-			ThreadPool.QueueUserWorkItem(_ =>
-			{
-				if (cancellationToken == null)
-					cancellationToken = default(CancellationToken);
-				cancellationToken.Register(() =>
-				{
-					tcs.SetCanceled();
-					return;
-				});
-
-				try
-				{
-					action?.Invoke();
-					tcs.SetResult(null);
-				}
-				catch (Exception ex)
-				{
-					tcs.SetException(ex);
-				}
-			});
-			return tcs.Task;
-		}
-
-		internal static Task<TResult> ExecuteTask<TResult>(Func<TResult> func, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			var tcs = new TaskCompletionSource<TResult>();
-			ThreadPool.QueueUserWorkItem(_ =>
-			{
-				if (cancellationToken == null)
-					cancellationToken = default(CancellationToken);
-				cancellationToken.Register(() =>
-				{
-					tcs.SetCanceled();
-					return;
-				});
-
-				try
-				{
-					var result = func != null
-						? func.Invoke()
-						: default(TResult);
-					tcs.SetResult(result);
-				}
-				catch (Exception ex)
-				{
-					tcs.SetException(ex);
-				}
-			});
-			return tcs.Task;
+			return (T)Helper.Deserialize(Helper.Serialize(@object));
 		}
 		#endregion
 

@@ -1,43 +1,43 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
-    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
-    <AssemblyName>VIEApps.Components.Caching</AssemblyName>
-    <Description>The .NET Standard 2.0 client library for working with cache in the VIEApps NGX</Description>
-    <Authors>VIEApps.net</Authors>
-    <Company>VIEApps.net</Company>
-    <Product>VIEApps NGX</Product>
-    <Copyright>© 2017 VIEApps.net</Copyright>
-    <Version>10.1.0.1</Version>
-    <AssemblyVersion>10.1.0.1</AssemblyVersion>
-    <FileVersion>10.1.0.1</FileVersion>
-    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
-    <PackageId>VIEApps.Components.Caching</PackageId>
-    <PackageTags>memcached;cache;vieapps;vieapps.components</PackageTags>
-    <PackageProjectUrl>https://github.com/vieapps/Components.Caching</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/vieapps/Components.Caching</RepositoryUrl>
-    <RepositoryType>git</RepositoryType>
-  </PropertyGroup>
+	<PropertyGroup>
+		<TargetFramework>netstandard2.0</TargetFramework>
+		<AllowUnsafeBlocks>false</AllowUnsafeBlocks>
+		<AssemblyName>VIEApps.Components.Caching</AssemblyName>
+		<Description>The .NET Standard 2.0 client library for working with cache in the VIEApps NGX</Description>
+		<Authors>VIEApps.net</Authors>
+		<Company>VIEApps.net</Company>
+		<Product>VIEApps NGX</Product>
+		<Copyright>© 2017 VIEApps.net</Copyright>
+		<Version>10.1.0.1</Version>
+		<AssemblyVersion>10.1.0.1</AssemblyVersion>
+		<FileVersion>10.1.0.1</FileVersion>
+		<GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+		<PackageId>VIEApps.Components.Caching</PackageId>
+		<PackageTags>memcached;cache;vieapps;vieapps.components</PackageTags>
+		<PackageProjectUrl>https://github.com/vieapps/Components.Caching</PackageProjectUrl>
+		<RepositoryUrl>https://github.com/vieapps/Components.Caching</RepositoryUrl>
+		<RepositoryType>git</RepositoryType>
+	</PropertyGroup>
 
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-    <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Debug\netstandard2.0\VIEApps.Components.Caching.xml</DocumentationFile>
-  </PropertyGroup>
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+		<WarningLevel>3</WarningLevel>
+		<DocumentationFile>bin\Debug\netstandard2.0\VIEApps.Components.Caching.xml</DocumentationFile>
+	</PropertyGroup>
 
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
-    <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Release\netstandard2.0\VIEApps.Components.Caching.xml</DocumentationFile>
-  </PropertyGroup>
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+		<WarningLevel>3</WarningLevel>
+		<DocumentationFile>bin\Release\netstandard2.0\VIEApps.Components.Caching.xml</DocumentationFile>
+	</PropertyGroup>
 
-  <ItemGroup>
-    <None Remove=".DS_Store" />
-    <None Remove=".gitattributes" />
-    <None Remove=".gitignore" />
-  </ItemGroup>
+	<ItemGroup>
+		<None Remove=".DS_Store" />
+		<None Remove=".gitattributes" />
+		<None Remove=".gitignore" />
+	</ItemGroup>
 
-  <ItemGroup>
-    <PackageReference Include="VIEApps.Enyim.Caching" Version="1.1.0" />
-  </ItemGroup>
-  
+	<ItemGroup>
+		<PackageReference Include="VIEApps.Enyim.Caching" Version="1.1.0" />
+	</ItemGroup>
+
 </Project>

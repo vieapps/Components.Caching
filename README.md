@@ -1,7 +1,6 @@
 # Components.Caching
-A wrapper for working with .NET cache, using in-process memory cache and distributed cache (memcached - via Enyim Memcached)
-- Default mode: Distributed
-- Session State Provider for ASP.NET (key-prefix is provider name in app.config/web.config)
-- Async version of Set/Get/Remove methods
-
-Enyim Memcached: https://github.com/enyim/EnyimMemcached
+A .NET Standard 2.0 wrapper for working with cache in .NET - using distributed cache
+- Ready with .NET Core 2.0 and .NET Framework 4.7.1 (and higher)
+- memcached as distributed cache (using [VIEApps.Enyim.Caching](https://github.com/vieapps/VIEApps.Enyim.Caching))
+## Nuget
+https://www.nuget.org/packages/VIEApps.Components.Caching
