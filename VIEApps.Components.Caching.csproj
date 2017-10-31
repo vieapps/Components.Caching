@@ -9,9 +9,9 @@
 		<Company>VIEApps.net</Company>
 		<Product>VIEApps NGX</Product>
 		<Copyright>© 2017 VIEApps.net</Copyright>
-		<Version>10.1.0.1</Version>
-		<AssemblyVersion>10.1.0.1</AssemblyVersion>
-		<FileVersion>10.1.0.1</FileVersion>
+		<Version>10.1.0.3</Version>
+		<AssemblyVersion>10.1.0.3</AssemblyVersion>
+		<FileVersion>10.1.0.3</FileVersion>
 		<GeneratePackageOnBuild>false</GeneratePackageOnBuild>
 		<PackageId>VIEApps.Components.Caching</PackageId>
 		<PackageTags>memcached;cache;vieapps;vieapps.components</PackageTags>
