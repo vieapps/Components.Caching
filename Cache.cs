@@ -4,7 +4,6 @@ using System.Linq;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using System.IO;
 using System.Configuration;
 using System.Diagnostics;
 
@@ -218,26 +217,23 @@ namespace net.vieapps.Components.Caching
 		#endregion
 
 		#region Set
-		bool _Set(string key, object value, int expirationTime = 0, bool doPush = true, StoreMode mode = StoreMode.Set)
+		bool _Set(string key, object value, TimeSpan validFor, bool doPush = true, StoreMode mode = StoreMode.Set)
 		{
-			// check key & value
-			if (string.IsNullOrWhiteSpace(key) || value == null)
-				return false;
-
 			// store
 			var success = false;
-			try
-			{
-				success = Cache.Memcached.Store(mode, this._GetKey(key), value, TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this._expirationTime));
-			}
-			catch (ArgumentException)
-			{
-				throw;
-			}
-			catch (Exception ex)
-			{
-				Helper.WriteLogs(this._name, "Error occurred while updating an object into cache [" + value.GetType().ToString() + "#" + key + "]", ex);
-			}
+			if (!string.IsNullOrWhiteSpace(key) && value != null)
+				try
+				{
+					success = Cache.Memcached.Store(mode, this._GetKey(key), value, validFor);
+				}
+				catch (ArgumentException)
+				{
+					throw;
+				}
+				catch (Exception ex)
+				{
+					Helper.WriteLogs(this._name, "Error occurred while updating an object into cache [" + value.GetType().ToString() + "#" + key + "]", ex);
+				}
 
 			// update mapping key when added successful
 			if (success && this._updateKeys)
@@ -247,84 +243,28 @@ namespace net.vieapps.Components.Caching
 			return success;
 		}
 
-		bool _Set(string key, object value, TimeSpan validFor, bool doPush = true, StoreMode mode = StoreMode.Set)
+		bool _Set(string key, object value, int expirationTime = 0, bool doPush = true, StoreMode mode = StoreMode.Set)
 		{
-			// check key & value
-			if (string.IsNullOrWhiteSpace(key) || value == null)
-				return false;
-
-			// store
-			var success = false;
-			try
-			{
-				success = Cache.Memcached.Store(mode, this._GetKey(key), value, validFor);
-			}
-			catch (ArgumentException)
-			{
-				throw;
-			}
-			catch (Exception ex)
-			{
-				Helper.WriteLogs(this._name, "Error occurred while updating an object into cache [" + value.GetType().ToString() + "#" + key + "]", ex);
-			}
-
-			// update mapping key when added successful
-			if (success && this._updateKeys)
-				this._UpdateKeys(key, doPush);
-
-			// return state
-			return success;
+			return this._Set(key, value, TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this._expirationTime), doPush, mode);
 		}
 
 		bool _Set(string key, object value, DateTime expiresAt, bool doPush = true, StoreMode mode = StoreMode.Set)
 		{
-			// check key & value
-			if (string.IsNullOrWhiteSpace(key) || value == null)
-				return false;
-
 			// store
 			var success = false;
-			try
-			{
-				success = Cache.Memcached.Store(mode, this._GetKey(key), value, expiresAt);
-			}
-			catch (ArgumentException)
-			{
-				throw;
-			}
-			catch (Exception ex)
-			{
-				Helper.WriteLogs(this._name, "Error occurred while updating an object into cache [" + value.GetType().ToString() + "#" + key + "]", ex);
-			}
-
-			// update mapping key when added successful
-			if (success && this._updateKeys)
-				this._UpdateKeys(key, doPush);
-
-			// return state
-			return success;
-		}
-
-		async Task<bool> _SetAsync(string key, object value, int expirationTime = 0, bool doPush = true, StoreMode mode = StoreMode.Set)
-		{
-			// check key & value
-			if (string.IsNullOrWhiteSpace(key) || value == null)
-				return false;
-
-			// store
-			var success = false;
-			try
-			{
-				success = await Cache.Memcached.StoreAsync(mode, this._GetKey(key), value, TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this._expirationTime));
-			}
-			catch (ArgumentException)
-			{
-				throw;
-			}
-			catch (Exception ex)
-			{
-				Helper.WriteLogs(this._name, "Error occurred while updating an object into cache [" + value.GetType().ToString() + "#" + key + "]", ex);
-			}
+			if (!string.IsNullOrWhiteSpace(key) && value != null)
+				try
+				{
+					success = Cache.Memcached.Store(mode, this._GetKey(key), value, expiresAt);
+				}
+				catch (ArgumentException)
+				{
+					throw;
+				}
+				catch (Exception ex)
+				{
+					Helper.WriteLogs(this._name, "Error occurred while updating an object into cache [" + value.GetType().ToString() + "#" + key + "]", ex);
+				}
 
 			// update mapping key when added successful
 			if (success && this._updateKeys)
@@ -336,24 +276,21 @@ namespace net.vieapps.Components.Caching
 
 		async Task<bool> _SetAsync(string key, object value, TimeSpan validFor, bool doPush = true, StoreMode mode = StoreMode.Set)
 		{
-			// check key & value
-			if (string.IsNullOrWhiteSpace(key) || value == null)
-				return false;
-
 			// store
 			var success = false;
-			try
-			{
-				success = await Cache.Memcached.StoreAsync(mode, this._GetKey(key), value, validFor);
-			}
-			catch (ArgumentException)
-			{
-				throw;
-			}
-			catch (Exception ex)
-			{
-				Helper.WriteLogs(this._name, "Error occurred while updating an object into cache [" + value.GetType().ToString() + "#" + key + "]", ex);
-			}
+			if (!string.IsNullOrWhiteSpace(key) && value != null)
+				try
+				{
+					success = await Cache.Memcached.StoreAsync(mode, this._GetKey(key), value, validFor);
+				}
+				catch (ArgumentException)
+				{
+					throw;
+				}
+				catch (Exception ex)
+				{
+					Helper.WriteLogs(this._name, "Error occurred while updating an object into cache [" + value.GetType().ToString() + "#" + key + "]", ex);
+				}
 
 			// update mapping key when added successful
 			if (success && this._updateKeys)
@@ -363,26 +300,28 @@ namespace net.vieapps.Components.Caching
 			return success;
 		}
 
+		Task<bool> _SetAsync(string key, object value, int expirationTime = 0, bool doPush = true, StoreMode mode = StoreMode.Set)
+		{
+			return this._SetAsync(key, value, TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this._expirationTime), doPush, mode);
+		}
+
 		async Task<bool> _SetAsync(string key, object value, DateTime expiresAt, bool doPush = true, StoreMode mode = StoreMode.Set)
 		{
-			// check key & value
-			if (string.IsNullOrWhiteSpace(key) || value == null)
-				return false;
-
 			// store
 			var success = false;
-			try
-			{
-				success = await Cache.Memcached.StoreAsync(mode, this._GetKey(key), value, expiresAt);
-			}
-			catch (ArgumentException)
-			{
-				throw;
-			}
-			catch (Exception ex)
-			{
-				Helper.WriteLogs(this._name, "Error occurred while updating an object into cache [" + value.GetType().ToString() + "#" + key + "]", ex);
-			}
+			if (!string.IsNullOrWhiteSpace(key) && value != null)
+				try
+				{
+					success = await Cache.Memcached.StoreAsync(mode, this._GetKey(key), value, expiresAt);
+				}
+				catch (ArgumentException)
+				{
+					throw;
+				}
+				catch (Exception ex)
+				{
+					Helper.WriteLogs(this._name, "Error occurred while updating an object into cache [" + value.GetType().ToString() + "#" + key + "]", ex);
+				}
 
 			// update mapping key when added successful
 			if (success && this._updateKeys)
@@ -581,28 +520,6 @@ namespace net.vieapps.Components.Caching
 		}
 		#endregion
 
-		#region Add & Replace
-		bool _Add(string key, object value, int expirationTime = 0)
-		{
-			return this._Set(key, value, expirationTime, true, StoreMode.Add);
-		}
-
-		Task<bool> _AddAsync(string key, object value, int expirationTime = 0)
-		{
-			return this._SetAsync(key, value, expirationTime, true, StoreMode.Add);
-		}
-
-		bool _Replace(string key, object value, int expirationTime = 0)
-		{
-			return this._Set(key, value, expirationTime, true, StoreMode.Replace);
-		}
-
-		Task<bool> _ReplaceAsync(string key, object value, int expirationTime = 0)
-		{
-			return this._SetAsync(key, value, expirationTime, true, StoreMode.Replace);
-		}
-		#endregion
-
 		#region Get
 		object _Get(string key, bool autoGetFragments = true)
 		{
@@ -673,7 +590,7 @@ namespace net.vieapps.Components.Caching
 		IDictionary<string, object> _Get(IEnumerable<string> keys)
 		{
 			// check keys
-			if (object.ReferenceEquals(keys, null))
+			if (keys == null)
 				return null;
 
 			// get collection of cached objects
@@ -720,7 +637,7 @@ namespace net.vieapps.Components.Caching
 		async Task<IDictionary<string, object>> _GetAsync(IEnumerable<string> keys)
 		{
 			// check keys
-			if (object.ReferenceEquals(keys, null))
+			if (keys == null)
 				return null;
 
 			// get collection of cached objects
@@ -784,6 +701,7 @@ namespace net.vieapps.Components.Caching
 				var bytes = index < 0
 					? null
 					: this._Get(this._GetFragmentKey(key, index), false) as byte[];
+
 				if (bytes != null && bytes.Length > 0)
 					fragments.Add(bytes);
 			});
@@ -806,16 +724,7 @@ namespace net.vieapps.Components.Caching
 			var length = 0;
 			for (var index = 0; index < fragment.TotalFragments; index++)
 			{
-				byte[] bytes = null;
-				var fragmentKey = this._GetKey(this._GetFragmentKey(fragment.Key, index));
-				try
-				{
-					bytes = Cache.Memcached.Get<byte[]>(fragmentKey);
-				}
-				catch (Exception ex)
-				{
-					Helper.WriteLogs(this._name, "Error occurred while fetching fragments from cache [" + fragmentKey + "]", ex);
-				}
+				byte[] bytes = Cache.Memcached.Get<byte[]>(this._GetKey(this._GetFragmentKey(fragment.Key, index)));
 
 				if (bytes != null && bytes.Length > 0)
 				{
@@ -861,6 +770,7 @@ namespace net.vieapps.Components.Caching
 				var bytes = indexes[index] < 0
 					? null
 					: await this._GetAsync(this._GetFragmentKey(key, indexes[index]), false) as byte[];
+
 				if (bytes != null && bytes.Length > 0)
 					fragments[index] = bytes;
 			};
@@ -888,15 +798,7 @@ namespace net.vieapps.Components.Caching
 			var fragments = Enumerable.Repeat(new byte[0], fragment.TotalFragments).ToList();
 			Func<int, Task> func = async (index) =>
 			{
-				var fragmentKey = this._GetKey(this._GetFragmentKey(fragment.Key, index));
-				try
-				{
-					fragments[index] = await Cache.Memcached.GetAsync<byte[]>(fragmentKey);
-				}
-				catch (Exception ex)
-				{
-					Helper.WriteLogs(this._name, "Error occurred while fetching fragments from cache [" + fragmentKey + "]", ex);
-				}
+				fragments[index] = await Cache.Memcached.GetAsync<byte[]>(this._GetKey(this._GetFragmentKey(fragment.Key, index)));
 			};
 
 			var tasks = new List<Task>();
@@ -944,20 +846,17 @@ namespace net.vieapps.Components.Caching
 		#region Remove
 		bool _Remove(string key, bool doPush = true)
 		{
-			// check
-			if (string.IsNullOrWhiteSpace(key))
-				return false;
-
 			// remove
 			var success = false;
-			try
-			{
-				success = Cache.Memcached.Remove(this._GetKey(key));
-			}
-			catch (Exception ex)
-			{
-				Helper.WriteLogs(this._name, "Error occurred while removing an object from cache storage [" + key + "]", ex);
-			}
+			if (!string.IsNullOrWhiteSpace(key))
+				try
+				{
+					success = Cache.Memcached.Remove(this._GetKey(key));
+				}
+				catch (Exception ex)
+				{
+					Helper.WriteLogs(this._name, "Error occurred while removing an object from cache storage [" + key + "]", ex);
+				}
 
 			// update mapping key when removed successful
 			if (success)
@@ -992,20 +891,17 @@ namespace net.vieapps.Components.Caching
 
 		async Task<bool> _RemoveAsync(string key, bool doPush = true)
 		{
-			// check
-			if (string.IsNullOrWhiteSpace(key))
-				return false;
-
 			// remove
 			var success = false;
-			try
-			{
-				success = await Cache.Memcached.RemoveAsync(this._GetKey(key));
-			}
-			catch (Exception ex)
-			{
-				Helper.WriteLogs(this._name, "Error occurred while removing an object from cache storage [" + key + "]", ex);
-			}
+			if (!string.IsNullOrWhiteSpace(key))
+				try
+				{
+					success = await Cache.Memcached.RemoveAsync(this._GetKey(key));
+				}
+				catch (Exception ex)
+				{
+					Helper.WriteLogs(this._name, "Error occurred while removing an object from cache storage [" + key + "]", ex);
+				}
 
 			// update mapping key when removed successful
 			if (success)
@@ -1043,7 +939,7 @@ namespace net.vieapps.Components.Caching
 		void _Remove(IEnumerable<string> keys, string keyPrefix = null)
 		{
 			// check
-			if (object.ReferenceEquals(keys, null))
+			if (keys == null)
 				return;
 
 			// remove
@@ -1059,7 +955,7 @@ namespace net.vieapps.Components.Caching
 		async Task _RemoveAsync(IEnumerable<string> keys, string keyPrefix = null)
 		{
 			// check
-			if (object.ReferenceEquals(keys, null))
+			if (keys == null)
 				return;
 
 			// remove
@@ -1076,10 +972,10 @@ namespace net.vieapps.Components.Caching
 		#endregion
 
 		#region Remove (Fragment)
-		void _RemoveFragments(string key, int maxIndex = 100)
+		void _RemoveFragments(string key, int max = 100)
 		{
 			var keys = new List<string>() { key, key + ":(Secondary-Pure-Object)" };
-			for (var index = 0; index < maxIndex; index++)
+			for (var index = 0; index < max; index++)
 				keys.Add(this._GetFragmentKey(key, index));
 			this._Remove(keys);
 		}
@@ -1090,10 +986,10 @@ namespace net.vieapps.Components.Caching
 				this._RemoveFragments(fragment.Key, fragment.TotalFragments);
 		}
 
-		async Task _RemoveFragmentsAsync(string key, int maxIndex = 100)
+		async Task _RemoveFragmentsAsync(string key, int max = 100)
 		{
 			var keys = new List<string>() { key, key + ":(Secondary-Pure-Object)" };
-			for (var index = 0; index < maxIndex; index++)
+			for (var index = 0; index < max; index++)
 				keys.Add(this._GetFragmentKey(key, index));
 			await this._RemoveAsync(keys);
 		}
@@ -1102,18 +998,6 @@ namespace net.vieapps.Components.Caching
 		{
 			if (!object.ReferenceEquals(fragment, null) && !string.IsNullOrWhiteSpace(fragment.Key) && fragment.TotalFragments > 0)
 				await this._RemoveFragmentsAsync(fragment.Key, fragment.TotalFragments);
-		}
-		#endregion
-
-		#region Exists
-		bool _Exists(string key)
-		{
-			return Cache.Memcached.Exists(this._GetKey(key));
-		}
-
-		Task<bool> _ExistsAsync(string key)
-		{
-			return Cache.Memcached.ExistsAsync(this._GetKey(key));
 		}
 		#endregion
 
@@ -1573,7 +1457,31 @@ namespace net.vieapps.Components.Caching
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
 		public bool Add(string key, object value, int expirationTime = 0)
 		{
-			return this._Add(key, value, expirationTime);
+			return this._Set(key, value, TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this._expirationTime), true, StoreMode.Add);
+		}
+
+		/// <summary>
+		/// Adds an item into cache with a specified key when the the key is not existed
+		/// </summary>
+		/// <param name="key">The string that presents key of item</param>
+		/// <param name="value">The object that is to be cached</param>
+		/// <param name="validFor">The time when the item is invalidated in the cache</param>
+		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
+		public bool Add(string key, object value, TimeSpan validFor)
+		{
+			return this._Set(key, value, validFor, true, StoreMode.Add);
+		}
+
+		/// <summary>
+		/// Adds an item into cache with a specified key when the the key is not existed
+		/// </summary>
+		/// <param name="key">The string that presents key of item</param>
+		/// <param name="value">The object that is to be cached</param>
+		/// <param name="expiresAt">The time when the item is invalidated in the cache</param>
+		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
+		public bool Add(string key, object value, DateTime expiresAt)
+		{
+			return this._Set(key, value, expiresAt, true, StoreMode.Add);
 		}
 
 		/// <summary>
@@ -1585,7 +1493,31 @@ namespace net.vieapps.Components.Caching
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
 		public Task<bool> AddAsync(string key, object value, int expirationTime = 0)
 		{
-			return this._AddAsync(key, value, expirationTime);
+			return this._SetAsync(key, value, TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this._expirationTime), true, StoreMode.Add);
+		}
+
+		/// <summary>
+		/// Adds an item into cache with a specified key when the the key is not existed
+		/// </summary>
+		/// <param name="key">The string that presents key of item</param>
+		/// <param name="value">The object that is to be cached</param>
+		/// <param name="validFor">The time when the item is invalidated in the cache</param>
+		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
+		public Task<bool> AddAsync(string key, object value, TimeSpan validFor)
+		{
+			return this._SetAsync(key, value, validFor, true, StoreMode.Add);
+		}
+
+		/// <summary>
+		/// Adds an item into cache with a specified key when the the key is not existed
+		/// </summary>
+		/// <param name="key">The string that presents key of item</param>
+		/// <param name="value">The object that is to be cached</param>
+		/// <param name="expiresAt">The time when the item is invalidated in the cache</param>
+		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
+		public Task<bool> AddAsync(string key, object value, DateTime expiresAt)
+		{
+			return this._SetAsync(key, value, expiresAt, true, StoreMode.Add);
 		}
 
 		/// <summary>
@@ -1597,7 +1529,31 @@ namespace net.vieapps.Components.Caching
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
 		public bool Replace(string key, object value, int expirationTime = 0)
 		{
-			return this._Replace(key, value, expirationTime);
+			return this._Set(key, value, TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this._expirationTime), true, StoreMode.Replace);
+		}
+
+		/// <summary>
+		/// Adds an item into cache with a specified key when the the key is existed (means update existed item)
+		/// </summary>
+		/// <param name="key">The string that presents key of item</param>
+		/// <param name="value">The object that is to be cached</param>
+		/// <param name="validFor">The time when the item is invalidated in the cache</param>
+		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
+		public bool Replace(string key, object value, TimeSpan validFor)
+		{
+			return this._Set(key, value, validFor, true, StoreMode.Replace);
+		}
+
+		/// <summary>
+		/// Adds an item into cache with a specified key when the the key is existed (means update existed item)
+		/// </summary>
+		/// <param name="key">The string that presents key of item</param>
+		/// <param name="value">The object that is to be cached</param>
+		/// <param name="expiresAt">The time when the item is invalidated in the cache</param>
+		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
+		public bool Replace(string key, object value, DateTime expiresAt)
+		{
+			return this._Set(key, value, expiresAt, true, StoreMode.Replace);
 		}
 
 		/// <summary>
@@ -1609,7 +1565,31 @@ namespace net.vieapps.Components.Caching
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
 		public Task<bool> ReplaceAsync(string key, object value, int expirationTime = 0)
 		{
-			return this._ReplaceAsync(key, value, expirationTime);
+			return this._SetAsync(key, value, TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this._expirationTime), true, StoreMode.Replace);
+		}
+
+		/// <summary>
+		/// Adds an item into cache with a specified key when the the key is existed (means update existed item)
+		/// </summary>
+		/// <param name="key">The string that presents key of item</param>
+		/// <param name="value">The object that is to be cached</param>
+		/// <param name="validFor">The time when the item is invalidated in the cache</param>
+		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
+		public Task<bool> ReplaceAsync(string key, object value, TimeSpan validFor)
+		{
+			return this._SetAsync(key, value, validFor, true, StoreMode.Replace);
+		}
+
+		/// <summary>
+		/// Adds an item into cache with a specified key when the the key is existed (means update existed item)
+		/// </summary>
+		/// <param name="key">The string that presents key of item</param>
+		/// <param name="value">The object that is to be cached</param>
+		/// <param name="expiresAt">The time when the item is invalidated in the cache</param>
+		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
+		public Task<bool> ReplaceAsync(string key, object value, DateTime expiresAt)
+		{
+			return this._SetAsync(key, value, expiresAt, true, StoreMode.Replace);
 		}
 		#endregion
 
@@ -1897,7 +1877,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns>Returns a boolean value indicating if the object that associates with the key is cached or not</returns>
 		public bool Exists(string key)
 		{
-			return this._Exists(key);
+			return Cache.Memcached.Exists(this._GetKey(key));
 		}
 
 		/// <summary>
@@ -1907,7 +1887,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns>Returns a boolean value indicating if the object that associates with the key is cached or not</returns>
 		public Task<bool> ExistsAsync(string key)
 		{
-			return this._ExistsAsync(key);
+			return Cache.Memcached.ExistsAsync(this._GetKey(key));
 		}
 		#endregion
 
