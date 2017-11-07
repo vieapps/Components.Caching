@@ -6,6 +6,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Diagnostics;
 using System.Configuration;
+
+using Enyim.Caching.Memcached;
 #endregion
 
 namespace net.vieapps.Components.Caching
@@ -13,35 +15,72 @@ namespace net.vieapps.Components.Caching
 	internal static class Helper
 	{
 
+		#region Data
+		/// <summary>
+		/// Gets the default time (in minutes) for caching an item
+		/// </summary>
+		public static readonly int ExpirationTime = 30;
+
+		/// <summary>
+		/// Gets the default size of one fragment (1 MBytes)
+		/// </summary>
+		public static readonly int FragmentSize = (1024 * 1024) - 512;
+		#endregion
+
 		#region Split & Serialize
-		internal static List<byte[]> Split(byte[] data, int sizeOfOneFragment)
+		internal static List<byte[]> Split(byte[] data, int fragmentSize = 0)
 		{
 			var fragments = new List<byte[]>();
-			int index = 0, length = data.Length;
-			while (index < data.Length)
+			if (data != null && data.Length > 0)
 			{
-				var size = sizeOfOneFragment > length
-					? length
-					: sizeOfOneFragment;
+				fragmentSize = fragmentSize > 0 ? fragmentSize : Helper.FragmentSize;
+				int index = 0, length = data.Length;
+				while (index < data.Length)
+				{
+					var size = fragmentSize > length
+						? length
+						: fragmentSize;
 
-				var fragment = new byte[size];
-				Array.Copy(data, index, fragment, 0, size);
-				fragments.Add(fragment);
+					var fragment = new byte[size];
+					Array.Copy(data, index, fragment, 0, size);
+					fragments.Add(fragment);
 
-				index += size;
-				length -= size;
+					index += size;
+					length -= size;
+				}
 			}
 			return fragments;
 		}
 
+		internal static List<byte[]> Split(object @object, int fragmentSize = 0)
+		{
+			return Helper.Split(Helper.Serialize(@object), fragmentSize);
+		}
+		#endregion
+
+		#region Serialize & Deserialize
+		static DefaultTranscoder _Transcoder = null;
+
+		internal static DefaultTranscoder Transcoder
+		{
+			get
+			{
+				return Helper._Transcoder ?? (Helper._Transcoder = new DefaultTranscoder());
+			}
+		}
+
 		internal static byte[] Serialize(object @object)
 		{
-			return (new Enyim.Caching.Memcached.DefaultTranscoder()).SerializeObject(@object).Array;
+			return @object == null
+				? new byte[0]
+				: Helper.Transcoder.SerializeObject(@object).Array;
 		}
 
 		internal static object Deserialize(byte[] data)
 		{
-			return (new Enyim.Caching.Memcached.DefaultTranscoder()).DeserializeObject(new ArraySegment<byte>(data));
+			return data == null || data.Length < 1
+				? null
+				: Helper.Transcoder.DeserializeObject(new ArraySegment<byte>(data));
 		}
 
 		internal static T Clone<T>(T @object)
@@ -73,7 +112,7 @@ namespace net.vieapps.Components.Caching
 
 			if (ex != null)
 			{
-				content += info + "- " + (ex.Message != null ? ex.Message : "No error message") + " [" + ex.GetType().ToString() + "]" + "\r\n"
+				content += info + "- " + (ex.Message != null ? ex.Message : "No error message") + $" [{ex.GetType()}]" + "\r\n"
 					+ info + "- " + (ex.StackTrace != null ? ex.StackTrace : "No stack trace");
 
 				ex = ex.InnerException;
@@ -81,7 +120,7 @@ namespace net.vieapps.Components.Caching
 				while (ex != null)
 				{
 					content += info + "- Inner (" + counter.ToString() + "): ----------------------------------" + "\r\n"
-						+ info + "- " + (ex.Message != null ? ex.Message : "No error message") + " [" + ex.GetType().ToString() + "]" + "\r\n"
+						+ info + "- " + (ex.Message != null ? ex.Message : "No error message") + $" [{ex.GetType()}]" + "\r\n"
 						+ info + "- " + (ex.StackTrace != null ? ex.StackTrace : "No stack trace");
 
 					counter++;

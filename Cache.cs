@@ -15,31 +15,21 @@ using Enyim.Caching.Configuration;
 namespace net.vieapps.Components.Caching
 {
 	/// <summary>
-	/// Manipulates cached objects in isolated regions
+	/// Manipulates distributed cache in isolated regions
 	/// </summary>
 	[DebuggerDisplay("{Name} ({ExpirationTime} minutes)")]
 	public sealed class Cache
 	{
 		/// <summary>
-		/// Gets default expiration time (in minutes)
+		/// Create new instance of  cache storage with isolated region
 		/// </summary>
-		public static readonly int DefaultExpirationTime = 30;
-
-		/// <summary>
-		/// Gets default size of one fragment (1 MBytes)
-		/// </summary>
-		public static readonly int DefaultFragmentSize = (1024 * 1024) - 512;
-
-		/// <summary>
-		/// Create new instance of isolated region cache storage
-		/// </summary>
-		/// <param name="name">The string that presents name of isolated region of the cache</param>
-		/// <param name="expirationTime">Time to cache an item (in minutes)</param>
+		/// <param name="name">The string that presents name of isolated region</param>
+		/// <param name="expirationTime">Time for caching an item (in minutes)</param>
 		/// <param name="updateKeys">true to active update keys of the region (to clear or using with other purpose further)</param>
 		/// <param name="provider">The string that presents the caching provider, default is memcached</param>
 		public Cache(string name = null, int expirationTime = 0, bool updateKeys = false, string provider = "Memcached")
 		{
-			if (!Enum.TryParse<Providers>(provider, out Providers cacheProvider))
+			if (!Enum.TryParse<Providers>(provider ?? "Memcached", out Providers cacheProvider))
 				cacheProvider = Providers.Memcached;
 
 			switch (cacheProvider)
@@ -50,7 +40,7 @@ namespace net.vieapps.Components.Caching
 			}
 		}
 
-		ICache _cache;
+		ICacheProvider _cache;
 
 		#region Properties
 		/// <summary>
@@ -76,13 +66,13 @@ namespace net.vieapps.Components.Caching
 		}
 
 		/// <summary>
-		/// Gets the collection of keys that associates with the cached items
+		/// Gets the collection of keys
 		/// </summary>
 		public HashSet<string> Keys
 		{
 			get
 			{
-				return this.GetKeys();
+				return this._cache.Keys;
 			}
 		}
 		#endregion
@@ -275,9 +265,9 @@ namespace net.vieapps.Components.Caching
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
 		/// <param name="setSecondary">true to add secondary item as pure object</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
-		public Task<bool> SetFragmentsAsync(string key, object value, int expirationTime = 0, bool setSecondary = false)
+		public Task<bool> SetAsFragmentsAsync(string key, object value, int expirationTime = 0, bool setSecondary = false)
 		{
-			return this._cache.SetFragmentsAsync(key, value, expirationTime, setSecondary);
+			return this._cache.SetAsFragmentsAsync(key, value, expirationTime, setSecondary);
 		}
 		#endregion
 

@@ -18,54 +18,10 @@ namespace net.vieapps.Components.Caching
 	/// Manipulates cached objects in isolated regions with memcached
 	/// </summary>
 	[DebuggerDisplay("Memcached: {Name} ({ExpirationTime} minutes)")]
-	public sealed class Memcached : ICache
+	public sealed class Memcached : ICacheProvider
 	{
-
-		#region Data
-		static MemcachedClient _Client = null;
-
 		/// <summary>
-		/// Gets the instance of memcached client
-		/// </summary>
-		public static MemcachedClient Client
-		{
-			get
-			{
-				return Memcached._Client ?? (Memcached._Client = new MemcachedClient(ConfigurationManager.GetSection("memcached") as MemcachedClientConfigurationSectionHandler));
-			}
-		}
-
-		string _name = "";
-		int _expirationTime = Cache.DefaultExpirationTime;
-		bool _updateKeys = false, _isUpdating = false;
-		HashSet<string> _addedKeys = null, _removedKeys = null;
-		ReaderWriterLockSlim _locker = new ReaderWriterLockSlim(LockRecursionPolicy.SupportsRecursion);
-
-		/// <summary>
-		/// Gets the name of the isolated region
-		/// </summary>
-		public string Name
-		{
-			get
-			{
-				return this._name;
-			}
-		}
-
-		/// <summary>
-		/// Gets the expiration time (in minutes)
-		/// </summary>
-		public int ExpirationTime
-		{
-			get
-			{
-				return this._expirationTime;
-			}
-		}
-		#endregion
-
-		/// <summary>
-		/// Create new instance of isolated region storage with memcached
+		/// Create new instance of memcached
 		/// </summary>
 		/// <param name="name">The string that presents name of isolated region of the cache</param>
 		/// <param name="expirationTime">Time to cache an item (in minutes)</param>
@@ -80,7 +36,7 @@ namespace net.vieapps.Components.Caching
 			// expiration time
 			this._expirationTime = expirationTime > 0
 				? expirationTime
-				: Cache.DefaultExpirationTime;
+				: Helper.ExpirationTime;
 
 			// update keys
 			if (updateKeys)
@@ -90,12 +46,33 @@ namespace net.vieapps.Components.Caching
 				this._removedKeys = new HashSet<string>();
 			}
 
-			// register region
+			// register the region
 			Task.Run(async () =>
 			{
 				await Memcached.RegisterRegionAsync(this.Name).ConfigureAwait(false);
 			}).ConfigureAwait(false);
 		}
+
+		#region Attributes
+		static MemcachedClient _Client = null;
+
+		/// <summary>
+		/// Gets the instance of memcached client
+		/// </summary>
+		public static MemcachedClient Client
+		{
+			get
+			{
+				return Memcached._Client ?? (Memcached._Client = new MemcachedClient(ConfigurationManager.GetSection("memcached") as MemcachedClientConfigurationSectionHandler));
+			}
+		}
+
+		string _name;
+		int _expirationTime;
+		bool _updateKeys, _isUpdating = false;
+		HashSet<string> _addedKeys, _removedKeys;
+		ReaderWriterLockSlim _locker = new ReaderWriterLockSlim(LockRecursionPolicy.SupportsRecursion);
+		#endregion
 
 		#region Keys
 		async Task _UpdateKeysAsync(bool checkUpdatedKeys = true, Action callback = null)
@@ -368,7 +345,7 @@ namespace net.vieapps.Components.Caching
 		#endregion
 
 		#region Set (Fragment)
-		bool _SetAsFragments(string key, Type type, List<byte[]> fragments, int expirationTime = 0, StoreMode mode = StoreMode.Set)
+		bool _SetFragments(string key, Type type, List<byte[]> fragments, int expirationTime = 0, StoreMode mode = StoreMode.Set)
 		{
 			// set info
 			var fragment = new Fragment()
@@ -387,6 +364,30 @@ namespace net.vieapps.Components.Caching
 				for (var index = 0; index < fragments.Count; index++)
 					items.Add(this._GetFragmentKey(fragment.Key, index), new ArraySegment<byte>(fragments[index]));
 				this._Set(items, null, expirationTime, mode);
+			}
+
+			return success;
+		}
+
+		async Task<bool> _SetFragmentsAsync(string key, Type type, List<byte[]> fragments, int expirationTime = 0, StoreMode mode = StoreMode.Set)
+		{
+			// set info
+			var fragment = new Fragment()
+			{
+				Key = key,
+				Type = type.ToString() + "," + type.Assembly.FullName,
+				TotalFragments = fragments.Count
+			};
+
+			var success = await this._SetAsync(fragment.Key, fragment, expirationTime, false, mode);
+
+			// set data
+			if (success)
+			{
+				var items = new Dictionary<string, object>();
+				for (var index = 0; index < fragments.Count; index++)
+					items.Add(this._GetFragmentKey(fragment.Key, index), new ArraySegment<byte>(fragments[index]));
+				await this._SetAsync(items, null, expirationTime, mode);
 			}
 
 			return success;
@@ -413,10 +414,10 @@ namespace net.vieapps.Components.Caching
 				return false;
 
 			// split into fragments
-			var fragments = Helper.Split(bytes, Cache.DefaultFragmentSize);
+			var fragments = Helper.Split(bytes);
 
 			// update into cache storage
-			var success = this._SetAsFragments(key, value.GetType(), fragments, expirationTime, mode);
+			var success = this._SetFragments(key, value.GetType(), fragments, expirationTime, mode);
 
 			// post-process when setted
 			if (success)
@@ -437,30 +438,6 @@ namespace net.vieapps.Components.Caching
 			}
 
 			// return result
-			return success;
-		}
-
-		async Task<bool> _SetAsFragmentsAsync(string key, Type type, List<byte[]> fragments, int expirationTime = 0, StoreMode mode = StoreMode.Set)
-		{
-			// set info
-			var fragment = new Fragment()
-			{
-				Key = key,
-				Type = type.ToString() + "," + type.Assembly.FullName,
-				TotalFragments = fragments.Count
-			};
-
-			var success = await this._SetAsync(fragment.Key, fragment, expirationTime, false, mode);
-
-			// set data
-			if (success)
-			{
-				var items = new Dictionary<string, object>();
-				for (var index = 0; index < fragments.Count; index++)
-					items.Add(this._GetFragmentKey(fragment.Key, index), new ArraySegment<byte>(fragments[index]));
-				await this._SetAsync(items, null, expirationTime, mode);
-			}
-
 			return success;
 		}
 
@@ -485,10 +462,10 @@ namespace net.vieapps.Components.Caching
 				return false;
 
 			// split into fragments
-			var fragments = Helper.Split(bytes, Cache.DefaultFragmentSize);
+			var fragments = Helper.Split(bytes);
 
 			// update into cache storage
-			var success = await this._SetAsFragmentsAsync(key, value.GetType(), fragments, expirationTime, mode);
+			var success = await this._SetFragmentsAsync(key, value.GetType(), fragments, expirationTime, mode);
 
 			// post-process when setted
 			if (success)
@@ -842,30 +819,26 @@ namespace net.vieapps.Components.Caching
 				}
 
 			// update mapping key when removed successful
-			if (success)
+			if (success && this._updateKeys)
 			{
-				// update removed keys and push to distributed cache
-				if (this._updateKeys)
-				{
-					if (!this._removedKeys.Contains(key))
-						try
-						{
-							this._locker.EnterWriteLock();
-							this._removedKeys.Add(key);
-						}
-						catch (Exception ex)
-						{
-							Helper.WriteLogs(this.Name, "Error occurred while updating the removed keys (for pushing)", ex);
-						}
-						finally
-						{
-							if (this._locker.IsWriteLockHeld)
-								this._locker.ExitWriteLock();
-						}
+				if (!this._removedKeys.Contains(key))
+					try
+					{
+						this._locker.EnterWriteLock();
+						this._removedKeys.Add(key);
+					}
+					catch (Exception ex)
+					{
+						Helper.WriteLogs(this.Name, "Error occurred while updating the removed keys (for pushing)", ex);
+					}
+					finally
+					{
+						if (this._locker.IsWriteLockHeld)
+							this._locker.ExitWriteLock();
+					}
 
-					if (doPush && this._removedKeys.Count > 0)
-						this._UpdateKeys(123);
-				}
+				if (doPush && this._removedKeys.Count > 0)
+					this._UpdateKeys(123);
 			}
 
 			// return state
@@ -887,30 +860,26 @@ namespace net.vieapps.Components.Caching
 				}
 
 			// update mapping key when removed successful
-			if (success)
+			if (success && this._updateKeys)
 			{
-				// update removed keys and push to distributed cache
-				if (this._updateKeys)
-				{
-					if (!this._removedKeys.Contains(key))
-						try
-						{
-							this._locker.EnterWriteLock();
-							this._removedKeys.Add(key);
-						}
-						catch (Exception ex)
-						{
-							Helper.WriteLogs(this.Name, "Error occurred while updating the removed keys (for pushing)", ex);
-						}
-						finally
-						{
-							if (this._locker.IsWriteLockHeld)
-								this._locker.ExitWriteLock();
-						}
+				if (!this._removedKeys.Contains(key))
+					try
+					{
+						this._locker.EnterWriteLock();
+						this._removedKeys.Add(key);
+					}
+					catch (Exception ex)
+					{
+						Helper.WriteLogs(this.Name, "Error occurred while updating the removed keys (for pushing)", ex);
+					}
+					finally
+					{
+						if (this._locker.IsWriteLockHeld)
+							this._locker.ExitWriteLock();
+					}
 
-					if (doPush && this._removedKeys.Count > 0)
-						this._UpdateKeys(123);
-				}
+				if (doPush && this._removedKeys.Count > 0)
+					this._UpdateKeys(123);
 			}
 
 			// return state
@@ -969,18 +938,19 @@ namespace net.vieapps.Components.Caching
 				this._RemoveFragments(fragment.Key, fragment.TotalFragments);
 		}
 
-		async Task _RemoveFragmentsAsync(string key, int max = 100)
+		Task _RemoveFragmentsAsync(string key, int max = 100)
 		{
 			var keys = new List<string>() { key, key + ":(Secondary-Pure-Object)" };
 			for (var index = 0; index < max; index++)
 				keys.Add(this._GetFragmentKey(key, index));
-			await this._RemoveAsync(keys);
+			return this._RemoveAsync(keys);
 		}
 
-		async Task _RemoveFragmentsAsync(Fragment fragment)
+		Task _RemoveFragmentsAsync(Fragment fragment)
 		{
-			if (!object.ReferenceEquals(fragment, null) && !string.IsNullOrWhiteSpace(fragment.Key) && fragment.TotalFragments > 0)
-				await this._RemoveFragmentsAsync(fragment.Key, fragment.TotalFragments);
+			return !object.ReferenceEquals(fragment, null) && !string.IsNullOrWhiteSpace(fragment.Key) && fragment.TotalFragments > 0
+				? this._RemoveFragmentsAsync(fragment.Key, fragment.TotalFragments)
+				: Task.CompletedTask;
 		}
 		#endregion
 
@@ -991,18 +961,19 @@ namespace net.vieapps.Components.Caching
 			this._Remove(this._GetKeys());
 			Memcached.Client.Remove(this._RegionKey);
 
-			try
-			{
-				this._locker.EnterWriteLock();
-				this._addedKeys.Clear();
-				this._removedKeys.Clear();
-			}
-			catch { }
-			finally
-			{
-				if (this._locker.IsWriteLockHeld)
-					this._locker.ExitWriteLock();
-			}
+			if (this._updateKeys)
+				try
+				{
+					this._locker.EnterWriteLock();
+					this._addedKeys.Clear();
+					this._removedKeys.Clear();
+				}
+				catch { }
+				finally
+				{
+					if (this._locker.IsWriteLockHeld)
+						this._locker.ExitWriteLock();
+				}
 		}
 
 		async Task _ClearAsync()
@@ -1014,18 +985,19 @@ namespace net.vieapps.Components.Caching
 				Memcached.Client.RemoveAsync(this._RegionKey)
 			);
 
-			try
-			{
-				this._locker.EnterWriteLock();
-				this._addedKeys.Clear();
-				this._removedKeys.Clear();
-			}
-			catch { }
-			finally
-			{
-				if (this._locker.IsWriteLockHeld)
-					this._locker.ExitWriteLock();
-			}
+			if (this._updateKeys)
+				try
+				{
+					this._locker.EnterWriteLock();
+					this._addedKeys.Clear();
+					this._removedKeys.Clear();
+				}
+				catch { }
+				finally
+				{
+					if (this._locker.IsWriteLockHeld)
+						this._locker.ExitWriteLock();
+				}
 		}
 		#endregion
 
@@ -1054,7 +1026,7 @@ namespace net.vieapps.Components.Caching
 		#region [Static]
 		internal static bool SetKeys(string key, HashSet<string> keys)
 		{
-			var fragmentsData = Helper.Split(Helper.Serialize(keys), Cache.DefaultFragmentSize);
+			var fragmentsData = Helper.Split(keys);
 			var fragmentsInfo = new Fragment()
 			{
 				Key = key,
@@ -1074,7 +1046,7 @@ namespace net.vieapps.Components.Caching
 
 		internal static async Task<bool> SetKeysAsync(string key, HashSet<string> keys)
 		{
-			var fragmentsData = Helper.Split(Helper.Serialize(keys), Cache.DefaultFragmentSize);
+			var fragmentsData = Helper.Split(keys);
 			var fragmentsInfo = new Fragment()
 			{
 				Key = key,
@@ -1220,7 +1192,29 @@ namespace net.vieapps.Components.Caching
 
 		// -----------------------------------------------------
 
-		#region [Public] Keys
+		#region [Public] Properties
+		/// <summary>
+		/// Gets the name of the isolated region
+		/// </summary>
+		public string Name
+		{
+			get
+			{
+				return this._name;
+			}
+		}
+
+		/// <summary>
+		/// Gets the expiration time (in minutes)
+		/// </summary>
+		public int ExpirationTime
+		{
+			get
+			{
+				return this._expirationTime;
+			}
+		}
+
 		/// <summary>
 		/// Gets the collection of keys that associates with the cached items
 		/// </summary>
@@ -1231,7 +1225,9 @@ namespace net.vieapps.Components.Caching
 				return this.GetKeys();
 			}
 		}
+		#endregion
 
+		#region [Public] Keys
 		/// <summary>
 		/// Gets the collection of keys that associates with the cached items
 		/// </summary>
@@ -1382,7 +1378,20 @@ namespace net.vieapps.Components.Caching
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
 		public bool SetFragments(string key, Type type, List<byte[]> fragments, int expirationTime = 0)
 		{
-			return this._SetAsFragments(key, type, fragments, expirationTime);
+			return this._SetFragments(key, type, fragments, expirationTime);
+		}
+
+		/// <summary>
+		/// Adds an item (as fragments) into cache with a specified key (if the key is already existed, then old cached item will be overriden)
+		/// </summary>
+		/// <param name="key">The string that presents key of item</param>
+		/// <param name="type">The object that presents type of object that serialized as all fragments</param>
+		/// <param name="fragments">The collection that contains all fragments (object that serialized as binary - array bytes)</param>
+		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
+		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
+		public Task<bool> SetFragmentsAsync(string key, Type type, List<byte[]> fragments, int expirationTime = 0)
+		{
+			return this._SetFragmentsAsync(key, type, fragments, expirationTime);
 		}
 
 		/// <summary>
@@ -1399,19 +1408,6 @@ namespace net.vieapps.Components.Caching
 		}
 
 		/// <summary>
-		/// Adds an item (as fragments) into cache with a specified key (if the key is already existed, then old cached item will be overriden)
-		/// </summary>
-		/// <param name="key">The string that presents key of item</param>
-		/// <param name="type">The object that presents type of object that serialized as all fragments</param>
-		/// <param name="fragments">The collection that contains all fragments (object that serialized as binary - array bytes)</param>
-		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
-		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
-		public Task<bool> SetFragmentsAsync(string key, Type type, List<byte[]> fragments, int expirationTime = 0)
-		{
-			return this._SetAsFragmentsAsync(key, type, fragments, expirationTime);
-		}
-
-		/// <summary>
 		/// Serializes object into array of bytes, splits into one or more fragments and updates into cache with a specified key (if the key is already existed, then old cached item will be overriden)
 		/// </summary>
 		/// <param name="key">The string that presents key of item</param>
@@ -1419,7 +1415,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
 		/// <param name="setSecondary">true to add secondary item as pure object</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
-		public Task<bool> SetFragmentsAsync(string key, object value, int expirationTime = 0, bool setSecondary = false)
+		public Task<bool> SetAsFragmentsAsync(string key, object value, int expirationTime = 0, bool setSecondary = false)
 		{
 			return this._SetAsFragmentsAsync(key, value, expirationTime, setSecondary);
 		}
@@ -1685,6 +1681,22 @@ namespace net.vieapps.Components.Caching
 		}
 
 		/// <summary>
+		/// Gets fragment information that associates with the key (only available when working with distributed cache)
+		/// </summary>
+		/// <param name="key">The string that presents key of fragment information</param>
+		/// <returns>The <see cref="Fragment">Fragment</see> object that presents information of all fragmented items in the cache storage</returns>
+		public async Task<Fragment> GetFragmentAsync(string key)
+		{
+			object fragment = null;
+			if (!string.IsNullOrWhiteSpace(key))
+				fragment = await this._GetAsync(key, false);
+
+			return fragment == null || !(fragment is Fragment)
+				? new Fragment() { Key = key, TotalFragments = 0 }
+				: (Fragment)fragment;
+		}
+
+		/// <summary>
 		/// Gets cached of fragmented items that associates with the key and indexes (only available when working with distributed cache)
 		/// </summary>
 		/// <param name="key">The string that presents key of all fragmented items</param>
@@ -1717,32 +1729,16 @@ namespace net.vieapps.Components.Caching
 		}
 
 		/// <summary>
-		/// Gets fragment information that associates with the key (only available when working with distributed cache)
-		/// </summary>
-		/// <param name="key">The string that presents key of fragment information</param>
-		/// <returns>The <see cref="Fragment">Fragment</see> object that presents information of all fragmented items in the cache storage</returns>
-		public async Task<Fragment> GetFragmentAsync(string key)
-		{
-			object fragment = null;
-			if (!string.IsNullOrWhiteSpace(key))
-				fragment = await this._GetAsync(key, false);
-
-			return fragment == null || !(fragment is Fragment)
-				? new Fragment() { Key = key, TotalFragments = 0 }
-				: (Fragment)fragment;
-		}
-
-		/// <summary>
 		/// Gets cached of fragmented items that associates with the key and indexes (only available when working with distributed cache)
 		/// </summary>
 		/// <param name="key">The string that presents key of all fragmented items</param>
 		/// <param name="indexes">The collection that presents indexes of all fragmented items need to get</param>
 		/// <returns>The collection of array of bytes that presents serialized information of fragmented items</returns>
-		public async Task<List<byte[]>> GetAsFragmentsAsync(string key, List<int> indexes)
+		public Task<List<byte[]>> GetAsFragmentsAsync(string key, List<int> indexes)
 		{
 			return string.IsNullOrWhiteSpace(key)
-				? null
-				: await this._GetAsFragmentsAsync(key, indexes);
+				? Task.FromResult<List<byte[]>>(null)
+				: this._GetAsFragmentsAsync(key, indexes);
 		}
 
 		/// <summary>
