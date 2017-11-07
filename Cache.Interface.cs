@@ -15,7 +15,7 @@ using Enyim.Caching.Configuration;
 namespace net.vieapps.Components.Caching
 {
 	/// <summary>
-	/// Interface of all cache providers for manipulating cached objects in isolated regions
+	/// Presents a provider of distributed cache for manipulating objects with isolated regions
 	/// </summary>
 	public interface ICacheProvider
 	{
@@ -498,7 +498,7 @@ namespace net.vieapps.Components.Caching
 	}
 
 	/// <summary>
-	/// Presents information of cached fragments
+	/// Presents information of a fragment cached object
 	/// </summary>
 	[Serializable]
 	public struct Fragment
@@ -509,15 +509,20 @@ namespace net.vieapps.Components.Caching
 	}
 
 	/// <summary>
-	/// Presents all available cache provider
+	/// Presents all available cache providers
 	/// </summary>
 	[Serializable]
-	public enum Providers
+	public enum CacheProviders
 	{
 		/// <summary>
-		/// Memcached client
+		/// Memcached
 		/// </summary>
-		Memcached
+		Memcached,
+
+		/// <summary>
+		/// Redis
+		/// </summary>
+		Redis
 	}
 
 }

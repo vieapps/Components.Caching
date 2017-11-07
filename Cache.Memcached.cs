@@ -21,12 +21,12 @@ namespace net.vieapps.Components.Caching
 	public sealed class Memcached : ICacheProvider
 	{
 		/// <summary>
-		/// Create new instance of memcached
+		/// Create new an instance of memcached
 		/// </summary>
 		/// <param name="name">The string that presents name of isolated region of the cache</param>
 		/// <param name="expirationTime">Time to cache an item (in minutes)</param>
 		/// <param name="updateKeys">true to active update keys of the region (to clear or using with other purpose further)</param>
-		public Memcached(string name = null, int expirationTime = 0, bool updateKeys = false)
+		public Memcached(string name, int expirationTime, bool updateKeys)
 		{
 			// region name
 			this._name = string.IsNullOrWhiteSpace(name)

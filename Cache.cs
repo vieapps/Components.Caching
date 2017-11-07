@@ -21,16 +21,32 @@ namespace net.vieapps.Components.Caching
 	public sealed class Cache
 	{
 		/// <summary>
-		/// Create new instance of  cache storage with isolated region
+		/// Create new an instance of  distributed cache with isolated region
+		/// </summary>
+		/// <param name="name">The string that presents name of isolated region</param>
+		/// <param name="expirationTime">Time for caching an item (in minutes)</param>
+		/// <param name="updateKeys">true to active update keys of the region (to clear or using with other purpose further)</param>
+		public Cache(string name = null, int expirationTime = 0, bool updateKeys = false) : this(name, expirationTime, updateKeys, null) { }
+
+		/// <summary>
+		/// Create new an instance of  distributed cache with isolated region
+		/// </summary>
+		/// <param name="name">The string that presents name of isolated region</param>
+		/// <param name="expirationTime">Time for caching an item (in minutes)</param>
+		/// <param name="provider">The string that presents the caching provider, default is memcached</param>
+		public Cache(string name, int expirationTime, string provider) : this(name, expirationTime, false, provider) { }
+
+		/// <summary>
+		/// Create new an instance of  distributed cache with isolated region
 		/// </summary>
 		/// <param name="name">The string that presents name of isolated region</param>
 		/// <param name="expirationTime">Time for caching an item (in minutes)</param>
 		/// <param name="updateKeys">true to active update keys of the region (to clear or using with other purpose further)</param>
 		/// <param name="provider">The string that presents the caching provider, default is memcached</param>
-		public Cache(string name = null, int expirationTime = 0, bool updateKeys = false, string provider = "Memcached")
+		public Cache(string name, int expirationTime, bool updateKeys, string provider)
 		{
-			if (!Enum.TryParse<Providers>(provider ?? "Memcached", out Providers cacheProvider))
-				cacheProvider = Providers.Memcached;
+			if (!Enum.TryParse<CacheProviders>(provider ?? "Memcached", out CacheProviders cacheProvider))
+				cacheProvider = CacheProviders.Memcached;
 
 			switch (cacheProvider)
 			{

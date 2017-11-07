@@ -16,15 +16,8 @@ namespace net.vieapps.Components.Caching
 	{
 
 		#region Data
-		/// <summary>
-		/// Gets the default time (in minutes) for caching an item
-		/// </summary>
-		public static readonly int ExpirationTime = 30;
-
-		/// <summary>
-		/// Gets the default size of one fragment (1 MBytes)
-		/// </summary>
-		public static readonly int FragmentSize = (1024 * 1024) - 512;
+		internal static readonly int ExpirationTime = 30;
+		internal static readonly int FragmentSize = (1024 * 1024) - 512;
 		#endregion
 
 		#region Split & Serialize
