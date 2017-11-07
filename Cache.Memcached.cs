@@ -24,7 +24,7 @@ namespace net.vieapps.Components.Caching
 		/// Create new an instance of memcached
 		/// </summary>
 		/// <param name="name">The string that presents name of isolated region of the cache</param>
-		/// <param name="expirationTime">Time to cache an item (in minutes)</param>
+		/// <param name="expirationTime">The number that presents times (in minutes) for caching an item</param>
 		/// <param name="updateKeys">true to active update keys of the region (to clear or using with other purpose further)</param>
 		public Memcached(string name, int expirationTime, bool updateKeys)
 		{
