@@ -5,5 +5,5 @@ A .NET Standard 2.0 wrapper library for working with distributed cache
 ## Nuget
 https://www.nuget.org/packages/VIEApps.Components.Caching
 ## Dependencies
-- Memcached: VIEApps.Enyim.Caching - https://github.com/vieapps/Enyim.Caching
-- Redis: StackExchange.Redis - https://github.com/StackExchange/StackExchange.Redis/
+- Memcached: [VIEApps.Enyim.Caching](https://github.com/vieapps/Enyim.Caching)
+- Redis: [StackExchange.Redis](https://github.com/StackExchange/StackExchange.Redis)
