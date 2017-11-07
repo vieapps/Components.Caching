@@ -3,21 +3,26 @@
 	<PropertyGroup>
 		<TargetFramework>netstandard2.0</TargetFramework>
 		<AllowUnsafeBlocks>false</AllowUnsafeBlocks>
+		<RootNamespace>net.vieapps.Components.Caching</RootNamespace>
 		<AssemblyName>VIEApps.Components.Caching</AssemblyName>
-		<Description>The .NET Standard 2.0 wrapper library for working with distributed cache</Description>
-		<Authors>VIEApps.net</Authors>
-		<Company>VIEApps.net</Company>
-		<Product>VIEApps NGX</Product>
-		<Copyright>© 2017 VIEApps.net</Copyright>
-		<Version>10.1.2.1712</Version>
+		<AssemblyTitle>VIEApps NGX Caching</AssemblyTitle>
 		<AssemblyVersion>10.1.2.1712</AssemblyVersion>
 		<FileVersion>10.1.2.1712</FileVersion>
+		<InformationalVersion>10.1 (v10.1.nstd-2017.12.01)</InformationalVersion>
+		<Product>VIEApps NGX</Product>
+		<Company>VIEApps.net</Company>
 		<GeneratePackageOnBuild>false</GeneratePackageOnBuild>
 		<PackageId>VIEApps.Components.Caching</PackageId>
-		<PackageTags>memcached;cache;vieapps;vieapps.components</PackageTags>
+		<Version>10.1.2.1712</Version>
+		<Title>VIEApps NGX Caching</Title>
+		<Description>The .NET Standard 2.0 wrapper library for working with distributed cache in .NET</Description>
+		<Summary>The .NET Standard 2.0 wrapper library for working with distributed cache in .NET</Summary>
+		<Authors>VIEApps.net</Authors>
+		<Copyright>© 2017 VIEApps.net</Copyright>
+		<PackageReleaseNotes></PackageReleaseNotes>
+		<PackageTags>cache;distributedcache;memcached;redis;vieapps;vieapps.components</PackageTags>
 		<PackageProjectUrl>https://github.com/vieapps/Components.Caching</PackageProjectUrl>
 		<RepositoryUrl>https://github.com/vieapps/Components.Caching</RepositoryUrl>
-		<RepositoryType>git</RepositoryType>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
