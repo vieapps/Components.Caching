@@ -42,18 +42,12 @@ namespace net.vieapps.Components.Caching
 		/// <param name="name">The string that presents name of isolated region</param>
 		/// <param name="expirationTime">Time for caching an item (in minutes)</param>
 		/// <param name="updateKeys">true to active update keys of the region (to clear or using with other purpose further)</param>
-		/// <param name="provider">The string that presents the caching provider, default is memcached</param>
+		/// <param name="provider">The string that presents the caching provider (memcached or redis), the default provider is memcached</param>
 		public Cache(string name, int expirationTime, bool updateKeys, string provider)
 		{
-			if (!Enum.TryParse<CacheProviders>(provider ?? "Memcached", out CacheProviders cacheProvider))
-				cacheProvider = CacheProviders.Memcached;
-
-			switch (cacheProvider)
-			{
-				default:
-					this._cache = new Memcached(name, expirationTime, updateKeys);
-					break;
-			}
+			this._cache = !string.IsNullOrWhiteSpace(provider) && provider.Trim().ToLower().Equals("redis")
+				? new Redis(name, expirationTime, updateKeys) as ICacheProvider
+				: new Memcached(name, expirationTime, updateKeys) as ICacheProvider;
 		}
 
 		ICacheProvider _cache;

@@ -496,33 +496,4 @@ namespace net.vieapps.Components.Caching
 		#endregion
 
 	}
-
-	/// <summary>
-	/// Presents information of a fragment cached object
-	/// </summary>
-	[Serializable]
-	public struct Fragment
-	{
-		public string Key;
-		public string Type;
-		public int TotalFragments;
-	}
-
-	/// <summary>
-	/// Presents all available cache providers
-	/// </summary>
-	[Serializable]
-	public enum CacheProviders
-	{
-		/// <summary>
-		/// Memcached
-		/// </summary>
-		Memcached,
-
-		/// <summary>
-		/// Redis
-		/// </summary>
-		Redis
-	}
-
 }

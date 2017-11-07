@@ -43,6 +43,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<PackageReference Include="StackExchange.Redis" Version="1.2.6" />
 		<PackageReference Include="VIEApps.Enyim.Caching" Version="1.1.2.1711" />
 	</ItemGroup>
 

@@ -1,13 +1,20 @@
 #region Related components
 using System;
 using System.IO;
+using System.Xml;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Diagnostics;
 using System.Configuration;
 
+using Newtonsoft.Json.Linq;
+
+using Enyim.Caching;
+using Enyim.Caching.Configuration;
 using Enyim.Caching.Memcached;
+
+using StackExchange.Redis;
 #endregion
 
 namespace net.vieapps.Components.Caching
@@ -18,9 +25,10 @@ namespace net.vieapps.Components.Caching
 		#region Data
 		internal static readonly int ExpirationTime = 30;
 		internal static readonly int FragmentSize = (1024 * 1024) - 512;
+		internal static readonly string RegionsKey = "VIEApps-NGX-Regions";
 		#endregion
 
-		#region Split & Serialize
+		#region Split into fragments
 		internal static List<byte[]> Split(byte[] data, int fragmentSize = 0)
 		{
 			var fragments = new List<byte[]>();
@@ -62,11 +70,15 @@ namespace net.vieapps.Components.Caching
 			}
 		}
 
-		internal static byte[] Serialize(object @object)
+		internal static byte[] Serialize(object value)
 		{
-			return @object == null
+			return value == null
 				? new byte[0]
-				: Helper.Transcoder.SerializeObject(@object).Array;
+				: value is byte[]
+					? (byte[])value
+					: value is ArraySegment<byte>
+						? ((ArraySegment<byte>)value).Array
+						: Helper.Transcoder.SerializeObject(value).Array;
 		}
 
 		internal static object Deserialize(byte[] data)
@@ -76,9 +88,49 @@ namespace net.vieapps.Components.Caching
 				: Helper.Transcoder.DeserializeObject(new ArraySegment<byte>(data));
 		}
 
+		internal static T Deserialize<T>(byte[] value)
+		{
+			var data = Helper.Deserialize(value);
+			return data != null && data is T
+				? (T)data
+				: default(T);
+		}
+
 		internal static T Clone<T>(T @object)
 		{
-			return (T)Helper.Deserialize(Helper.Serialize(@object));
+			return Helper.Deserialize<T>(Helper.Serialize(@object));
+		}
+		#endregion
+
+		#region Get client
+		internal static MemcachedClient GetMemcachedClient()
+		{
+			var configuration = ConfigurationManager.GetSection("memcached") as MemcachedClientConfigurationSectionHandler;
+			if (configuration == null)
+				throw new ConfigurationErrorsException("The section named 'memcached' is not found in your sytem configuration file (app.config or web.config");
+			return new Enyim.Caching.MemcachedClient(configuration);
+		}
+
+		internal static ConnectionMultiplexer RedisConnection = null;
+
+		internal static IDatabase GetRedisClient()
+		{
+			var configuration = ConfigurationManager.GetSection("redis") as RedisClientConfigurationSectionHandler;
+			if (configuration == null)
+				throw new ConfigurationErrorsException("The section named 'redis' is not found in your sytem configuration file (app.config or web.config");
+
+			var connectionString = "";
+			if (configuration.Section.SelectNodes("servers/add") is XmlNodeList nodes)
+				foreach (XmlNode server in nodes)
+				{
+					var info = configuration.GetJson(server);
+					var address = (info["address"] as JValue).Value as string;
+					var port = Convert.ToInt32(info["port"] != null ? (info["port"] as JValue).Value as string : "6379");
+					connectionString += (connectionString != "" ? "," : "") + address + ":" + port.ToString();
+				}
+
+			Helper.RedisConnection = Helper.RedisConnection ?? ConnectionMultiplexer.Connect(connectionString);
+			return Helper.RedisConnection.GetDatabase();
 		}
 		#endregion
 
@@ -178,5 +230,34 @@ namespace net.vieapps.Components.Caching
 		}
 		#endregion
 
+	}
+
+	[Serializable]
+	public struct Fragment
+	{
+		public string Key;
+		public string Type;
+		public int TotalFragments;
+	}
+
+	public class RedisClientConfigurationSectionHandler : IConfigurationSectionHandler
+	{
+		public object Create(object parent, object configContext, XmlNode section)
+		{
+			this._section = section;
+			return this;
+		}
+
+		XmlNode _section = null;
+
+		public XmlNode Section { get { return this._section; } }
+
+		public JObject GetJson(XmlNode node)
+		{
+			var settings = new JObject();
+			foreach (XmlAttribute attribute in node.Attributes)
+				settings.Add(new JProperty(attribute.Name, attribute.Value));
+			return settings;
+		}
 	}
 }

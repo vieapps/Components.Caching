@@ -9,7 +9,6 @@ using System.Diagnostics;
 
 using Enyim.Caching;
 using Enyim.Caching.Memcached;
-using Enyim.Caching.Configuration;
 #endregion
 
 namespace net.vieapps.Components.Caching
@@ -63,7 +62,7 @@ namespace net.vieapps.Components.Caching
 		{
 			get
 			{
-				return Memcached._Client ?? (Memcached._Client = new MemcachedClient(ConfigurationManager.GetSection("memcached") as MemcachedClientConfigurationSectionHandler));
+				return Memcached._Client ?? (Memcached._Client = Helper.GetMemcachedClient());
 			}
 		}
 
@@ -105,6 +104,9 @@ namespace net.vieapps.Components.Caching
 			// update keys
 			await Memcached.SetKeysAsync(this._RegionKey, syncKeys);
 
+			// delay a moment before re-checking
+			await Task.Delay(123);
+
 			// check to see new updated keys
 			if (!totalAddedKeys.Equals(this._addedKeys.Count) || !totalRemovedKeys.Equals(this._removedKeys.Count))
 			{
@@ -116,22 +118,21 @@ namespace net.vieapps.Components.Caching
 			}
 
 			// clear keys
-			if (totalAddedKeys.Equals(this._addedKeys.Count))
-				try
-				{
-					this._locker.EnterWriteLock();
-					this._addedKeys.Clear();
-					this._removedKeys.Clear();
-				}
-				catch (Exception ex)
-				{
-					Helper.WriteLogs(this.Name, "Error occurred while removes keys (after pushing process)", ex);
-				}
-				finally
-				{
-					if (this._locker.IsWriteLockHeld)
-						this._locker.ExitWriteLock();
-				}
+			try
+			{
+				this._locker.EnterWriteLock();
+				this._addedKeys.Clear();
+				this._removedKeys.Clear();
+			}
+			catch (Exception ex)
+			{
+				Helper.WriteLogs(this.Name, "Error occurred while removes keys (after pushing process)", ex);
+			}
+			finally
+			{
+				if (this._locker.IsWriteLockHeld)
+					this._locker.ExitWriteLock();
+			}
 
 			// remove flags
 			this._isUpdating = false;
@@ -1024,26 +1025,6 @@ namespace net.vieapps.Components.Caching
 		#endregion
 
 		#region [Static]
-		internal static bool SetKeys(string key, HashSet<string> keys)
-		{
-			var fragmentsData = Helper.Split(keys);
-			var fragmentsInfo = new Fragment()
-			{
-				Key = key,
-				Type = keys.GetType().ToString() + "," + keys.GetType().Assembly.FullName,
-				TotalFragments = fragmentsData.Count
-			};
-
-			if (Memcached.Client.Store(StoreMode.Set, key, fragmentsInfo))
-			{
-				for (int index = 0; index < fragmentsData.Count; index++)
-					Memcached.Client.Store(StoreMode.Set, key + ":" + index, fragmentsData[index]);
-				return true;
-			}
-
-			return false;
-		}
-
 		internal static async Task<bool> SetKeysAsync(string key, HashSet<string> keys)
 		{
 			var fragmentsData = Helper.Split(keys);
@@ -1093,7 +1074,7 @@ namespace net.vieapps.Components.Caching
 			try
 			{
 				return fragments.Length > 0
-					? Helper.Deserialize(fragments) as HashSet<string>
+					? Helper.Deserialize<HashSet<string>>(fragments)
 					: new HashSet<string>();
 			}
 			catch
@@ -1135,7 +1116,7 @@ namespace net.vieapps.Components.Caching
 			try
 			{
 				return data.Length > 0
-					? Helper.Deserialize(data) as HashSet<string>
+					? Helper.Deserialize<HashSet<string>>(data)
 					: new HashSet<string>();
 			}
 			catch
@@ -1144,14 +1125,12 @@ namespace net.vieapps.Components.Caching
 			}
 		}
 
-		static readonly string RegionsKey = "VIEApps-NGX-Regions";
-
 		/// <summary>
 		/// Gets the collection of all registered regions (in distributed cache)
 		/// </summary>
 		public static HashSet<string> GetRegions()
 		{
-			return Memcached.FetchKeys(Memcached.RegionsKey);
+			return Memcached.FetchKeys(Helper.RegionsKey);
 		}
 
 		/// <summary>
@@ -1159,34 +1138,34 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		public static Task<HashSet<string>> GetRegionsAsync()
 		{
-			return Memcached.FetchKeysAsync(Memcached.RegionsKey);
+			return Memcached.FetchKeysAsync(Helper.RegionsKey);
 		}
 
 		static async Task RegisterRegionAsync(string name)
 		{
 			// wait for other
 			var attempt = 0;
-			while (attempt < 123 && await Memcached.Client.ExistsAsync(Memcached.RegionsKey + "-Registering"))
+			while (attempt < 123 && await Memcached.Client.ExistsAsync(Helper.RegionsKey + "-Registering"))
 			{
 				await Task.Delay(234);
 				attempt++;
 			}
 
 			// set flag
-			await Memcached.Client.StoreAsync(StoreMode.Set, Memcached.RegionsKey + "-Registering", "v", TimeSpan.FromSeconds(13));
+			await Memcached.Client.StoreAsync(StoreMode.Set, Helper.RegionsKey + "-Registering", "v", TimeSpan.FromSeconds(13));
 
 			// fetch regions
-			var regions = await Memcached.FetchKeysAsync(Memcached.RegionsKey);
+			var regions = await Memcached.FetchKeysAsync(Helper.RegionsKey);
 
 			// register
 			if (!regions.Contains(name))
 			{
 				regions.Add(name);
-				await Memcached.SetKeysAsync(Memcached.RegionsKey, regions);
+				await Memcached.SetKeysAsync(Helper.RegionsKey, regions);
 			}
 
 			// remove flag
-			await Memcached.Client.RemoveAsync(Memcached.RegionsKey + "-Registering");
+			await Memcached.Client.RemoveAsync(Helper.RegionsKey + "-Registering");
 		}
 		#endregion
 
@@ -1216,13 +1195,13 @@ namespace net.vieapps.Components.Caching
 		}
 
 		/// <summary>
-		/// Gets the collection of keys that associates with the cached items
+		/// Gets the collection of keys
 		/// </summary>
 		public HashSet<string> Keys
 		{
 			get
 			{
-				return this.GetKeys();
+				return this._GetKeys();
 			}
 		}
 		#endregion
@@ -1421,7 +1400,7 @@ namespace net.vieapps.Components.Caching
 		}
 		#endregion
 
-		#region [Public] Add & Replace
+		#region [Public] Add
 		/// <summary>
 		/// Adds an item into cache with a specified key when the the key is not existed
 		/// </summary>
@@ -1493,7 +1472,9 @@ namespace net.vieapps.Components.Caching
 		{
 			return this._SetAsync(key, value, expiresAt, true, StoreMode.Add);
 		}
+		#endregion
 
+		#region [Public] Replace
 		/// <summary>
 		/// Adds an item into cache with a specified key when the the key is existed (means update existed item)
 		/// </summary>
