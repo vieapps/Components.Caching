@@ -20,6 +20,8 @@ namespace net.vieapps.Components.Caching
 	[DebuggerDisplay("{Name} ({ExpirationTime} minutes)")]
 	public sealed class Cache
 	{
+		ICacheProvider _cache;
+
 		/// <summary>
 		/// Create new an instance of  distributed cache with isolated region
 		/// </summary>
@@ -49,8 +51,6 @@ namespace net.vieapps.Components.Caching
 				? new Redis(name, expirationTime, updateKeys) as ICacheProvider
 				: new Memcached(name, expirationTime, updateKeys) as ICacheProvider;
 		}
-
-		ICacheProvider _cache;
 
 		#region Properties
 		/// <summary>
@@ -242,19 +242,6 @@ namespace net.vieapps.Components.Caching
 		}
 
 		/// <summary>
-		/// Serializes object into array of bytes, splits into one or more fragments and updates into cache with a specified key (if the key is already existed, then old cached item will be overriden)
-		/// </summary>
-		/// <param name="key">The string that presents key of item</param>
-		/// <param name="value">The object that is to be cached</param>
-		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
-		/// <param name="setSecondary">true to add secondary item as pure object</param>
-		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
-		public bool SetAsFragments(string key, object value, int expirationTime = 0, bool setSecondary = false)
-		{
-			return this._cache.SetAsFragments(key, value, expirationTime, setSecondary);
-		}
-
-		/// <summary>
 		/// Adds an item (as fragments) into cache with a specified key (if the key is already existed, then old cached item will be overriden)
 		/// </summary>
 		/// <param name="key">The string that presents key of item</param>
@@ -265,6 +252,19 @@ namespace net.vieapps.Components.Caching
 		public Task<bool> SetFragmentsAsync(string key, Type type, List<byte[]> fragments, int expirationTime = 0)
 		{
 			return this._cache.SetFragmentsAsync(key, type, fragments, expirationTime);
+		}
+
+		/// <summary>
+		/// Serializes object into array of bytes, splits into one or more fragments and updates into cache with a specified key (if the key is already existed, then old cached item will be overriden)
+		/// </summary>
+		/// <param name="key">The string that presents key of item</param>
+		/// <param name="value">The object that is to be cached</param>
+		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
+		/// <param name="setSecondary">true to add secondary item as pure object</param>
+		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
+		public bool SetAsFragments(string key, object value, int expirationTime = 0, bool setSecondary = false)
+		{
+			return this._cache.SetAsFragments(key, value, expirationTime, setSecondary);
 		}
 
 		/// <summary>
@@ -531,6 +531,16 @@ namespace net.vieapps.Components.Caching
 		}
 
 		/// <summary>
+		/// Gets fragment information that associates with the key (only available when working with distributed cache)
+		/// </summary>
+		/// <param name="key">The string that presents key of fragment information</param>
+		/// <returns>The <see cref="Fragment">Fragment</see> object that presents information of all fragmented items in the cache storage</returns>
+		public Task<Fragment> GetFragmentAsync(string key)
+		{
+			return this._cache.GetFragmentAsync(key);
+		}
+
+		/// <summary>
 		/// Gets cached of fragmented items that associates with the key and indexes (only available when working with distributed cache)
 		/// </summary>
 		/// <param name="key">The string that presents key of all fragmented items</param>
@@ -550,16 +560,6 @@ namespace net.vieapps.Components.Caching
 		public List<byte[]> GetAsFragments(string key, params int[] indexes)
 		{
 			return this._cache.GetAsFragments(key, indexes);
-		}
-
-		/// <summary>
-		/// Gets fragment information that associates with the key (only available when working with distributed cache)
-		/// </summary>
-		/// <param name="key">The string that presents key of fragment information</param>
-		/// <returns>The <see cref="Fragment">Fragment</see> object that presents information of all fragmented items in the cache storage</returns>
-		public Task<Fragment> GetFragmentAsync(string key)
-		{
-			return this._cache.GetFragmentAsync(key);
 		}
 
 		/// <summary>
