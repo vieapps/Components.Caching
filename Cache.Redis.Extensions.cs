@@ -9,130 +9,123 @@ using StackExchange.Redis;
 
 namespace net.vieapps.Components.Caching
 {
-	internal static class RedisExtensions
+	public static class RedisExtensions
 	{
-		internal static readonly DateTime UnixEpoch = new DateTime(1970, 1, 1);
-
-		internal static TimeSpan ToTimeSpan(this DateTime value)
-		{
-			return value - RedisExtensions.UnixEpoch;
-		}
-
-		internal static bool Set(this IDatabase redis, string key, object value)
+		public static bool Set(this IDatabase redis, string key, object value)
 		{
 			return redis.StringSet(key, Helper.Serialize(value));
 		}
 
-		internal static bool Set(this IDatabase redis, string key, object value, TimeSpan validFor)
+		public static bool Set(this IDatabase redis, string key, object value, TimeSpan validFor)
 		{
 			return redis.StringSet(key, Helper.Serialize(value), validFor);
 		}
 
-		internal static bool Set(this IDatabase redis, string key, object value, DateTime expiresAt)
+		public static bool Set(this IDatabase redis, string key, object value, DateTime expiresAt)
 		{
 			return redis.StringSet(key, Helper.Serialize(value), expiresAt.ToTimeSpan());
 		}
 
-		internal static Task<bool> SetAsync(this IDatabase redis, string key, object value)
+		public static Task<bool> SetAsync(this IDatabase redis, string key, object value)
 		{
 			return redis.StringSetAsync(key, Helper.Serialize(value));
 		}
 
-		internal static Task<bool> SetAsync(this IDatabase redis, string key, object value, TimeSpan validFor)
+		public static Task<bool> SetAsync(this IDatabase redis, string key, object value, TimeSpan validFor)
 		{
 			return redis.StringSetAsync(key, Helper.Serialize(value), validFor);
 		}
 
-		internal static Task<bool> SetAsync(this IDatabase redis, string key, object value, DateTime expiresAt)
+		public static Task<bool> SetAsync(this IDatabase redis, string key, object value, DateTime expiresAt)
 		{
 			return redis.StringSetAsync(key, Helper.Serialize(value), expiresAt.ToTimeSpan());
 		}
 
-		internal static bool Add(this IDatabase redis, string key, object value)
+		public static bool Add(this IDatabase redis, string key, object value)
 		{
 			return redis.Exists(key)
 				? false
 				: redis.Set(key, value);
 		}
 
-		internal static bool Add(this IDatabase redis, string key, object value, TimeSpan validFor)
+		public static bool Add(this IDatabase redis, string key, object value, TimeSpan validFor)
 		{
 			return redis.Exists(key)
 				? false
 				: redis.Set(key, value, validFor);
 		}
 
-		internal static bool Add(this IDatabase redis, string key, object value, DateTime expiresAt)
+		public static bool Add(this IDatabase redis, string key, object value, DateTime expiresAt)
 		{
 			return redis.Exists(key)
 				? false
 				: redis.Set(key, value, expiresAt);
 		}
 
-		internal static async Task<bool> AddAsync(this IDatabase redis, string key, object value)
+		public static async Task<bool> AddAsync(this IDatabase redis, string key, object value)
 		{
 			return await redis.ExistsAsync(key)
 				? false
 				: await redis.SetAsync(key, value);
 		}
 
-		internal static async Task<bool> AddAsync(this IDatabase redis, string key, object value, TimeSpan validFor)
+		public static async Task<bool> AddAsync(this IDatabase redis, string key, object value, TimeSpan validFor)
 		{
 			return await redis.ExistsAsync(key)
 				? false
 				: await redis.SetAsync(key, value, validFor);
 		}
 
-		internal static async Task<bool> AddAsync(this IDatabase redis, string key, object value, DateTime expiresAt)
+		public static async Task<bool> AddAsync(this IDatabase redis, string key, object value, DateTime expiresAt)
 		{
 			return await redis.ExistsAsync(key)
 				? false
 				: await redis.SetAsync(key, value, expiresAt);
 		}
 
-		internal static bool Replace(this IDatabase redis, string key, object value)
+		public static bool Replace(this IDatabase redis, string key, object value)
 		{
 			return redis.Exists(key)
 				? redis.Set(key, value)
 				: false;
 		}
 
-		internal static bool Replace(this IDatabase redis, string key, object value, TimeSpan validFor)
+		public static bool Replace(this IDatabase redis, string key, object value, TimeSpan validFor)
 		{
 			return redis.Exists(key)
 				? redis.Set(key, value, validFor)
 				: false;
 		}
 
-		internal static bool Replace(this IDatabase redis, string key, object value, DateTime expiresAt)
+		public static bool Replace(this IDatabase redis, string key, object value, DateTime expiresAt)
 		{
 			return redis.Exists(key)
 				? redis.Set(key, value, expiresAt)
 				: false;
 		}
 
-		internal static async Task<bool> ReplaceAsync(this IDatabase redis, string key, object value)
+		public static async Task<bool> ReplaceAsync(this IDatabase redis, string key, object value)
 		{
 			return await redis.ExistsAsync(key)
 				? await redis.SetAsync(key, value)
 				: false;
 		}
 
-		internal static async Task<bool> ReplaceAsync(this IDatabase redis, string key, object value, TimeSpan validFor)
+		public static async Task<bool> ReplaceAsync(this IDatabase redis, string key, object value, TimeSpan validFor)
 		{
 			return await redis.ExistsAsync(key)
 				? await redis.SetAsync(key, value, validFor)
 				: false;
 		}
 
-		internal static async Task<bool> ReplaceAsync(this IDatabase redis, string key, object value, DateTime expiresAt)
+		public static async Task<bool> ReplaceAsync(this IDatabase redis, string key, object value, DateTime expiresAt)
 		{
 			return await redis.ExistsAsync(key)
 				? await redis.SetAsync(key, value, expiresAt)
 				: false;
 		}
 
-		internal static object Get(this IDatabase redis, string key)
+		public static object Get(this IDatabase redis, string key)
 		{
 			var value = (byte[])redis.StringGet(key);
 			return value != null
@@ -140,7 +133,7 @@ namespace net.vieapps.Components.Caching
 				: null;
 		}
 
-		internal static T Get<T>(this IDatabase redis, string key)
+		public static T Get<T>(this IDatabase redis, string key)
 		{
 			var value = redis.Get(key);
 			return value != null && value is T
@@ -148,7 +141,7 @@ namespace net.vieapps.Components.Caching
 				: default(T);
 		}
 
-		internal static async Task<object> GetAsync(this IDatabase redis, string key)
+		public static async Task<object> GetAsync(this IDatabase redis, string key)
 		{
 			var value = (byte[])await redis.StringGetAsync(key);
 			return value != null
@@ -156,7 +149,7 @@ namespace net.vieapps.Components.Caching
 				: null;
 		}
 
-		internal static async Task<T> GetAsync<T>(this IDatabase redis, string key)
+		public static async Task<T> GetAsync<T>(this IDatabase redis, string key)
 		{
 			var value = await redis.GetAsync(key);
 			return value != null && value is T
@@ -164,7 +157,7 @@ namespace net.vieapps.Components.Caching
 				: default(T);
 		}
 
-		internal static IDictionary<string, object> Get(this IDatabase redis, IEnumerable<string> keys)
+		public static IDictionary<string, object> Get(this IDatabase redis, IEnumerable<string> keys)
 		{
 			var objects = new Dictionary<string, object>();
 			if (keys != null)
@@ -173,7 +166,7 @@ namespace net.vieapps.Components.Caching
 			return objects;
 		}
 
-		internal static async Task<IDictionary<string, object>> GetAsync(this IDatabase redis, IEnumerable<string> keys)
+		public static async Task<IDictionary<string, object>> GetAsync(this IDatabase redis, IEnumerable<string> keys)
 		{
 			var objects = new Dictionary<string, object>();
 			if (keys != null)
@@ -190,27 +183,27 @@ namespace net.vieapps.Components.Caching
 			return objects;
 		}
 
-		internal static bool Exists(this IDatabase redis, string key)
+		public static bool Exists(this IDatabase redis, string key)
 		{
 			return redis.KeyExists(key);
 		}
 
-		internal static Task<bool> ExistsAsync(this IDatabase redis, string key)
+		public static Task<bool> ExistsAsync(this IDatabase redis, string key)
 		{
 			return redis.KeyExistsAsync(key);
 		}
 
-		internal static bool Remove(this IDatabase redis, string key)
+		public static bool Remove(this IDatabase redis, string key)
 		{
 			return redis.KeyDelete(key);
 		}
 
-		internal static Task<bool> RemoveAsync(this IDatabase redis, string key)
+		public static Task<bool> RemoveAsync(this IDatabase redis, string key)
 		{
 			return redis.KeyDeleteAsync(key);
 		}
 
-		internal static bool HashSetUpdate(this IDatabase redis, RedisKey setKey, string itemKey)
+		public static bool HashSetUpdate(this IDatabase redis, RedisKey setKey, string itemKey)
 		{
 			try
 			{
@@ -232,7 +225,7 @@ namespace net.vieapps.Components.Caching
 			}
 		}
 
-		internal static async Task<bool> HashSetUpdateAsync(this IDatabase redis, string setKey, string itemKey)
+		public static async Task<bool> HashSetUpdateAsync(this IDatabase redis, string setKey, string itemKey)
 		{
 			try
 			{
@@ -254,7 +247,7 @@ namespace net.vieapps.Components.Caching
 			}
 		}
 
-		internal static bool HashSetRemove(this IDatabase redis, string setKey, string itemKey)
+		public static bool HashSetRemove(this IDatabase redis, string setKey, string itemKey)
 		{
 			try
 			{
@@ -266,7 +259,7 @@ namespace net.vieapps.Components.Caching
 			}
 		}
 
-		internal static async Task<bool> HashSetRemoveAsync(this IDatabase redis, string setKey, string itemKey)
+		public static async Task<bool> HashSetRemoveAsync(this IDatabase redis, string setKey, string itemKey)
 		{
 			try
 			{
@@ -278,7 +271,7 @@ namespace net.vieapps.Components.Caching
 			}
 		}
 
-		internal static HashSet<string> HashSetGet(this IDatabase redis, string setKey)
+		public static HashSet<string> HashSetGet(this IDatabase redis, string setKey)
 		{
 			try
 			{
@@ -293,7 +286,7 @@ namespace net.vieapps.Components.Caching
 			}
 		}
 
-		internal static async Task<HashSet<string>> HashSetGetAsync(this IDatabase redis, string setKey)
+		public static async Task<HashSet<string>> HashSetGetAsync(this IDatabase redis, string setKey)
 		{
 			try
 			{

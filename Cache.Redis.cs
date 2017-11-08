@@ -1262,13 +1262,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns>The <see cref="Fragment">Fragment</see> object that presents information of all fragmented items in the cache storage</returns>
 		public Fragment GetFragment(string key)
 		{
-			object fragment = null;
-			if (!string.IsNullOrWhiteSpace(key))
-				fragment = this._Get(key, false);
-
-			return fragment == null || !(fragment is Fragment)
-				? new Fragment() { Key = key, TotalFragments = 0 }
-				: (Fragment)fragment;
+			throw new NotSupportedException();
 		}
 
 		/// <summary>
@@ -1276,15 +1270,9 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		/// <param name="key">The string that presents key of fragment information</param>
 		/// <returns>The <see cref="Fragment">Fragment</see> object that presents information of all fragmented items in the cache storage</returns>
-		public async Task<Fragment> GetFragmentAsync(string key)
+		public Task<Fragment> GetFragmentAsync(string key)
 		{
-			object fragment = null;
-			if (!string.IsNullOrWhiteSpace(key))
-				fragment = await this._GetAsync(key, false);
-
-			return fragment == null || !(fragment is Fragment)
-				? new Fragment() { Key = key, TotalFragments = 0 }
-				: (Fragment)fragment;
+			throw new NotSupportedException();
 		}
 
 		/// <summary>
@@ -1295,9 +1283,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns>The collection of array of bytes that presents serialized information of fragmented items</returns>
 		public List<byte[]> GetAsFragments(string key, List<int> indexes)
 		{
-			return string.IsNullOrWhiteSpace(key)
-				? null
-				: this._GetAsFragments(key, indexes);
+			throw new NotSupportedException();
 		}
 
 		/// <summary>
@@ -1308,15 +1294,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns>The collection of array of bytes that presents serialized information of fragmented items</returns>
 		public List<byte[]> GetAsFragments(string key, params int[] indexes)
 		{
-			if (string.IsNullOrWhiteSpace(key))
-				return null;
-
-			var indexesList = new List<int>();
-			if (indexes != null && indexes.Length > 0)
-				foreach (int index in indexes)
-					indexesList.Add(index);
-
-			return this.GetAsFragments(key, indexesList);
+			throw new NotSupportedException();
 		}
 
 		/// <summary>
@@ -1327,9 +1305,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns>The collection of array of bytes that presents serialized information of fragmented items</returns>
 		public Task<List<byte[]>> GetAsFragmentsAsync(string key, List<int> indexes)
 		{
-			return string.IsNullOrWhiteSpace(key)
-				? Task.FromResult<List<byte[]>>(null)
-				: this._GetAsFragmentsAsync(key, indexes);
+			throw new NotSupportedException();
 		}
 
 		/// <summary>
@@ -1340,15 +1316,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns>The collection of array of bytes that presents serialized information of fragmented items</returns>
 		public Task<List<byte[]>> GetAsFragmentsAsync(string key, params int[] indexes)
 		{
-			if (string.IsNullOrWhiteSpace(key))
-				return null;
-
-			var indexesList = new List<int>();
-			if (indexes != null && indexes.Length > 0)
-				foreach (int index in indexes)
-					indexesList.Add(index);
-
-			return this.GetAsFragmentsAsync(key, indexesList);
+			throw new NotSupportedException();
 		}
 		#endregion
 
@@ -1475,4 +1443,30 @@ namespace net.vieapps.Components.Caching
 		#endregion
 
 	}
+
+	// -----------------------------------------------------
+
+	#region Configuration section handler
+	public class RedisClientConfigurationSectionHandler : IConfigurationSectionHandler
+	{
+		public object Create(object parent, object configContext, XmlNode section)
+		{
+			this._section = section;
+			return this;
+		}
+
+		XmlNode _section = null;
+
+		public XmlNode Section { get { return this._section; } }
+
+		public JObject GetJson(XmlNode node)
+		{
+			var settings = new JObject();
+			foreach (XmlAttribute attribute in node.Attributes)
+				settings.Add(new JProperty(attribute.Name, attribute.Value));
+			return settings;
+		}
+	}
+	#endregion
+
 }

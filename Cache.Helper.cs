@@ -19,13 +19,19 @@ using StackExchange.Redis;
 
 namespace net.vieapps.Components.Caching
 {
-	internal static class Helper
+	public static class Helper
 	{
 
 		#region Data
-		internal static readonly int ExpirationTime = 30;
+		public static readonly DateTime UnixEpoch = new DateTime(1970, 1, 1);
+		public static readonly int ExpirationTime = 30;
 		internal static readonly int FragmentSize = (1024 * 1024) - 512;
 		internal static readonly string RegionsKey = "VIEApps-NGX-Regions";
+
+		public static TimeSpan ToTimeSpan(this DateTime value)
+		{
+			return value - Helper.UnixEpoch;
+		}
 		#endregion
 
 		#region Split into fragments
@@ -70,7 +76,7 @@ namespace net.vieapps.Components.Caching
 			}
 		}
 
-		internal static byte[] Serialize(object value)
+		public static byte[] Serialize(object value)
 		{
 			return value == null
 				? new byte[0]
@@ -81,14 +87,14 @@ namespace net.vieapps.Components.Caching
 						: Helper.Transcoder.SerializeObject(value).Array;
 		}
 
-		internal static object Deserialize(byte[] data)
+		public static object Deserialize(byte[] data)
 		{
 			return data == null || data.Length < 1
 				? null
 				: Helper.Transcoder.DeserializeObject(new ArraySegment<byte>(data));
 		}
 
-		internal static T Deserialize<T>(byte[] value)
+		public static T Deserialize<T>(byte[] value)
 		{
 			if (typeof(T).Equals(typeof(byte[])))
 				return (T)((object)value);
@@ -249,26 +255,5 @@ namespace net.vieapps.Components.Caching
 		public string Key;
 		public string Type;
 		public int TotalFragments;
-	}
-
-	public class RedisClientConfigurationSectionHandler : IConfigurationSectionHandler
-	{
-		public object Create(object parent, object configContext, XmlNode section)
-		{
-			this._section = section;
-			return this;
-		}
-
-		XmlNode _section = null;
-
-		public XmlNode Section { get { return this._section; } }
-
-		public JObject GetJson(XmlNode node)
-		{
-			var settings = new JObject();
-			foreach (XmlAttribute attribute in node.Attributes)
-				settings.Add(new JProperty(attribute.Name, attribute.Value));
-			return settings;
-		}
 	}
 }

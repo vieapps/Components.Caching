@@ -6,17 +6,17 @@
 		<RootNamespace>net.vieapps.Components.Caching</RootNamespace>
 		<AssemblyName>VIEApps.Components.Caching</AssemblyName>
 		<AssemblyTitle>VIEApps NGX Caching</AssemblyTitle>
-		<AssemblyVersion>10.1.2.1712</AssemblyVersion>
-		<FileVersion>10.1.2.1712</FileVersion>
+		<AssemblyVersion>10.1.3.1712</AssemblyVersion>
+		<FileVersion>10.1.3.1712</FileVersion>
 		<InformationalVersion>10.1 (v10.1.nstd-2017.12.01)</InformationalVersion>
 		<Product>VIEApps NGX</Product>
 		<Company>VIEApps.net</Company>
 		<GeneratePackageOnBuild>false</GeneratePackageOnBuild>
 		<PackageId>VIEApps.Components.Caching</PackageId>
-		<Version>10.1.2.1712</Version>
+		<Version>10.1.3.1712</Version>
 		<Title>VIEApps NGX Caching</Title>
-		<Description>The .NET Standard 2.0 wrapper library for working with distributed cache in .NET</Description>
-		<Summary>The .NET Standard 2.0 wrapper library for working with distributed cache in .NET</Summary>
+		<Description>The .NET Standard 2.0 wrapper library for working with distributed cache (memcached &amp; redis) in .NET</Description>
+		<Summary>The .NET Standard 2.0 wrapper library for working with distributed cache (memcached &amp; redis) in .NET</Summary>
 		<Authors>VIEApps.net</Authors>
 		<Copyright>© 2017 VIEApps.net</Copyright>
 		<PackageReleaseNotes></PackageReleaseNotes>
