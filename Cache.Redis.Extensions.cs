@@ -217,7 +217,7 @@ namespace net.vieapps.Components.Caching
 				: redis.KeyDeleteAsync(key);
 		}
 
-		public static bool UpdateSetMembers(this IDatabase redis, string key, string value)
+		internal static bool UpdateSetMembers(this IDatabase redis, string key, string value)
 		{
 			try
 			{
@@ -239,7 +239,7 @@ namespace net.vieapps.Components.Caching
 			}
 		}
 
-		public static async Task<bool> UpdateSetMembersAsync(this IDatabase redis, string key, string value)
+		internal static async Task<bool> UpdateSetMembersAsync(this IDatabase redis, string key, string value)
 		{
 			try
 			{
@@ -261,7 +261,7 @@ namespace net.vieapps.Components.Caching
 			}
 		}
 
-		public static bool RemoveSetMembers(this IDatabase redis, string key, string value)
+		internal static bool RemoveSetMembers(this IDatabase redis, string key, string value)
 		{
 			try
 			{
@@ -273,7 +273,7 @@ namespace net.vieapps.Components.Caching
 			}
 		}
 
-		public static async Task<bool> RemoveSetMembersAsync(this IDatabase redis, string key, string value)
+		internal static async Task<bool> RemoveSetMembersAsync(this IDatabase redis, string key, string value)
 		{
 			try
 			{
@@ -285,7 +285,7 @@ namespace net.vieapps.Components.Caching
 			}
 		}
 
-		public static HashSet<string> GetSetMembers(this IDatabase redis, string key)
+		internal static HashSet<string> GetSetMembers(this IDatabase redis, string key)
 		{
 			try
 			{
@@ -298,7 +298,7 @@ namespace net.vieapps.Components.Caching
 			}
 		}
 
-		public static async Task<HashSet<string>> GetSetMembersAsync(this IDatabase redis, string key)
+		internal static async Task<HashSet<string>> GetSetMembersAsync(this IDatabase redis, string key)
 		{
 			try
 			{
@@ -310,6 +310,5 @@ namespace net.vieapps.Components.Caching
 				return new HashSet<string>();
 			}
 		}
-
 	}
 }
