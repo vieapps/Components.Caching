@@ -217,18 +217,18 @@ namespace net.vieapps.Components.Caching
 				: redis.KeyDeleteAsync(key);
 		}
 
-		public static bool UpdateSetMembers(this IDatabase redis, RedisKey setKey, string itemKey)
+		public static bool UpdateSetMembers(this IDatabase redis, string key, string value)
 		{
 			try
 			{
-				return redis.SetAdd(setKey, itemKey);
+				return redis.SetAdd(key, value);
 			}
 			catch (RedisServerException ex)
 			{
 				if (ex.Message.Contains("WRONGTYPE"))
 				{
-					redis.KeyDelete(setKey);
-					return redis.SetAdd(setKey, itemKey);
+					redis.KeyDelete(key);
+					return redis.SetAdd(key, value);
 				}
 				else
 					throw;
@@ -239,18 +239,18 @@ namespace net.vieapps.Components.Caching
 			}
 		}
 
-		public static async Task<bool> UpdateSetMembersAsync(this IDatabase redis, string setKey, string itemKey)
+		public static async Task<bool> UpdateSetMembersAsync(this IDatabase redis, string key, string value)
 		{
 			try
 			{
-				return await redis.SetAddAsync(setKey, itemKey);
+				return await redis.SetAddAsync(key, value);
 			}
 			catch (RedisServerException ex)
 			{
 				if (ex.Message.Contains("WRONGTYPE"))
 				{
-					await redis.KeyDeleteAsync(setKey);
-					return await redis.SetAddAsync(setKey, itemKey);
+					await redis.KeyDeleteAsync(key);
+					return await redis.SetAddAsync(key, value);
 				}
 				else
 					throw;
@@ -261,11 +261,11 @@ namespace net.vieapps.Components.Caching
 			}
 		}
 
-		public static bool RemoveSetMembers(this IDatabase redis, string setKey, string itemKey)
+		public static bool RemoveSetMembers(this IDatabase redis, string key, string value)
 		{
 			try
 			{
-				return redis.SetRemove(setKey, itemKey);
+				return redis.SetRemove(key, value);
 			}
 			catch
 			{
@@ -273,11 +273,11 @@ namespace net.vieapps.Components.Caching
 			}
 		}
 
-		public static async Task<bool> RemoveSetMembersAsync(this IDatabase redis, string setKey, string itemKey)
+		public static async Task<bool> RemoveSetMembersAsync(this IDatabase redis, string key, string value)
 		{
 			try
 			{
-				return await redis.SetRemoveAsync(setKey, itemKey);
+				return await redis.SetRemoveAsync(key, value);
 			}
 			catch
 			{
@@ -285,12 +285,12 @@ namespace net.vieapps.Components.Caching
 			}
 		}
 
-		public static HashSet<string> GetSetMembers(this IDatabase redis, string setKey)
+		public static HashSet<string> GetSetMembers(this IDatabase redis, string key)
 		{
 			try
 			{
-				var keys = redis.SetMembers(setKey);
-				return new HashSet<string>(keys != null ? keys.Where(key => !key.IsNull).Select(key => key.ToString()) : new string[] { });
+				var keys = redis.SetMembers(key);
+				return new HashSet<string>(keys != null ? keys.Where(k => !k.IsNull).Select(k => k.ToString()) : new string[] { });
 			}
 			catch
 			{
@@ -298,12 +298,12 @@ namespace net.vieapps.Components.Caching
 			}
 		}
 
-		public static async Task<HashSet<string>> GetSetMembersAsync(this IDatabase redis, string setKey)
+		public static async Task<HashSet<string>> GetSetMembersAsync(this IDatabase redis, string key)
 		{
 			try
 			{
-				var keys = await redis.SetMembersAsync(setKey);
-				return new HashSet<string>(keys != null ? keys.Where(key => !key.IsNull).Select(key => key.ToString()) : new string[] { });
+				var keys = await redis.SetMembersAsync(key);
+				return new HashSet<string>(keys != null ? keys.Where(k => !k.IsNull).Select(k => k.ToString()) : new string[] { });
 			}
 			catch
 			{
