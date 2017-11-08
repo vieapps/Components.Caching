@@ -108,12 +108,12 @@ namespace net.vieapps.Components.Caching
 		}
 		#endregion
 
-		#region Get client
+		#region Get client of a cache provider
 		internal static MemcachedClient GetMemcachedClient()
 		{
 			var configuration = ConfigurationManager.GetSection("memcached") as MemcachedClientConfigurationSectionHandler;
 			if (configuration == null)
-				throw new ConfigurationErrorsException("The section named 'memcached' is not found in your sytem configuration file (app.config or web.config");
+				throw new ConfigurationErrorsException("The section named 'memcached' is not found, please check your configuration file (app.config or web.config");
 			return new Enyim.Caching.MemcachedClient(configuration);
 		}
 
@@ -123,7 +123,7 @@ namespace net.vieapps.Components.Caching
 		{
 			var configuration = ConfigurationManager.GetSection("redis") as RedisClientConfigurationSectionHandler;
 			if (configuration == null)
-				throw new ConfigurationErrorsException("The section named 'redis' is not found in your sytem configuration file (app.config or web.config");
+				throw new ConfigurationErrorsException("The section named 'redis' is not found, please check your configuration file (app.config or web.config");
 
 			var connectionString = "";
 			if (configuration.Section.SelectNodes("servers/add") is XmlNodeList nodes)
@@ -134,6 +134,11 @@ namespace net.vieapps.Components.Caching
 					var port = Convert.ToInt32(info["port"] != null ? (info["port"] as JValue).Value as string : "6379");
 					connectionString += (connectionString != "" ? "," : "") + address + ":" + port.ToString();
 				}
+
+			if (configuration.Section.SelectSingleNode("options") is XmlNode node)
+				foreach (XmlAttribute option in node.Attributes)
+					if (!string.IsNullOrWhiteSpace(option.Value))
+						connectionString += (connectionString != "" ? "," : "") + option.Value;
 
 			Helper.RedisConnection = Helper.RedisConnection ?? ConnectionMultiplexer.Connect(connectionString);
 			return Helper.RedisConnection.GetDatabase();

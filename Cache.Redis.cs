@@ -45,8 +45,11 @@ namespace net.vieapps.Components.Caching
 			// register the region
 			Task.Run(async () =>
 			{
-				await Redis.Client.HashSetGetAsync(this._RegionKey);
-				await Redis.Client.HashSetUpdateAsync(Helper.RegionsKey, this._name);
+				try
+				{
+					await Redis.Client.HashSetUpdateAsync(Helper.RegionsKey, this._name);
+				}
+				catch { }
 			});
 		}
 
@@ -66,8 +69,7 @@ namespace net.vieapps.Components.Caching
 
 		string _name;
 		int _expirationTime;
-		bool _updateKeys = false;
-		ReaderWriterLockSlim _locker = new ReaderWriterLockSlim(LockRecursionPolicy.SupportsRecursion);
+		bool _updateKeys;
 		#endregion
 
 		#region Keys
@@ -109,7 +111,7 @@ namespace net.vieapps.Components.Caching
 		#endregion
 
 		#region Set
-		bool _Set(string key, object value, TimeSpan validFor, bool doPush = true)
+		bool _Set(string key, object value, TimeSpan validFor)
 		{
 			// store
 			var success = false;
@@ -128,19 +130,19 @@ namespace net.vieapps.Components.Caching
 				}
 
 			// update mapping key when added successful
-			if (success && doPush)
+			if (success)
 				this._UpdateKey(key);
 
 			// return state
 			return success;
 		}
 
-		bool _Set(string key, object value, int expirationTime = 0, bool doPush = true)
+		bool _Set(string key, object value, int expirationTime = 0)
 		{
-			return this._Set(key, value, TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime), doPush);
+			return this._Set(key, value, TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime));
 		}
 
-		bool _Set(string key, object value, DateTime expiresAt, bool doPush = true)
+		bool _Set(string key, object value, DateTime expiresAt)
 		{
 			// store
 			var success = false;
@@ -159,14 +161,14 @@ namespace net.vieapps.Components.Caching
 				}
 
 			// update mapping key when added successful
-			if (success && doPush)
+			if (success)
 				this._UpdateKey(key);
 
 			// return state
 			return success;
 		}
 
-		async Task<bool> _SetAsync(string key, object value, TimeSpan validFor, bool doPush = true)
+		async Task<bool> _SetAsync(string key, object value, TimeSpan validFor)
 		{
 			// store
 			var success = false;
@@ -185,19 +187,19 @@ namespace net.vieapps.Components.Caching
 				}
 
 			// update mapping key when added successful
-			if (success && doPush)
+			if (success)
 				await this._UpdateKeyAsync(key);
 
 			// return state
 			return success;
 		}
 
-		Task<bool> _SetAsync(string key, object value, int expirationTime = 0, bool doPush = true)
+		Task<bool> _SetAsync(string key, object value, int expirationTime = 0)
 		{
-			return this._SetAsync(key, value, TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime), doPush);
+			return this._SetAsync(key, value, TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime));
 		}
 
-		async Task<bool> _SetAsync(string key, object value, DateTime expiresAt, bool doPush = true)
+		async Task<bool> _SetAsync(string key, object value, DateTime expiresAt)
 		{
 			// store
 			var success = false;
@@ -216,7 +218,7 @@ namespace net.vieapps.Components.Caching
 				}
 
 			// update mapping key when added successful
-			if (success && doPush)
+			if (success)
 				await this._UpdateKeyAsync(key);
 
 			// return state
@@ -227,9 +229,8 @@ namespace net.vieapps.Components.Caching
 		#region Set (Multiple)
 		void _Set<T>(IDictionary<string, T> items, string keyPrefix = null, int expirationTime = 0)
 		{
-			if (items != null && items.Count > 0)
-				foreach (var item in items)
-					this._Set((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + item.Key, item.Value, expirationTime);
+			if (items != null)
+				items.Where(kvp => kvp.Key != null).ToList().ForEach(kvp => this._Set((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + kvp.Key, kvp.Value, expirationTime));
 		}
 
 		void _Set(IDictionary<string, object> items, string keyPrefix = null, int expirationTime = 0)
@@ -237,10 +238,12 @@ namespace net.vieapps.Components.Caching
 			this._Set<object>(items, keyPrefix, expirationTime);
 		}
 
-		async Task _SetAsync<T>(IDictionary<string, T> items, string keyPrefix = null, int expirationTime = 0)
+		Task _SetAsync<T>(IDictionary<string, T> items, string keyPrefix = null, int expirationTime = 0)
 		{
-			if (items != null && items.Count > 0)
-				await Task.WhenAll(items.Select(item => this._SetAsync((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + item.Key, item.Value, expirationTime)));
+			var tasks = items != null
+				? items.Where(kvp => kvp.Key != null).Select(kvp => this._SetAsync((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + kvp.Key, kvp.Value, expirationTime))
+				: new List<Task<bool>>();
+			return Task.WhenAll(tasks);
 		}
 
 		Task _SetAsync(IDictionary<string, object> items, string keyPrefix = null, int expirationTime = 0)
@@ -272,7 +275,7 @@ namespace net.vieapps.Components.Caching
 		#endregion
 
 		#region Add
-		bool _Add(string key, object value, TimeSpan validFor, bool doPush = true)
+		bool _Add(string key, object value, TimeSpan validFor)
 		{
 			// store
 			var success = false;
@@ -291,19 +294,19 @@ namespace net.vieapps.Components.Caching
 				}
 
 			// update mapping key when added successful
-			if (success && doPush)
+			if (success)
 				this._UpdateKey(key);
 
 			// return state
 			return success;
 		}
 
-		bool _Add(string key, object value, int expirationTime = 0, bool doPush = true)
+		bool _Add(string key, object value, int expirationTime = 0)
 		{
-			return this._Add(key, value, TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime), doPush);
+			return this._Add(key, value, TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime));
 		}
 
-		bool _Add(string key, object value, DateTime expiresAt, bool doPush = true)
+		bool _Add(string key, object value, DateTime expiresAt)
 		{
 			// store
 			var success = false;
@@ -322,14 +325,14 @@ namespace net.vieapps.Components.Caching
 				}
 
 			// update mapping key when added successful
-			if (success && doPush)
+			if (success)
 				this._UpdateKey(key);
 
 			// return state
 			return success;
 		}
 
-		async Task<bool> _AddAsync(string key, object value, TimeSpan validFor, bool doPush = true)
+		async Task<bool> _AddAsync(string key, object value, TimeSpan validFor)
 		{
 			// store
 			var success = false;
@@ -348,19 +351,19 @@ namespace net.vieapps.Components.Caching
 				}
 
 			// update mapping key when added successful
-			if (success && doPush)
+			if (success)
 				await this._UpdateKeyAsync(key);
 
 			// return state
 			return success;
 		}
 
-		Task<bool> _AddAsync(string key, object value, int expirationTime = 0, bool doPush = true)
+		Task<bool> _AddAsync(string key, object value, int expirationTime = 0)
 		{
-			return this._AddAsync(key, value, TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime), doPush);
+			return this._AddAsync(key, value, TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime));
 		}
 
-		async Task<bool> _AddAsync(string key, object value, DateTime expiresAt, bool doPush = true)
+		async Task<bool> _AddAsync(string key, object value, DateTime expiresAt)
 		{
 			// store
 			var success = false;
@@ -379,7 +382,7 @@ namespace net.vieapps.Components.Caching
 				}
 
 			// update mapping key when added successful
-			if (success && doPush)
+			if (success)
 				await this._UpdateKeyAsync(key);
 
 			// return state
@@ -388,7 +391,7 @@ namespace net.vieapps.Components.Caching
 		#endregion
 
 		#region Replace
-		bool _Replace(string key, object value, TimeSpan validFor, bool doPush = true)
+		bool _Replace(string key, object value, TimeSpan validFor)
 		{
 			// store
 			var success = false;
@@ -407,19 +410,19 @@ namespace net.vieapps.Components.Caching
 				}
 
 			// update mapping key when added successful
-			if (success && doPush)
+			if (success)
 				this._UpdateKey(key);
 
 			// return state
 			return success;
 		}
 
-		bool _Replace(string key, object value, int expirationTime = 0, bool doPush = true)
+		bool _Replace(string key, object value, int expirationTime = 0)
 		{
-			return this._Replace(key, value, TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime), doPush);
+			return this._Replace(key, value, TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime));
 		}
 
-		bool _Replace(string key, object value, DateTime expiresAt, bool doPush = true)
+		bool _Replace(string key, object value, DateTime expiresAt)
 		{
 			// store
 			var success = false;
@@ -438,14 +441,14 @@ namespace net.vieapps.Components.Caching
 				}
 
 			// update mapping key when added successful
-			if (success && doPush)
+			if (success)
 				this._UpdateKey(key);
 
 			// return state
 			return success;
 		}
 
-		async Task<bool> _ReplaceAsync(string key, object value, TimeSpan validFor, bool doPush = true)
+		async Task<bool> _ReplaceAsync(string key, object value, TimeSpan validFor)
 		{
 			// store
 			var success = false;
@@ -464,19 +467,19 @@ namespace net.vieapps.Components.Caching
 				}
 
 			// update mapping key when added successful
-			if (success && doPush)
-				this._UpdateKey(key);
+			if (success)
+				await this._UpdateKeyAsync(key);
 
 			// return state
 			return success;
 		}
 
-		Task<bool> _ReplaceAsync(string key, object value, int expirationTime = 0, bool doPush = true)
+		Task<bool> _ReplaceAsync(string key, object value, int expirationTime = 0)
 		{
-			return this._ReplaceAsync(key, value, TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime), doPush);
+			return this._ReplaceAsync(key, value, TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime));
 		}
 
-		async Task<bool> _ReplaceAsync(string key, object value, DateTime expiresAt, bool doPush = true)
+		async Task<bool> _ReplaceAsync(string key, object value, DateTime expiresAt)
 		{
 			// store
 			var success = false;
@@ -495,8 +498,8 @@ namespace net.vieapps.Components.Caching
 				}
 
 			// update mapping key when added successful
-			if (success && doPush)
-				this._UpdateKey(key);
+			if (success)
+				await this._UpdateKeyAsync(key);
 
 			// return state
 			return success;
@@ -509,19 +512,15 @@ namespace net.vieapps.Components.Caching
 			if (string.IsNullOrWhiteSpace(key))
 				throw new ArgumentNullException(key);
 
-			// get cached item
-			object value = null;
 			try
 			{
-				value = Redis.Client.Get(this._GetKey(key));
+				return Redis.Client.Get(this._GetKey(key));
 			}
 			catch (Exception ex)
 			{
 				Helper.WriteLogs(this.Name, $"Error occurred while fetching an object from cache storage [{key}]", ex);
+				return null;
 			}
-
-			// return object
-			return value;
 		}
 
 		async Task<object> _GetAsync(string key, bool autoGetFragments = true)
@@ -529,19 +528,15 @@ namespace net.vieapps.Components.Caching
 			if (string.IsNullOrWhiteSpace(key))
 				throw new ArgumentNullException(key);
 
-			// get cached item
-			object value = null;
 			try
 			{
-				value = await Redis.Client.GetAsync(this._GetKey(key));
+				return await Redis.Client.GetAsync(this._GetKey(key));
 			}
 			catch (Exception ex)
 			{
 				Helper.WriteLogs(this.Name, $"Error occurred while fetching an object from cache storage [{key}]", ex);
+				return null;
 			}
-
-			// return object
-			return value;
 		}
 		#endregion
 
@@ -567,10 +562,7 @@ namespace net.vieapps.Components.Caching
 			if (items != null && items.Count > 0)
 				try
 				{
-					objects = items.ToDictionary(
-							kvp => kvp.Key.Remove(0, this.Name.Length + 1),
-							kvp => kvp.Value
-						);
+					objects = items.ToDictionary(kvp => kvp.Key.Remove(0, this.Name.Length + 1), kvp => kvp.Value);
 				}
 				catch { }
 
@@ -609,10 +601,7 @@ namespace net.vieapps.Components.Caching
 			if (items != null && items.Count > 0)
 				try
 				{
-					objects = items.ToDictionary(
-							kvp => kvp.Key.Remove(0, this.Name.Length + 1),
-							kvp => kvp.Value
-						);
+					objects = items.ToDictionary(kvp => kvp.Key.Remove(0, this.Name.Length + 1), kvp => kvp.Value);
 				}
 				catch { }
 
@@ -654,7 +643,7 @@ namespace net.vieapps.Components.Caching
 		#endregion
 
 		#region Remove
-		bool _Remove(string key, bool doPush = true)
+		bool _Remove(string key)
 		{
 			// remove
 			var success = false;
@@ -669,14 +658,14 @@ namespace net.vieapps.Components.Caching
 				}
 
 			// update mapping key when removed successful
-			if (success && doPush)
+			if (success)
 				this._RemoveKey(key);
 
 			// return state
 			return success;
 		}
 
-		async Task<bool> _RemoveAsync(string key, bool doPush = true)
+		async Task<bool> _RemoveAsync(string key)
 		{
 			// remove
 			var success = false;
@@ -691,7 +680,7 @@ namespace net.vieapps.Components.Caching
 				}
 
 			// update mapping key when removed successful
-			if (success && doPush)
+			if (success)
 				await this._RemoveKeyAsync(key);
 
 			// return state
@@ -703,18 +692,14 @@ namespace net.vieapps.Components.Caching
 		void _Remove(IEnumerable<string> keys, string keyPrefix = null)
 		{
 			if (keys != null)
-				foreach (string key in keys)
-					if (!string.IsNullOrWhiteSpace(key))
-						this._Remove((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + key);
+				keys.Where(key => !string.IsNullOrWhiteSpace(key)).ToList().ForEach(key => this._Remove((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + key));
 		}
 
 		Task _RemoveAsync(IEnumerable<string> keys, string keyPrefix = null)
 		{
-			var tasks = new List<Task>();
-			if (keys != null)
-				foreach (string key in keys)
-					if (!string.IsNullOrWhiteSpace(key))
-						tasks.Add(this._RemoveAsync((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + key));
+			var tasks = keys != null
+				? keys.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => this._RemoveAsync((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + key))
+				: new List<Task<bool>>();
 			return Task.WhenAll(tasks);
 		}
 		#endregion
@@ -895,7 +880,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
 		public Task<bool> SetAsync(string key, object value, int expirationTime = 0)
 		{
-			return this._SetAsync(key, value, expirationTime, true);
+			return this._SetAsync(key, value, expirationTime);
 		}
 
 		/// <summary>
