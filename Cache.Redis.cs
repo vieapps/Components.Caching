@@ -26,8 +26,8 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		/// <param name="name">The string that presents name of isolated region of the cache</param>
 		/// <param name="expirationTime">The number that presents times (in minutes) for caching an item</param>
-		/// <param name="updateKeys">true to active update keys of the region (to clear or using with other purpose further)</param>
-		public Redis(string name, int expirationTime, bool updateKeys)
+		/// <param name="storeKeys">true to active store keys of the region (to clear or using with other purpose further)</param>
+		public Redis(string name, int expirationTime, bool storeKeys)
 		{
 			// region name
 			this._name = string.IsNullOrWhiteSpace(name)
@@ -39,8 +39,8 @@ namespace net.vieapps.Components.Caching
 				? expirationTime
 				: Helper.ExpirationTime;
 
-			// update keys
-			this._updateKeys = updateKeys;
+			// store keys
+			this._storeKeys = storeKeys;
 
 			// register the region
 			Task.Run(async () =>
@@ -69,32 +69,32 @@ namespace net.vieapps.Components.Caching
 
 		string _name;
 		int _expirationTime;
-		bool _updateKeys;
+		bool _storeKeys;
 		#endregion
 
 		#region Keys
 		void _UpdateKey(string key)
 		{
-			if (this._updateKeys)
+			if (this._storeKeys)
 				Redis.Client.UpdateSetMembers(this._RegionKey, this._GetKey(key));
 		}
 
 		Task _UpdateKeyAsync(string key)
 		{
-			return this._updateKeys
+			return this._storeKeys
 				? Redis.Client.UpdateSetMembersAsync(this._RegionKey, this._GetKey(key))
 				: Task.CompletedTask;
 		}
 
 		void _RemoveKey(string key)
 		{
-			if (this._updateKeys)
+			if (this._storeKeys)
 				Redis.Client.RemoveSetMembers(this._RegionKey, this._GetKey(key));
 		}
 
 		Task _RemoveKeyAsync(string key)
 		{
-			return this._updateKeys
+			return this._storeKeys
 				? Redis.Client.RemoveSetMembersAsync(this._RegionKey, this._GetKey(key))
 				: Task.CompletedTask;
 		}
@@ -113,7 +113,6 @@ namespace net.vieapps.Components.Caching
 		#region Set
 		bool _Set(string key, object value, TimeSpan validFor)
 		{
-			// store
 			var success = false;
 			if (!string.IsNullOrWhiteSpace(key) && value != null)
 				try
@@ -129,11 +128,9 @@ namespace net.vieapps.Components.Caching
 					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
 				}
 
-			// update mapping key when added successful
 			if (success)
 				this._UpdateKey(key);
 
-			// return state
 			return success;
 		}
 
@@ -144,7 +141,6 @@ namespace net.vieapps.Components.Caching
 
 		bool _Set(string key, object value, DateTime expiresAt)
 		{
-			// store
 			var success = false;
 			if (!string.IsNullOrWhiteSpace(key) && value != null)
 				try
@@ -160,17 +156,14 @@ namespace net.vieapps.Components.Caching
 					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
 				}
 
-			// update mapping key when added successful
 			if (success)
 				this._UpdateKey(key);
 
-			// return state
 			return success;
 		}
 
 		async Task<bool> _SetAsync(string key, object value, TimeSpan validFor)
 		{
-			// store
 			var success = false;
 			if (!string.IsNullOrWhiteSpace(key) && value != null)
 				try
@@ -186,7 +179,6 @@ namespace net.vieapps.Components.Caching
 					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
 				}
 
-			// update mapping key when added successful
 			if (success)
 				await this._UpdateKeyAsync(key);
 
@@ -201,7 +193,6 @@ namespace net.vieapps.Components.Caching
 
 		async Task<bool> _SetAsync(string key, object value, DateTime expiresAt)
 		{
-			// store
 			var success = false;
 			if (!string.IsNullOrWhiteSpace(key) && value != null)
 				try
@@ -217,11 +208,9 @@ namespace net.vieapps.Components.Caching
 					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
 				}
 
-			// update mapping key when added successful
 			if (success)
 				await this._UpdateKeyAsync(key);
 
-			// return state
 			return success;
 		}
 		#endregion
@@ -240,10 +229,9 @@ namespace net.vieapps.Components.Caching
 
 		Task _SetAsync<T>(IDictionary<string, T> items, string keyPrefix = null, int expirationTime = 0)
 		{
-			var tasks = items != null
-				? items.Where(kvp => kvp.Key != null).Select(kvp => this._SetAsync((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + kvp.Key, kvp.Value, expirationTime))
-				: new List<Task<bool>>();
-			return Task.WhenAll(tasks);
+			return items != null
+				? Task.WhenAll(items.Where(kvp => kvp.Key != null).Select(kvp => this._SetAsync((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + kvp.Key, kvp.Value, expirationTime)))
+				: Task.CompletedTask;
 		}
 
 		Task _SetAsync(IDictionary<string, object> items, string keyPrefix = null, int expirationTime = 0)
@@ -277,7 +265,6 @@ namespace net.vieapps.Components.Caching
 		#region Add
 		bool _Add(string key, object value, TimeSpan validFor)
 		{
-			// store
 			var success = false;
 			if (!string.IsNullOrWhiteSpace(key) && value != null)
 				try
@@ -293,11 +280,9 @@ namespace net.vieapps.Components.Caching
 					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
 				}
 
-			// update mapping key when added successful
 			if (success)
 				this._UpdateKey(key);
 
-			// return state
 			return success;
 		}
 
@@ -308,7 +293,6 @@ namespace net.vieapps.Components.Caching
 
 		bool _Add(string key, object value, DateTime expiresAt)
 		{
-			// store
 			var success = false;
 			if (!string.IsNullOrWhiteSpace(key) && value != null)
 				try
@@ -324,17 +308,14 @@ namespace net.vieapps.Components.Caching
 					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
 				}
 
-			// update mapping key when added successful
 			if (success)
 				this._UpdateKey(key);
 
-			// return state
 			return success;
 		}
 
 		async Task<bool> _AddAsync(string key, object value, TimeSpan validFor)
 		{
-			// store
 			var success = false;
 			if (!string.IsNullOrWhiteSpace(key) && value != null)
 				try
@@ -350,11 +331,9 @@ namespace net.vieapps.Components.Caching
 					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
 				}
 
-			// update mapping key when added successful
 			if (success)
 				await this._UpdateKeyAsync(key);
 
-			// return state
 			return success;
 		}
 
@@ -365,7 +344,6 @@ namespace net.vieapps.Components.Caching
 
 		async Task<bool> _AddAsync(string key, object value, DateTime expiresAt)
 		{
-			// store
 			var success = false;
 			if (!string.IsNullOrWhiteSpace(key) && value != null)
 				try
@@ -381,11 +359,9 @@ namespace net.vieapps.Components.Caching
 					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
 				}
 
-			// update mapping key when added successful
 			if (success)
 				await this._UpdateKeyAsync(key);
 
-			// return state
 			return success;
 		}
 		#endregion
@@ -393,7 +369,6 @@ namespace net.vieapps.Components.Caching
 		#region Replace
 		bool _Replace(string key, object value, TimeSpan validFor)
 		{
-			// store
 			var success = false;
 			if (!string.IsNullOrWhiteSpace(key) && value != null)
 				try
@@ -409,11 +384,9 @@ namespace net.vieapps.Components.Caching
 					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
 				}
 
-			// update mapping key when added successful
 			if (success)
 				this._UpdateKey(key);
 
-			// return state
 			return success;
 		}
 
@@ -424,7 +397,6 @@ namespace net.vieapps.Components.Caching
 
 		bool _Replace(string key, object value, DateTime expiresAt)
 		{
-			// store
 			var success = false;
 			if (!string.IsNullOrWhiteSpace(key) && value != null)
 				try
@@ -440,17 +412,14 @@ namespace net.vieapps.Components.Caching
 					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
 				}
 
-			// update mapping key when added successful
 			if (success)
 				this._UpdateKey(key);
 
-			// return state
 			return success;
 		}
 
 		async Task<bool> _ReplaceAsync(string key, object value, TimeSpan validFor)
 		{
-			// store
 			var success = false;
 			if (!string.IsNullOrWhiteSpace(key) && value != null)
 				try
@@ -466,11 +435,9 @@ namespace net.vieapps.Components.Caching
 					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
 				}
 
-			// update mapping key when added successful
 			if (success)
 				await this._UpdateKeyAsync(key);
 
-			// return state
 			return success;
 		}
 
@@ -481,7 +448,6 @@ namespace net.vieapps.Components.Caching
 
 		async Task<bool> _ReplaceAsync(string key, object value, DateTime expiresAt)
 		{
-			// store
 			var success = false;
 			if (!string.IsNullOrWhiteSpace(key) && value != null)
 				try
@@ -497,11 +463,9 @@ namespace net.vieapps.Components.Caching
 					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
 				}
 
-			// update mapping key when added successful
 			if (success)
 				await this._UpdateKeyAsync(key);
 
-			// return state
 			return success;
 		}
 		#endregion
@@ -511,7 +475,6 @@ namespace net.vieapps.Components.Caching
 		{
 			if (string.IsNullOrWhiteSpace(key))
 				throw new ArgumentNullException(key);
-
 			try
 			{
 				return Redis.Client.Get(this._GetKey(key));
@@ -527,7 +490,6 @@ namespace net.vieapps.Components.Caching
 		{
 			if (string.IsNullOrWhiteSpace(key))
 				throw new ArgumentNullException(key);
-
 			try
 			{
 				return await Redis.Client.GetAsync(this._GetKey(key));
@@ -543,11 +505,9 @@ namespace net.vieapps.Components.Caching
 		#region Get (Multiple)
 		IDictionary<string, object> _Get(IEnumerable<string> keys)
 		{
-			// check keys
 			if (keys == null)
 				return null;
 
-			// get collection of cached objects
 			IDictionary<string, object> items = null;
 			try
 			{
@@ -558,15 +518,7 @@ namespace net.vieapps.Components.Caching
 				Helper.WriteLogs(this.Name, "Error occurred while fetch a collection of objects from cache storage", ex);
 			}
 
-			IDictionary<string, object> objects = null;
-			if (items != null && items.Count > 0)
-				try
-				{
-					objects = items.ToDictionary(kvp => kvp.Key.Remove(0, this.Name.Length + 1), kvp => kvp.Value);
-				}
-				catch { }
-
-			// return collection of cached objects
+			var objects = items.ToDictionary(kvp => kvp.Key.Remove(0, this.Name.Length + 1), kvp => kvp.Value);
 			return objects != null && objects.Count > 0
 				? objects
 				: null;
@@ -582,11 +534,9 @@ namespace net.vieapps.Components.Caching
 
 		async Task<IDictionary<string, object>> _GetAsync(IEnumerable<string> keys)
 		{
-			// check keys
 			if (keys == null)
 				return null;
 
-			// get collection of cached objects
 			IDictionary<string, object> items = null;
 			try
 			{
@@ -597,15 +547,7 @@ namespace net.vieapps.Components.Caching
 				Helper.WriteLogs(this.Name, "Error occurred while fetch a collection of objects from cache storage", ex);
 			}
 
-			IDictionary<string, object> objects = null;
-			if (items != null && items.Count > 0)
-				try
-				{
-					objects = items.ToDictionary(kvp => kvp.Key.Remove(0, this.Name.Length + 1), kvp => kvp.Value);
-				}
-				catch { }
-
-			// return collection of cached objects
+			var objects = items.ToDictionary(kvp => kvp.Key.Remove(0, this.Name.Length + 1), kvp => kvp.Value);
 			return objects != null && objects.Count > 0
 				? objects
 				: null;
@@ -645,7 +587,6 @@ namespace net.vieapps.Components.Caching
 		#region Remove
 		bool _Remove(string key)
 		{
-			// remove
 			var success = false;
 			if (!string.IsNullOrWhiteSpace(key))
 				try
@@ -657,17 +598,14 @@ namespace net.vieapps.Components.Caching
 					Helper.WriteLogs(this.Name, $"Error occurred while removing an object from cache storage [{key}]", ex);
 				}
 
-			// update mapping key when removed successful
 			if (success)
 				this._RemoveKey(key);
 
-			// return state
 			return success;
 		}
 
 		async Task<bool> _RemoveAsync(string key)
 		{
-			// remove
 			var success = false;
 			if (!string.IsNullOrWhiteSpace(key))
 				try
@@ -679,11 +617,9 @@ namespace net.vieapps.Components.Caching
 					Helper.WriteLogs(this.Name, $"Error occurred while removing an object from cache storage [{key}]", ex);
 				}
 
-			// update mapping key when removed successful
 			if (success)
 				await this._RemoveKeyAsync(key);
 
-			// return state
 			return success;
 		}
 		#endregion
@@ -697,10 +633,9 @@ namespace net.vieapps.Components.Caching
 
 		Task _RemoveAsync(IEnumerable<string> keys, string keyPrefix = null)
 		{
-			var tasks = keys != null
-				? keys.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => this._RemoveAsync((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + key))
-				: new List<Task<bool>>();
-			return Task.WhenAll(tasks);
+			return keys != null
+				? Task.WhenAll(keys.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => this._RemoveAsync((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + key)))
+				: Task.CompletedTask;
 		}
 		#endregion
 
@@ -735,7 +670,6 @@ namespace net.vieapps.Components.Caching
 
 		async Task _ClearAsync()
 		{
-			// remove
 			var keys = await this._GetKeysAsync();
 			await Task.WhenAll(
 				this._RemoveAsync(keys),
