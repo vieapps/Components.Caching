@@ -47,7 +47,7 @@ namespace net.vieapps.Components.Caching
 			{
 				try
 				{
-					await Redis.Client.HashSetUpdateAsync(Helper.RegionsKey, this._name);
+					await Redis.Client.UpdateSetMembersAsync(Helper.RegionsKey, this._name);
 				}
 				catch { }
 			});
@@ -76,37 +76,37 @@ namespace net.vieapps.Components.Caching
 		void _UpdateKey(string key)
 		{
 			if (this._updateKeys)
-				Redis.Client.HashSetUpdate(this._RegionKey, this._GetKey(key));
+				Redis.Client.UpdateSetMembers(this._RegionKey, this._GetKey(key));
 		}
 
 		Task _UpdateKeyAsync(string key)
 		{
 			return this._updateKeys
-				? Redis.Client.HashSetUpdateAsync(this._RegionKey, this._GetKey(key))
+				? Redis.Client.UpdateSetMembersAsync(this._RegionKey, this._GetKey(key))
 				: Task.CompletedTask;
 		}
 
 		void _RemoveKey(string key)
 		{
 			if (this._updateKeys)
-				Redis.Client.HashSetRemove(this._RegionKey, this._GetKey(key));
+				Redis.Client.RemoveSetMembers(this._RegionKey, this._GetKey(key));
 		}
 
 		Task _RemoveKeyAsync(string key)
 		{
 			return this._updateKeys
-				? Redis.Client.HashSetRemoveAsync(this._RegionKey, this._GetKey(key))
+				? Redis.Client.RemoveSetMembersAsync(this._RegionKey, this._GetKey(key))
 				: Task.CompletedTask;
 		}
 
 		HashSet<string> _GetKeys()
 		{
-			return Redis.Client.HashSetGet(this._RegionKey);
+			return Redis.Client.GetSetMembers(this._RegionKey);
 		}
 
 		Task<HashSet<string>> _GetKeysAsync()
 		{
-			return Redis.Client.HashSetGetAsync(this._RegionKey);
+			return Redis.Client.GetSetMembersAsync(this._RegionKey);
 		}
 		#endregion
 
@@ -767,7 +767,7 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		public static HashSet<string> GetRegions()
 		{
-			return Redis.Client.HashSetGet(Helper.RegionsKey);
+			return Redis.Client.GetSetMembers(Helper.RegionsKey);
 		}
 
 		/// <summary>
@@ -775,7 +775,7 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		public static Task<HashSet<string>> GetRegionsAsync()
 		{
-			return Redis.Client.HashSetGetAsync(Helper.RegionsKey);
+			return Redis.Client.GetSetMembersAsync(Helper.RegionsKey);
 		}
 		#endregion
 
