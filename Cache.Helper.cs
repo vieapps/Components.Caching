@@ -144,7 +144,7 @@ namespace net.vieapps.Components.Caching
 			if (configuration.Section.SelectSingleNode("options") is XmlNode node)
 				foreach (XmlAttribute option in node.Attributes)
 					if (!string.IsNullOrWhiteSpace(option.Value))
-						connectionString += (connectionString != "" ? "," : "") + option.Value;
+						connectionString += (connectionString != "" ? "," : "") + option.Name + "=" + option.Value;
 
 			Helper.RedisConnection = Helper.RedisConnection ?? ConnectionMultiplexer.Connect(connectionString);
 			return Helper.RedisConnection.GetDatabase();
