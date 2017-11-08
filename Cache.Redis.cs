@@ -40,12 +40,14 @@ namespace net.vieapps.Components.Caching
 				: Helper.ExpirationTime;
 
 			// update keys
-			if (updateKeys)
+			this._updateKeys = updateKeys;
+
+			// register the region
+			Task.Run(async () =>
 			{
-				this._updateKeys = true;
-				this._addedKeys = new HashSet<string>();
-				this._removedKeys = new HashSet<string>();
-			}
+				await Redis.Client.HashSetGetAsync(this._RegionKey);
+				await Redis.Client.HashSetUpdateAsync(Helper.RegionsKey, this._name);
+			});
 		}
 
 		#region Attributes
@@ -64,122 +66,45 @@ namespace net.vieapps.Components.Caching
 
 		string _name;
 		int _expirationTime;
-		bool _updateKeys, _isUpdating = false;
-		HashSet<string> _addedKeys, _removedKeys;
+		bool _updateKeys = false;
 		ReaderWriterLockSlim _locker = new ReaderWriterLockSlim(LockRecursionPolicy.SupportsRecursion);
 		#endregion
 
 		#region Keys
-		async Task _UpdateKeysAsync(bool checkUpdatedKeys = true, Action callback = null)
+		void _UpdateKey(string key)
 		{
-			// no key need to update, then stop
-			if (checkUpdatedKeys && this._addedKeys.Count < 1 && this._removedKeys.Count < 1)
-				return;
-
-			// if other task/thread is processing, then stop
-			if (this._isUpdating)
-				return;
-
-			// set flag
-			this._isUpdating = true;
-
-			// prepare
-			var syncKeys = await Redis.FetchKeysAsync(this._RegionKey);
-
-			var totalRemovedKeys = this._removedKeys.Count;
-			var totalAddedKeys = this._addedKeys.Count;
-
-			// update removed keys
-			if (totalRemovedKeys > 0)
-				syncKeys = new HashSet<string>(syncKeys.Except(this._removedKeys));
-
-			// update added keys
-			if (totalAddedKeys > 0)
-				syncKeys = new HashSet<string>(syncKeys.Union(this._addedKeys));
-
-			// update keys
-			await Redis.SetKeysAsync(this._RegionKey, syncKeys);
-
-			// delay a moment before re-checking
-			await Task.Delay(123);
-
-			// check to see new updated keys
-			if (!totalAddedKeys.Equals(this._addedKeys.Count) || !totalRemovedKeys.Equals(this._removedKeys.Count))
-			{
-				// delay a moment before re-updating
-				await Task.Delay(345);
-
-				// update keys
-				await Redis.SetKeysAsync(this._RegionKey, new HashSet<string>(syncKeys.Except(this._removedKeys).Union(this._addedKeys)));
-			}
-
-			// clear keys
-			try
-			{
-				this._locker.EnterWriteLock();
-				this._addedKeys.Clear();
-				this._removedKeys.Clear();
-			}
-			catch (Exception ex)
-			{
-				Helper.WriteLogs(this.Name, "Error occurred while removes keys (after pushing process)", ex);
-			}
-			finally
-			{
-				if (this._locker.IsWriteLockHeld)
-					this._locker.ExitWriteLock();
-			}
-
-			// remove flags
-			this._isUpdating = false;
-
-			// callback
-			callback?.Invoke();
+			if (this._updateKeys)
+				Redis.Client.HashSetUpdate(this._RegionKey, this._GetKey(key));
 		}
 
-		void _UpdateKeys(int delay = 13, bool checkUpdatedKeys = true, Action callback = null)
+		Task _UpdateKeyAsync(string key)
 		{
-			Task.Run(async () =>
-			{
-				await Task.Delay(delay);
-				await this._UpdateKeysAsync(checkUpdatedKeys, callback).ConfigureAwait(false);
-			}).ConfigureAwait(false);
+			return this._updateKeys
+				? Redis.Client.HashSetUpdateAsync(this._RegionKey, this._GetKey(key))
+				: Task.CompletedTask;
 		}
 
-		void _UpdateKeys(string key, bool doPush)
+		void _RemoveKey(string key)
 		{
-			// update added keys
-			if (!this._updateKeys)
-				return;
+			if (this._updateKeys)
+				Redis.Client.HashSetRemove(this._RegionKey, this._GetKey(key));
+		}
 
-			if (!this._addedKeys.Contains(key))
-				try
-				{
-					this._locker.EnterWriteLock();
-					this._addedKeys.Add(key);
-				}
-				catch (Exception ex)
-				{
-					Helper.WriteLogs(this.Name, "Error occurred while updating the added keys of the region (for pushing)", ex);
-				}
-				finally
-				{
-					if (this._locker.IsWriteLockHeld)
-						this._locker.ExitWriteLock();
-				}
-
-			if (doPush && this._addedKeys.Count > 0)
-				this._UpdateKeys(113);
+		Task _RemoveKeyAsync(string key)
+		{
+			return this._updateKeys
+				? Redis.Client.HashSetRemoveAsync(this._RegionKey, this._GetKey(key))
+				: Task.CompletedTask;
 		}
 
 		HashSet<string> _GetKeys()
 		{
-			return Redis.FetchKeys(this._RegionKey);
+			return Redis.Client.HashSetGet(this._RegionKey);
 		}
 
 		Task<HashSet<string>> _GetKeysAsync()
 		{
-			return Redis.FetchKeysAsync(this._RegionKey);
+			return Redis.Client.HashSetGetAsync(this._RegionKey);
 		}
 		#endregion
 
@@ -203,8 +128,8 @@ namespace net.vieapps.Components.Caching
 				}
 
 			// update mapping key when added successful
-			if (success && this._updateKeys)
-				this._UpdateKeys(key, doPush);
+			if (success && doPush)
+				this._UpdateKey(key);
 
 			// return state
 			return success;
@@ -234,8 +159,8 @@ namespace net.vieapps.Components.Caching
 				}
 
 			// update mapping key when added successful
-			if (success && this._updateKeys)
-				this._UpdateKeys(key, doPush);
+			if (success && doPush)
+				this._UpdateKey(key);
 
 			// return state
 			return success;
@@ -260,8 +185,8 @@ namespace net.vieapps.Components.Caching
 				}
 
 			// update mapping key when added successful
-			if (success && this._updateKeys)
-				this._UpdateKeys(key, doPush);
+			if (success && doPush)
+				await this._UpdateKeyAsync(key);
 
 			// return state
 			return success;
@@ -291,8 +216,8 @@ namespace net.vieapps.Components.Caching
 				}
 
 			// update mapping key when added successful
-			if (success && this._updateKeys)
-				this._UpdateKeys(key, doPush);
+			if (success && doPush)
+				await this._UpdateKeyAsync(key);
 
 			// return state
 			return success;
@@ -302,17 +227,9 @@ namespace net.vieapps.Components.Caching
 		#region Set (Multiple)
 		void _Set<T>(IDictionary<string, T> items, string keyPrefix = null, int expirationTime = 0)
 		{
-			// check collection
-			if (items == null || items.Count < 1)
-				return;
-
-			// set items
-			foreach (var item in items)
-				this._Set((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + item.Key, item.Value, expirationTime, false);
-
-			// update keys
-			if (this._updateKeys && this._addedKeys.Count > 0)
-				this._UpdateKeys(123);
+			if (items != null && items.Count > 0)
+				foreach (var item in items)
+					this._Set((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + item.Key, item.Value, expirationTime);
 		}
 
 		void _Set(IDictionary<string, object> items, string keyPrefix = null, int expirationTime = 0)
@@ -322,17 +239,8 @@ namespace net.vieapps.Components.Caching
 
 		async Task _SetAsync<T>(IDictionary<string, T> items, string keyPrefix = null, int expirationTime = 0)
 		{
-			// check collection
-			if (items == null || items.Count < 1)
-				return;
-
-			// set items
-			var tasks = items.Select(item => this._SetAsync((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + item.Key, item.Value, expirationTime, false));
-			await Task.WhenAll(tasks);
-
-			// update keys
-			if (this._updateKeys && this._addedKeys.Count > 0)
-				this._UpdateKeys(123);
+			if (items != null && items.Count > 0)
+				await Task.WhenAll(items.Select(item => this._SetAsync((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + item.Key, item.Value, expirationTime)));
 		}
 
 		Task _SetAsync(IDictionary<string, object> items, string keyPrefix = null, int expirationTime = 0)
@@ -344,146 +252,22 @@ namespace net.vieapps.Components.Caching
 		#region Set (Fragment)
 		bool _SetFragments(string key, Type type, List<byte[]> fragments, int expirationTime = 0)
 		{
-			// set info
-			var fragment = new Fragment()
-			{
-				Key = key,
-				Type = type.ToString() + "," + type.Assembly.FullName,
-				TotalFragments = fragments.Count
-			};
-
-			var success = this._Set(fragment.Key, fragment, expirationTime, false);
-
-			// set data
-			if (success)
-			{
-				var items = new Dictionary<string, object>();
-				for (var index = 0; index < fragments.Count; index++)
-					items.Add(this._GetFragmentKey(fragment.Key, index), fragments[index]);
-				this._Set(items, null, expirationTime);
-			}
-
-			return success;
+			throw new NotSupportedException();
 		}
 
-		async Task<bool> _SetFragmentsAsync(string key, Type type, List<byte[]> fragments, int expirationTime = 0)
+		Task<bool> _SetFragmentsAsync(string key, Type type, List<byte[]> fragments, int expirationTime = 0)
 		{
-			// set info
-			var fragment = new Fragment()
-			{
-				Key = key,
-				Type = type.ToString() + "," + type.Assembly.FullName,
-				TotalFragments = fragments.Count
-			};
-
-			var success = await this._SetAsync(fragment.Key, fragment, expirationTime, false);
-
-			// set data
-			if (success)
-			{
-				var items = new Dictionary<string, object>();
-				for (var index = 0; index < fragments.Count; index++)
-					items.Add(this._GetFragmentKey(fragment.Key, index), fragments[index]);
-				await this._SetAsync(items, null, expirationTime);
-			}
-
-			return success;
+			throw new NotSupportedException();
 		}
 
 		bool _SetAsFragments(string key, object value, int expirationTime = 0, bool setSecondary = false)
 		{
-			// check
-			if (value == null)
-				return false;
-
-			// serialize the object to an array of bytes
-			var bytes = value is byte[]
-				? value as byte[]
-				: value is ArraySegment<byte>
-					? ((ArraySegment<byte>)value).Array
-					: null;
-
-			if (bytes == null)
-				bytes = Helper.Serialize(value);
-
-			// check
-			if (bytes == null || bytes.Length < 1)
-				return false;
-
-			// split into fragments
-			var fragments = Helper.Split(bytes);
-
-			// update into cache storage
-			var success = this._SetFragments(key, value.GetType(), fragments, expirationTime);
-
-			// post-process when setted
-			if (success)
-			{
-				// update pure object (secondary) into cache
-				if (setSecondary && !(value is byte[]))
-					try
-					{
-						this._Set(key + ":(Secondary-Pure-Object)", value, expirationTime, false);
-					}
-					catch (Exception ex)
-					{
-						Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache (pure object of fragments) [{key}:(Secondary-Pure-Object)]", ex);
-					}
-
-				// update keys
-				this._UpdateKeys(key, true);
-			}
-
-			// return result
-			return success;
+			return this._Set(key, value, expirationTime);
 		}
 
-		async Task<bool> _SetAsFragmentsAsync(string key, object value, int expirationTime = 0, bool setSecondary = false)
+		Task<bool> _SetAsFragmentsAsync(string key, object value, int expirationTime = 0, bool setSecondary = false)
 		{
-			// check
-			if (value == null)
-				return false;
-
-			// serialize the object to an array of bytes
-			var bytes = value is byte[]
-				? value as byte[]
-				: value is ArraySegment<byte>
-					? ((ArraySegment<byte>)value).Array
-					: null;
-
-			if (bytes == null)
-				bytes = Helper.Serialize(value);
-
-			// check
-			if (bytes == null || bytes.Length < 1)
-				return false;
-
-			// split into fragments
-			var fragments = Helper.Split(bytes);
-
-			// update into cache storage
-			var success = await this._SetFragmentsAsync(key, value.GetType(), fragments, expirationTime);
-
-			// post-process when setted
-			if (success)
-			{
-				// update pure object (secondary) into cache
-				if (setSecondary && !(value is byte[]))
-					try
-					{
-						await this._SetAsync(key + ":(Secondary-Pure-Object)", value, expirationTime, false);
-					}
-					catch (Exception ex)
-					{
-						Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache (pure object of fragments) [{key}:(Secondary-Pure-Object)" + "]", ex);
-					}
-
-				// update keys
-				this._UpdateKeys(key, true);
-			}
-
-			// return result
-			return success;
+			return this._SetAsync(key, value, expirationTime);
 		}
 		#endregion
 
@@ -507,8 +291,8 @@ namespace net.vieapps.Components.Caching
 				}
 
 			// update mapping key when added successful
-			if (success && this._updateKeys)
-				this._UpdateKeys(key, doPush);
+			if (success && doPush)
+				this._UpdateKey(key);
 
 			// return state
 			return success;
@@ -538,8 +322,8 @@ namespace net.vieapps.Components.Caching
 				}
 
 			// update mapping key when added successful
-			if (success && this._updateKeys)
-				this._UpdateKeys(key, doPush);
+			if (success && doPush)
+				this._UpdateKey(key);
 
 			// return state
 			return success;
@@ -564,8 +348,8 @@ namespace net.vieapps.Components.Caching
 				}
 
 			// update mapping key when added successful
-			if (success && this._updateKeys)
-				this._UpdateKeys(key, doPush);
+			if (success && doPush)
+				await this._UpdateKeyAsync(key);
 
 			// return state
 			return success;
@@ -595,8 +379,8 @@ namespace net.vieapps.Components.Caching
 				}
 
 			// update mapping key when added successful
-			if (success && this._updateKeys)
-				this._UpdateKeys(key, doPush);
+			if (success && doPush)
+				await this._UpdateKeyAsync(key);
 
 			// return state
 			return success;
@@ -623,8 +407,8 @@ namespace net.vieapps.Components.Caching
 				}
 
 			// update mapping key when added successful
-			if (success && this._updateKeys)
-				this._UpdateKeys(key, doPush);
+			if (success && doPush)
+				this._UpdateKey(key);
 
 			// return state
 			return success;
@@ -654,8 +438,8 @@ namespace net.vieapps.Components.Caching
 				}
 
 			// update mapping key when added successful
-			if (success && this._updateKeys)
-				this._UpdateKeys(key, doPush);
+			if (success && doPush)
+				this._UpdateKey(key);
 
 			// return state
 			return success;
@@ -680,8 +464,8 @@ namespace net.vieapps.Components.Caching
 				}
 
 			// update mapping key when added successful
-			if (success && this._updateKeys)
-				this._UpdateKeys(key, doPush);
+			if (success && doPush)
+				this._UpdateKey(key);
 
 			// return state
 			return success;
@@ -711,8 +495,8 @@ namespace net.vieapps.Components.Caching
 				}
 
 			// update mapping key when added successful
-			if (success && this._updateKeys)
-				this._UpdateKeys(key, doPush);
+			if (success && doPush)
+				this._UpdateKey(key);
 
 			// return state
 			return success;
@@ -736,18 +520,6 @@ namespace net.vieapps.Components.Caching
 				Helper.WriteLogs(this.Name, $"Error occurred while fetching an object from cache storage [{key}]", ex);
 			}
 
-			// get object as merged of all fragments
-			if (autoGetFragments && value != null && value is Fragment)
-				try
-				{
-					value = this._GetAsFragments((Fragment)value);
-				}
-				catch (Exception ex)
-				{
-					Helper.WriteLogs(this.Name, $"Error occurred while fetching an objects' fragments from cache storage [{key}]", ex);
-					value = null;
-				}
-
 			// return object
 			return value;
 		}
@@ -767,18 +539,6 @@ namespace net.vieapps.Components.Caching
 			{
 				Helper.WriteLogs(this.Name, $"Error occurred while fetching an object from cache storage [{key}]", ex);
 			}
-
-			// get object as merged of all fragments
-			if (autoGetFragments && value != null && value is Fragment)
-				try
-				{
-					value = await this._GetAsFragmentsAsync((Fragment)value);
-				}
-				catch (Exception ex)
-				{
-					Helper.WriteLogs(this.Name, $"Error occurred while fetching an objects' fragments from cache storage [{key}]", ex);
-					value = null;
-				}
 
 			// return object
 			return value;
@@ -809,7 +569,7 @@ namespace net.vieapps.Components.Caching
 				{
 					objects = items.ToDictionary(
 							kvp => kvp.Key.Remove(0, this.Name.Length + 1),
-							kvp => kvp.Value != null && kvp.Value is Fragment ? this._GetAsFragments((Fragment)kvp.Value) : kvp.Value
+							kvp => kvp.Value
 						);
 				}
 				catch { }
@@ -845,23 +605,16 @@ namespace net.vieapps.Components.Caching
 				Helper.WriteLogs(this.Name, "Error occurred while fetch a collection of objects from cache storage", ex);
 			}
 
-			var objects = new Dictionary<string, object>();
+			IDictionary<string, object> objects = null;
 			if (items != null && items.Count > 0)
-			{
-				Func<KeyValuePair<string, object>, Task> func = async (kvp) =>
+				try
 				{
-					var key = kvp.Key.Remove(0, this.Name.Length + 1);
-					var value = kvp.Value != null && kvp.Value is Fragment
-						? await this._GetAsFragmentsAsync((Fragment)kvp.Value)
-						: kvp.Value;
-					objects.Add(key, value);
-				};
-
-				var tasks = new List<Task>();
-				foreach (var kvp in items)
-					tasks.Add(func(kvp));
-				await Task.WhenAll(tasks);
-			}
+					objects = items.ToDictionary(
+							kvp => kvp.Key.Remove(0, this.Name.Length + 1),
+							kvp => kvp.Value
+						);
+				}
+				catch { }
 
 			// return collection of cached objects
 			return objects != null && objects.Count > 0
@@ -881,154 +634,22 @@ namespace net.vieapps.Components.Caching
 		#region Get (Fragment)
 		List<byte[]> _GetAsFragments(string key, List<int> indexes)
 		{
-			if (string.IsNullOrWhiteSpace(key))
-				return null;
-
-			var fragments = new List<byte[]>();
-			indexes.ForEach(index =>
-			{
-				var bytes = index < 0
-					? null
-					: this._Get(this._GetFragmentKey(key, index), false) as byte[];
-
-				if (bytes != null && bytes.Length > 0)
-					fragments.Add(bytes);
-			});
-			return fragments;
+			throw new NotSupportedException();
 		}
 
 		object _GetAsFragments(Fragment fragment)
 		{
-			// check data
-			if (object.ReferenceEquals(fragment, null) || string.IsNullOrWhiteSpace(fragment.Key) || string.IsNullOrWhiteSpace(fragment.Type) || fragment.TotalFragments < 1)
-				return null;
-
-			// check type
-			var type = Type.GetType(fragment.Type);
-			if (type == null)
-				return null;
-
-			// get all fragments
-			var fragments = new byte[0];
-			var length = 0;
-			for (var index = 0; index < fragment.TotalFragments; index++)
-			{
-				var bytes = Redis.Client.Get<byte[]>(this._GetKey(this._GetFragmentKey(fragment.Key, index)));
-
-				if (bytes != null && bytes.Length > 0)
-				{
-					Array.Resize<byte>(ref fragments, length + bytes.Length);
-					Array.Copy(bytes, 0, fragments, length, bytes.Length);
-					length += bytes.Length;
-				}
-			}
-
-			// deserialize object
-			object @object = type.Equals(typeof(byte[])) && fragments.Length > 0
-				? fragments
-				: null;
-
-			if (@object == null && fragments.Length > 0)
-				try
-				{
-					@object = Helper.Deserialize(fragments);
-				}
-				catch (Exception ex)
-				{
-					Helper.WriteLogs(this.Name, $"Error occurred while trying to get fragmented object (error occured while serializing the object from an array of bytes) [{fragment.Key}]", ex);
-					if (!type.Equals(typeof(byte[])))
-					{
-						@object = this._Get(fragment.Key + ":(Secondary-Pure-Object)", false);
-						if (@object != null && @object is Fragment)
-							@object = null;
-					}
-				}
-
-			// return object
-			return @object;
+			throw new NotSupportedException();
 		}
 
-		async Task<List<byte[]>> _GetAsFragmentsAsync(string key, List<int> indexes)
+		Task<List<byte[]>> _GetAsFragmentsAsync(string key, List<int> indexes)
 		{
-			if (string.IsNullOrWhiteSpace(key))
-				return null;
-
-			var fragments = Enumerable.Repeat(new byte[0], indexes.Count).ToList();
-			Func<int, Task> func = async (index) =>
-			{
-				var bytes = indexes[index] < 0
-					? null
-					: await this._GetAsync(this._GetFragmentKey(key, indexes[index]), false) as byte[];
-
-				if (bytes != null && bytes.Length > 0)
-					fragments[index] = bytes;
-			};
-
-			var tasks = new List<Task>();
-			for (var index = 0; index < indexes.Count; index++)
-				tasks.Add(func(index));
-			await Task.WhenAll(tasks);
-
-			return fragments;
+			throw new NotSupportedException();
 		}
 
-		async Task<object> _GetAsFragmentsAsync(Fragment fragment)
+		Task<object> _GetAsFragmentsAsync(Fragment fragment)
 		{
-			// check data
-			if (object.ReferenceEquals(fragment, null) || string.IsNullOrWhiteSpace(fragment.Key) || string.IsNullOrWhiteSpace(fragment.Type) || fragment.TotalFragments < 1)
-				return null;
-
-			// check type
-			var type = Type.GetType(fragment.Type);
-			if (type == null)
-				return null;
-
-			// get all fragments
-			var fragments = Enumerable.Repeat(new byte[0], fragment.TotalFragments).ToList();
-			Func<int, Task> func = async (index) =>
-			{
-				fragments[index] = await Redis.Client.GetAsync<byte[]>(this._GetKey(this._GetFragmentKey(fragment.Key, index)));
-			};
-
-			var tasks = new List<Task>();
-			for (var index = 0; index < fragment.TotalFragments; index++)
-				tasks.Add(func(index));
-			await Task.WhenAll(tasks);
-
-			// merge
-			var data = new byte[0];
-			var length = 0;
-			foreach (var bytes in fragments)
-				if (bytes != null && bytes.Length > 0)
-				{
-					Array.Resize<byte>(ref data, length + bytes.Length);
-					Array.Copy(bytes, 0, data, length, bytes.Length);
-					length += bytes.Length;
-				}
-
-			// deserialize object
-			object @object = type.Equals(typeof(byte[])) && data.Length > 0
-				? data
-				: null;
-
-			if (@object == null && data.Length > 0)
-				try
-				{
-					@object = Helper.Deserialize(data);
-				}
-				catch (Exception ex)
-				{
-					Helper.WriteLogs(this.Name, $"Error occurred while trying to get fragmented object (error occured while serializing the object from an array of bytes) [{fragment.Key}]", ex);
-					if (!type.Equals(typeof(byte[])))
-					{
-						@object = await this._GetAsync(fragment.Key + ":(Secondary-Pure-Object)", false);
-						if (@object != null && @object is Fragment)
-							@object = null;
-					}
-				}
-
-			// return object
-			return @object;
+			throw new NotSupportedException();
 		}
 		#endregion
 
@@ -1048,27 +669,8 @@ namespace net.vieapps.Components.Caching
 				}
 
 			// update mapping key when removed successful
-			if (success && this._updateKeys)
-			{
-				if (!this._removedKeys.Contains(key))
-					try
-					{
-						this._locker.EnterWriteLock();
-						this._removedKeys.Add(key);
-					}
-					catch (Exception ex)
-					{
-						Helper.WriteLogs(this.Name, "Error occurred while updating the removed keys (for pushing)", ex);
-					}
-					finally
-					{
-						if (this._locker.IsWriteLockHeld)
-							this._locker.ExitWriteLock();
-					}
-
-				if (doPush && this._removedKeys.Count > 0)
-					this._UpdateKeys(123);
-			}
+			if (success && doPush)
+				this._RemoveKey(key);
 
 			// return state
 			return success;
@@ -1089,27 +691,8 @@ namespace net.vieapps.Components.Caching
 				}
 
 			// update mapping key when removed successful
-			if (success && this._updateKeys)
-			{
-				if (!this._removedKeys.Contains(key))
-					try
-					{
-						this._locker.EnterWriteLock();
-						this._removedKeys.Add(key);
-					}
-					catch (Exception ex)
-					{
-						Helper.WriteLogs(this.Name, "Error occurred while updating the removed keys (for pushing)", ex);
-					}
-					finally
-					{
-						if (this._locker.IsWriteLockHeld)
-							this._locker.ExitWriteLock();
-					}
-
-				if (doPush && this._removedKeys.Count > 0)
-					this._UpdateKeys(123);
-			}
+			if (success && doPush)
+				await this._RemoveKeyAsync(key);
 
 			// return state
 			return success;
@@ -1119,90 +702,50 @@ namespace net.vieapps.Components.Caching
 		#region Remove (Multiple)
 		void _Remove(IEnumerable<string> keys, string keyPrefix = null)
 		{
-			// check
-			if (keys == null)
-				return;
-
-			// remove
-			foreach (string key in keys)
-				if (!string.IsNullOrWhiteSpace(key))
-					this._Remove((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + key, false);
-
-			// update keys
-			if (this._updateKeys && this._removedKeys.Count > 0)
-				this._UpdateKeys(123);
+			if (keys != null)
+				foreach (string key in keys)
+					if (!string.IsNullOrWhiteSpace(key))
+						this._Remove((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + key);
 		}
 
-		async Task _RemoveAsync(IEnumerable<string> keys, string keyPrefix = null)
+		Task _RemoveAsync(IEnumerable<string> keys, string keyPrefix = null)
 		{
-			// check
-			if (keys == null)
-				return;
-
-			// remove
 			var tasks = new List<Task>();
-			foreach (string key in keys)
-				if (!string.IsNullOrWhiteSpace(key))
-					tasks.Add(this._RemoveAsync((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + key, false));
-			await Task.WhenAll(tasks);
-
-			// update keys
-			if (this._updateKeys && this._removedKeys.Count > 0)
-				this._UpdateKeys(123);
+			if (keys != null)
+				foreach (string key in keys)
+					if (!string.IsNullOrWhiteSpace(key))
+						tasks.Add(this._RemoveAsync((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + key));
+			return Task.WhenAll(tasks);
 		}
 		#endregion
 
 		#region Remove (Fragment)
 		void _RemoveFragments(string key, int max = 100)
 		{
-			var keys = new List<string>() { key, key + ":(Secondary-Pure-Object)" };
-			for (var index = 0; index < max; index++)
-				keys.Add(this._GetFragmentKey(key, index));
-			this._Remove(keys);
+			throw new NotSupportedException();
 		}
 
 		void _RemoveFragments(Fragment fragment)
 		{
-			if (!object.ReferenceEquals(fragment, null) && !string.IsNullOrWhiteSpace(fragment.Key) && fragment.TotalFragments > 0)
-				this._RemoveFragments(fragment.Key, fragment.TotalFragments);
+			throw new NotSupportedException();
 		}
 
 		Task _RemoveFragmentsAsync(string key, int max = 100)
 		{
-			var keys = new List<string>() { key, key + ":(Secondary-Pure-Object)" };
-			for (var index = 0; index < max; index++)
-				keys.Add(this._GetFragmentKey(key, index));
-			return this._RemoveAsync(keys);
+			throw new NotSupportedException();
 		}
 
 		Task _RemoveFragmentsAsync(Fragment fragment)
 		{
-			return !object.ReferenceEquals(fragment, null) && !string.IsNullOrWhiteSpace(fragment.Key) && fragment.TotalFragments > 0
-				? this._RemoveFragmentsAsync(fragment.Key, fragment.TotalFragments)
-				: Task.CompletedTask;
+			throw new NotSupportedException();
 		}
 		#endregion
 
 		#region Clear
 		void _Clear()
 		{
-			// remove
 			this._Remove(this._GetKeys());
 			Redis.Client.Remove(this._RegionKey);
-
-			if (this._updateKeys)
-				try
-				{
-					this._locker.EnterWriteLock();
-					this._addedKeys.Clear();
-					this._removedKeys.Clear();
-				}
-				catch { }
-				finally
-				{
-					if (this._locker.IsWriteLockHeld)
-						this._locker.ExitWriteLock();
-				}
 		}
 
 		async Task _ClearAsync()
@@ -1213,20 +756,6 @@ namespace net.vieapps.Components.Caching
 				this._RemoveAsync(keys),
 				Redis.Client.RemoveAsync(this._RegionKey)
 			);
-
-			if (this._updateKeys)
-				try
-				{
-					this._locker.EnterWriteLock();
-					this._addedKeys.Clear();
-					this._removedKeys.Clear();
-				}
-				catch { }
-				finally
-				{
-					if (this._locker.IsWriteLockHeld)
-						this._locker.ExitWriteLock();
-				}
 		}
 		#endregion
 
@@ -1236,11 +765,6 @@ namespace net.vieapps.Components.Caching
 		string _GetKey(string key)
 		{
 			return this.Name + "@" + key.Replace(" ", "-");
-		}
-
-		string _GetFragmentKey(string key, int index)
-		{
-			return key.Replace(" ", "-") + "$[Fragment<" + index.ToString() + ">]";
 		}
 
 		string _RegionKey
@@ -1253,112 +777,12 @@ namespace net.vieapps.Components.Caching
 		#endregion
 
 		#region [Static]
-		internal static async Task<bool> SetKeysAsync(string key, HashSet<string> keys)
-		{
-			var fragmentsData = Helper.Split(keys);
-			var fragmentsInfo = new Fragment()
-			{
-				Key = key,
-				Type = keys.GetType().ToString() + "," + keys.GetType().Assembly.FullName,
-				TotalFragments = fragmentsData.Count
-			};
-
-			if (await Redis.Client.SetAsync(key, fragmentsInfo))
-			{
-				var tasks = new List<Task>();
-				for (int index = 0; index < fragmentsData.Count; index++)
-					tasks.Add(Redis.Client.SetAsync(key + ":" + index, fragmentsData[index]));
-				await Task.WhenAll(tasks);
-
-				return true;
-			}
-
-			return false;
-		}
-
-		internal static HashSet<string> FetchKeys(string key)
-		{
-			// get info
-			var info = Redis.Client.Get<Fragment>(key);
-			if (object.ReferenceEquals(info, null))
-				return new HashSet<string>();
-
-			// get all fragments
-			var fragments = new byte[0];
-			var length = 0;
-			for (var index = 0; index < info.TotalFragments; index++)
-			{
-				var bytes = Redis.Client.Get<byte[]>(key + ":" + index);
-
-				if (bytes != null && bytes.Length > 0)
-				{
-					Array.Resize<byte>(ref fragments, length + bytes.Length);
-					Array.Copy(bytes, 0, fragments, length, bytes.Length);
-					length += bytes.Length;
-				}
-			}
-
-			// deserialize
-			try
-			{
-				return fragments.Length > 0
-					? Helper.Deserialize<HashSet<string>>(fragments)
-					: new HashSet<string>();
-			}
-			catch
-			{
-				return new HashSet<string>();
-			}
-		}
-
-		internal static async Task<HashSet<string>> FetchKeysAsync(string key)
-		{
-			// get info
-			var info = await Redis.Client.GetAsync<Fragment>(key);
-			if (object.ReferenceEquals(info, null))
-				return new HashSet<string>();
-
-			// get all fragments
-			var fragments = Enumerable.Repeat(new byte[0], info.TotalFragments).ToList();
-			Func<int, Task> func = async (index) =>
-			{
-				fragments[index] = await Redis.Client.GetAsync<byte[]>(key + ":" + index);
-			};
-
-			var tasks = new List<Task>();
-			for (var index = 0; index < info.TotalFragments; index++)
-				tasks.Add(func(index));
-			await Task.WhenAll(tasks);
-
-			var data = new byte[0];
-			var length = 0;
-			foreach (var bytes in fragments)
-				if (bytes != null && bytes.Length > 0)
-				{
-					Array.Resize<byte>(ref data, length + bytes.Length);
-					Array.Copy(bytes, 0, data, length, bytes.Length);
-					length += bytes.Length;
-				}
-
-			// deserialize
-			try
-			{
-				return data.Length > 0
-					? Helper.Deserialize<HashSet<string>>(data)
-					: new HashSet<string>();
-			}
-			catch
-			{
-				return new HashSet<string>();
-			}
-		}
-
 		/// <summary>
 		/// Gets the collection of all registered regions (in distributed cache)
 		/// </summary>
 		public static HashSet<string> GetRegions()
 		{
-			return Redis.FetchKeys(Helper.RegionsKey);
+			return Redis.Client.HashSetGet(Helper.RegionsKey);
 		}
 
 		/// <summary>
@@ -1366,34 +790,7 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		public static Task<HashSet<string>> GetRegionsAsync()
 		{
-			return Redis.FetchKeysAsync(Helper.RegionsKey);
-		}
-
-		static async Task RegisterRegionAsync(string name)
-		{
-			// wait for other
-			var attempt = 0;
-			while (attempt < 123 && await Redis.Client.ExistsAsync(Helper.RegionsKey + "-Registering"))
-			{
-				await Task.Delay(234);
-				attempt++;
-			}
-
-			// set flag
-			await Redis.Client.SetAsync(Helper.RegionsKey + "-Registering", "v", TimeSpan.FromSeconds(13));
-
-			// fetch regions
-			var regions = await Redis.FetchKeysAsync(Helper.RegionsKey);
-
-			// register
-			if (!regions.Contains(name))
-			{
-				regions.Add(name);
-				await Redis.SetKeysAsync(Helper.RegionsKey, regions);
-			}
-
-			// remove flag
-			await Redis.Client.RemoveAsync(Helper.RegionsKey + "-Registering");
+			return Redis.Client.HashSetGetAsync(Helper.RegionsKey);
 		}
 		#endregion
 

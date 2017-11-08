@@ -90,6 +90,12 @@ namespace net.vieapps.Components.Caching
 
 		internal static T Deserialize<T>(byte[] value)
 		{
+			if (typeof(T).Equals(typeof(byte[])))
+				return (T)((object)value);
+
+			if (typeof(T).Equals(typeof(ArraySegment<byte>)))
+				return (T)((object)new ArraySegment<byte>(value));
+
 			var data = Helper.Deserialize(value);
 			return data != null && data is T
 				? (T)data

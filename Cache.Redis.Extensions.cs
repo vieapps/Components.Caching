@@ -1,5 +1,6 @@
 #region Related components
 using System;
+using System.Linq;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -207,6 +208,104 @@ namespace net.vieapps.Components.Caching
 		internal static Task<bool> RemoveAsync(this IDatabase redis, string key)
 		{
 			return redis.KeyDeleteAsync(key);
+		}
+
+		internal static bool HashSetUpdate(this IDatabase redis, RedisKey setKey, string itemKey)
+		{
+			try
+			{
+				return redis.SetAdd(setKey, itemKey);
+			}
+			catch (RedisServerException ex)
+			{
+				if (ex.Message.Contains("WRONGTYPE Operation against a key holding the wrong kind of value"))
+				{
+					redis.KeyDelete(setKey);
+					return redis.SetAdd(setKey, itemKey);
+				}
+				else
+					throw;
+			}
+			catch (Exception)
+			{
+				throw;
+			}
+		}
+
+		internal static async Task<bool> HashSetUpdateAsync(this IDatabase redis, string setKey, string itemKey)
+		{
+			try
+			{
+				return await redis.SetAddAsync(setKey, itemKey);
+			}
+			catch (RedisServerException ex)
+			{
+				if (ex.Message.Contains("WRONGTYPE Operation against a key holding the wrong kind of value"))
+				{
+					await redis.KeyDeleteAsync(setKey);
+					return await redis.SetAddAsync(setKey, itemKey);
+				}
+				else
+					throw;
+			}
+			catch (Exception)
+			{
+				throw;
+			}
+		}
+
+		internal static bool HashSetRemove(this IDatabase redis, string setKey, string itemKey)
+		{
+			try
+			{
+				return redis.SetRemove(setKey, itemKey);
+			}
+			catch
+			{
+				return false;
+			}
+		}
+
+		internal static async Task<bool> HashSetRemoveAsync(this IDatabase redis, string setKey, string itemKey)
+		{
+			try
+			{
+				return await redis.SetRemoveAsync(setKey, itemKey);
+			}
+			catch
+			{
+				return false;
+			}
+		}
+
+		internal static HashSet<string> HashSetGet(this IDatabase redis, string setKey)
+		{
+			try
+			{
+				var keys = redis.SetMembers(setKey);
+				return keys != null && keys.Length > 0
+					? new HashSet<string>(keys.Where(key => !key.IsNull).Select(key => key.ToString()))
+					: new HashSet<string>();
+			}
+			catch
+			{
+				return new HashSet<string>();
+			}
+		}
+
+		internal static async Task<HashSet<string>> HashSetGetAsync(this IDatabase redis, string setKey)
+		{
+			try
+			{
+				var keys = await redis.SetMembersAsync(setKey);
+				return keys != null && keys.Length > 0
+					? new HashSet<string>(keys.Where(key => !key.IsNull).Select(key => key.ToString()))
+					: new HashSet<string>();
+			}
+			catch
+			{
+				return new HashSet<string>();
+			}
 		}
 
 	}
