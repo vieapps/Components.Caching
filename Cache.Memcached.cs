@@ -24,8 +24,8 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		/// <param name="name">The string that presents name of isolated region of the cache</param>
 		/// <param name="expirationTime">The number that presents times (in minutes) for caching an item</param>
-		/// <param name="updateKeys">true to active update keys of the region (to clear or using with other purpose further)</param>
-		public Memcached(string name, int expirationTime, bool updateKeys)
+		/// <param name="storeKeys">true to active store keys of the region (to clear or using with other purpose further)</param>
+		public Memcached(string name, int expirationTime, bool storeKeys)
 		{
 			// region name
 			this._name = string.IsNullOrWhiteSpace(name)
@@ -38,9 +38,9 @@ namespace net.vieapps.Components.Caching
 				: Helper.ExpirationTime;
 
 			// update keys
-			if (updateKeys)
+			if (storeKeys)
 			{
-				this._updateKeys = true;
+				this._storeKeys = true;
 				this._addedKeys = new HashSet<string>();
 				this._removedKeys = new HashSet<string>();
 			}
@@ -68,7 +68,7 @@ namespace net.vieapps.Components.Caching
 
 		string _name;
 		int _expirationTime;
-		bool _updateKeys, _isUpdating = false;
+		bool _storeKeys, _isUpdatingKeys = false;
 		HashSet<string> _addedKeys, _removedKeys;
 		ReaderWriterLockSlim _locker = new ReaderWriterLockSlim(LockRecursionPolicy.SupportsRecursion);
 		#endregion
@@ -81,11 +81,11 @@ namespace net.vieapps.Components.Caching
 				return;
 
 			// if other task/thread is processing, then stop
-			if (this._isUpdating)
+			if (this._isUpdatingKeys)
 				return;
 
 			// set flag
-			this._isUpdating = true;
+			this._isUpdatingKeys = true;
 
 			// prepare
 			var syncKeys = await Memcached.FetchKeysAsync(this._RegionKey);
@@ -135,7 +135,7 @@ namespace net.vieapps.Components.Caching
 			}
 
 			// remove flags
-			this._isUpdating = false;
+			this._isUpdatingKeys = false;
 
 			// callback
 			callback?.Invoke();
@@ -153,7 +153,7 @@ namespace net.vieapps.Components.Caching
 		void _UpdateKeys(string key, bool doPush)
 		{
 			// update added keys
-			if (!this._updateKeys)
+			if (!this._storeKeys)
 				return;
 
 			if (!this._addedKeys.Contains(key))
@@ -190,7 +190,6 @@ namespace net.vieapps.Components.Caching
 		#region Set
 		bool _Set(string key, object value, TimeSpan validFor, bool doPush = true, StoreMode mode = StoreMode.Set)
 		{
-			// store
 			var success = false;
 			if (!string.IsNullOrWhiteSpace(key) && value != null)
 				try
@@ -206,11 +205,9 @@ namespace net.vieapps.Components.Caching
 					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
 				}
 
-			// update mapping key when added successful
-			if (success && this._updateKeys)
+			if (success)
 				this._UpdateKeys(key, doPush);
 
-			// return state
 			return success;
 		}
 
@@ -221,7 +218,6 @@ namespace net.vieapps.Components.Caching
 
 		bool _Set(string key, object value, DateTime expiresAt, bool doPush = true, StoreMode mode = StoreMode.Set)
 		{
-			// store
 			var success = false;
 			if (!string.IsNullOrWhiteSpace(key) && value != null)
 				try
@@ -237,17 +233,14 @@ namespace net.vieapps.Components.Caching
 					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
 				}
 
-			// update mapping key when added successful
-			if (success && this._updateKeys)
+			if (success)
 				this._UpdateKeys(key, doPush);
 
-			// return state
 			return success;
 		}
 
 		async Task<bool> _SetAsync(string key, object value, TimeSpan validFor, bool doPush = true, StoreMode mode = StoreMode.Set)
 		{
-			// store
 			var success = false;
 			if (!string.IsNullOrWhiteSpace(key) && value != null)
 				try
@@ -263,11 +256,9 @@ namespace net.vieapps.Components.Caching
 					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
 				}
 
-			// update mapping key when added successful
-			if (success && this._updateKeys)
+			if (success)
 				this._UpdateKeys(key, doPush);
 
-			// return state
 			return success;
 		}
 
@@ -278,7 +269,6 @@ namespace net.vieapps.Components.Caching
 
 		async Task<bool> _SetAsync(string key, object value, DateTime expiresAt, bool doPush = true, StoreMode mode = StoreMode.Set)
 		{
-			// store
 			var success = false;
 			if (!string.IsNullOrWhiteSpace(key) && value != null)
 				try
@@ -294,11 +284,9 @@ namespace net.vieapps.Components.Caching
 					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
 				}
 
-			// update mapping key when added successful
-			if (success && this._updateKeys)
+			if (success)
 				this._UpdateKeys(key, doPush);
 
-			// return state
 			return success;
 		}
 		#endregion
@@ -306,16 +294,9 @@ namespace net.vieapps.Components.Caching
 		#region Set (Multiple)
 		void _Set<T>(IDictionary<string, T> items, string keyPrefix = null, int expirationTime = 0, StoreMode mode = StoreMode.Set)
 		{
-			// check collection
-			if (items == null || items.Count < 1)
-				return;
-
-			// set items
-			foreach (var item in items)
-				this._Set((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + item.Key, item.Value, expirationTime, false, mode);
-
-			// update keys
-			if (this._updateKeys && this._addedKeys.Count > 0)
+			if (items != null)
+				items.Where(kvp => !string.IsNullOrWhiteSpace(kvp.Key)).ToList().ForEach(kvp => this._Set((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + kvp.Key, kvp.Value, expirationTime, false, mode));
+			if (this._storeKeys && this._addedKeys.Count > 0)
 				this._UpdateKeys(123);
 		}
 
@@ -326,16 +307,10 @@ namespace net.vieapps.Components.Caching
 
 		async Task _SetAsync<T>(IDictionary<string, T> items, string keyPrefix = null, int expirationTime = 0, StoreMode mode = StoreMode.Set)
 		{
-			// check collection
-			if (items == null || items.Count < 1)
-				return;
-
-			// set items
-			var tasks = items.Select(item => this._SetAsync((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + item.Key, item.Value, expirationTime, false, mode));
-			await Task.WhenAll(tasks);
-
-			// update keys
-			if (this._updateKeys && this._addedKeys.Count > 0)
+			await Task.WhenAll(items != null
+				? items.Where(kvp => !string.IsNullOrWhiteSpace(kvp.Key)).Select(kvp => this._SetAsync((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + kvp.Key, kvp.Value, expirationTime, false, mode))
+				: new List<Task<bool>>());
+			if (this._storeKeys && this._addedKeys.Count > 0)
 				this._UpdateKeys(123);
 		}
 
@@ -348,7 +323,6 @@ namespace net.vieapps.Components.Caching
 		#region Set (Fragment)
 		bool _SetFragments(string key, Type type, List<byte[]> fragments, int expirationTime = 0, StoreMode mode = StoreMode.Set)
 		{
-			// set info
 			var fragment = new Fragment()
 			{
 				Key = key,
@@ -357,8 +331,6 @@ namespace net.vieapps.Components.Caching
 			};
 
 			var success = this._Set(fragment.Key, fragment, expirationTime, false, mode);
-
-			// set data
 			if (success)
 			{
 				var items = new Dictionary<string, object>();
@@ -372,7 +344,6 @@ namespace net.vieapps.Components.Caching
 
 		async Task<bool> _SetFragmentsAsync(string key, Type type, List<byte[]> fragments, int expirationTime = 0, StoreMode mode = StoreMode.Set)
 		{
-			// set info
 			var fragment = new Fragment()
 			{
 				Key = key,
@@ -381,8 +352,6 @@ namespace net.vieapps.Components.Caching
 			};
 
 			var success = await this._SetAsync(fragment.Key, fragment, expirationTime, false, mode);
-
-			// set data
 			if (success)
 			{
 				var items = new Dictionary<string, object>();
@@ -396,34 +365,23 @@ namespace net.vieapps.Components.Caching
 
 		bool _SetAsFragments(string key, object value, int expirationTime = 0, bool setSecondary = false, StoreMode mode = StoreMode.Set)
 		{
-			// check
 			if (value == null)
 				return false;
 
-			// serialize the object to an array of bytes
 			var bytes = value is byte[]
 				? value as byte[]
 				: value is ArraySegment<byte>
 					? ((ArraySegment<byte>)value).Array
 					: null;
-
 			if (bytes == null)
 				bytes = Helper.Serialize(value);
-
-			// check
 			if (bytes == null || bytes.Length < 1)
 				return false;
 
-			// split into fragments
 			var fragments = Helper.Split(bytes);
-
-			// update into cache storage
 			var success = this._SetFragments(key, value.GetType(), fragments, expirationTime, mode);
-
-			// post-process when setted
 			if (success)
 			{
-				// update pure object (secondary) into cache
 				if (setSecondary && !(value is byte[]))
 					try
 					{
@@ -433,45 +391,31 @@ namespace net.vieapps.Components.Caching
 					{
 						Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache (pure object of fragments) [{key}:(Secondary-Pure-Object)]", ex);
 					}
-
-				// update keys
 				this._UpdateKeys(key, true);
 			}
 
-			// return result
 			return success;
 		}
 
 		async Task<bool> _SetAsFragmentsAsync(string key, object value, int expirationTime = 0, bool setSecondary = false, StoreMode mode = StoreMode.Set)
 		{
-			// check
 			if (value == null)
 				return false;
 
-			// serialize the object to an array of bytes
 			var bytes = value is byte[]
 				? value as byte[]
 				: value is ArraySegment<byte>
 					? ((ArraySegment<byte>)value).Array
 					: null;
-
 			if (bytes == null)
 				bytes = Helper.Serialize(value);
-
-			// check
 			if (bytes == null || bytes.Length < 1)
 				return false;
 
-			// split into fragments
 			var fragments = Helper.Split(bytes);
-
-			// update into cache storage
 			var success = await this._SetFragmentsAsync(key, value.GetType(), fragments, expirationTime, mode);
-
-			// post-process when setted
 			if (success)
 			{
-				// update pure object (secondary) into cache
 				if (setSecondary && !(value is byte[]))
 					try
 					{
@@ -481,12 +425,9 @@ namespace net.vieapps.Components.Caching
 					{
 						Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache (pure object of fragments) [{key}:(Secondary-Pure-Object)" + "]", ex);
 					}
-
-				// update keys
 				this._UpdateKeys(key, true);
 			}
 
-			// return result
 			return success;
 		}
 		#endregion
@@ -497,7 +438,6 @@ namespace net.vieapps.Components.Caching
 			if (string.IsNullOrWhiteSpace(key))
 				throw new ArgumentNullException(key);
 
-			// get cached item
 			object value = null;
 			try
 			{
@@ -508,7 +448,6 @@ namespace net.vieapps.Components.Caching
 				Helper.WriteLogs(this.Name, $"Error occurred while fetching an object from cache storage [{key}]", ex);
 			}
 
-			// get object as merged of all fragments
 			if (autoGetFragments && value != null && value is Fragment)
 				try
 				{
@@ -520,7 +459,6 @@ namespace net.vieapps.Components.Caching
 					value = null;
 				}
 
-			// return object
 			return value;
 		}
 
@@ -529,7 +467,6 @@ namespace net.vieapps.Components.Caching
 			if (string.IsNullOrWhiteSpace(key))
 				throw new ArgumentNullException(key);
 
-			// get cached item
 			object value = null;
 			try
 			{
@@ -540,7 +477,6 @@ namespace net.vieapps.Components.Caching
 				Helper.WriteLogs(this.Name, $"Error occurred while fetching an object from cache storage [{key}]", ex);
 			}
 
-			// get object as merged of all fragments
 			if (autoGetFragments && value != null && value is Fragment)
 				try
 				{
@@ -552,7 +488,6 @@ namespace net.vieapps.Components.Caching
 					value = null;
 				}
 
-			// return object
 			return value;
 		}
 		#endregion
@@ -560,7 +495,6 @@ namespace net.vieapps.Components.Caching
 		#region Get (Multiple)
 		IDictionary<string, object> _Get(IEnumerable<string> keys)
 		{
-			// check keys
 			if (keys == null)
 				return null;
 
@@ -575,18 +509,9 @@ namespace net.vieapps.Components.Caching
 				Helper.WriteLogs(this.Name, "Error occurred while fetch a collection of objects from cache storage", ex);
 			}
 
-			IDictionary<string, object> objects = null;
-			if (items != null && items.Count > 0)
-				try
-				{
-					objects = items.ToDictionary(
-							kvp => kvp.Key.Remove(0, this.Name.Length + 1),
-							kvp => kvp.Value != null && kvp.Value is Fragment ? this._GetAsFragments((Fragment)kvp.Value) : kvp.Value
-						);
-				}
-				catch { }
-
-			// return collection of cached objects
+			var objects = items != null
+				? items.ToDictionary(kvp => kvp.Key.Remove(0, this.Name.Length + 1), kvp => kvp.Value != null && kvp.Value is Fragment ? this._GetAsFragments((Fragment)kvp.Value) : kvp.Value)
+				: null;
 			return objects != null && objects.Count > 0
 				? objects
 				: null;
@@ -602,11 +527,9 @@ namespace net.vieapps.Components.Caching
 
 		async Task<IDictionary<string, object>> _GetAsync(IEnumerable<string> keys)
 		{
-			// check keys
 			if (keys == null)
 				return null;
 
-			// get collection of cached objects
 			IDictionary<string, object> items = null;
 			try
 			{
@@ -618,24 +541,10 @@ namespace net.vieapps.Components.Caching
 			}
 
 			var objects = new Dictionary<string, object>();
-			if (items != null && items.Count > 0)
-			{
-				Func<KeyValuePair<string, object>, Task> func = async (kvp) =>
-				{
-					var key = kvp.Key.Remove(0, this.Name.Length + 1);
-					var value = kvp.Value != null && kvp.Value is Fragment
-						? await this._GetAsFragmentsAsync((Fragment)kvp.Value)
-						: kvp.Value;
-					objects.Add(key, value);
-				};
-
-				var tasks = new List<Task>();
-				foreach (var kvp in items)
-					tasks.Add(func(kvp));
-				await Task.WhenAll(tasks);
-			}
-
-			// return collection of cached objects
+			await Task.WhenAll(items != null
+				? items.Select(async (kvp) => objects[kvp.Key.Remove(0, this.Name.Length + 1)] = kvp.Value != null && kvp.Value is Fragment ? await this._GetAsFragmentsAsync((Fragment)kvp.Value) : kvp.Value)
+				: new List<Task<object>>()
+			);
 			return objects != null && objects.Count >0
 				? objects
 				: null;
@@ -671,16 +580,13 @@ namespace net.vieapps.Components.Caching
 
 		object _GetAsFragments(Fragment fragment)
 		{
-			// check data
 			if (object.ReferenceEquals(fragment, null) || string.IsNullOrWhiteSpace(fragment.Key) || string.IsNullOrWhiteSpace(fragment.Type) || fragment.TotalFragments < 1)
 				return null;
 
-			// check type
 			var type = Type.GetType(fragment.Type);
 			if (type == null)
 				return null;
 
-			// get all fragments
 			var fragments = new byte[0];
 			var length = 0;
 			for (var index = 0; index < fragment.TotalFragments; index++)
@@ -695,11 +601,9 @@ namespace net.vieapps.Components.Caching
 				}
 			}
 
-			// deserialize object
 			object @object = type.Equals(typeof(byte[])) && fragments.Length > 0
 				? fragments
 				: null;
-
 			if (@object == null && fragments.Length > 0)
 				try
 				{
@@ -716,7 +620,6 @@ namespace net.vieapps.Components.Caching
 					}
 				}
 
-			// return object
 			return @object;
 		}
 
@@ -746,28 +649,23 @@ namespace net.vieapps.Components.Caching
 
 		async Task<object> _GetAsFragmentsAsync(Fragment fragment)
 		{
-			// check data
 			if (object.ReferenceEquals(fragment, null) || string.IsNullOrWhiteSpace(fragment.Key) || string.IsNullOrWhiteSpace(fragment.Type) || fragment.TotalFragments < 1)
 				return null;
 
-			// check type
 			var type = Type.GetType(fragment.Type);
 			if (type == null)
 				return null;
 
-			// get all fragments
 			var fragments = Enumerable.Repeat(new byte[0], fragment.TotalFragments).ToList();
 			Func<int, Task> func = async (index) =>
 			{
 				fragments[index] = await Memcached.Client.GetAsync<byte[]>(this._GetKey(this._GetFragmentKey(fragment.Key, index)));
 			};
-
 			var tasks = new List<Task>();
 			for (var index = 0; index < fragment.TotalFragments; index++)
 				tasks.Add(func(index));
 			await Task.WhenAll(tasks);
 
-			// merge
 			var data = new byte[0];
 			var length = 0;
 			foreach (var bytes in fragments)
@@ -778,11 +676,9 @@ namespace net.vieapps.Components.Caching
 					length += bytes.Length;
 				}
 
-			// deserialize object
 			object @object = type.Equals(typeof(byte[])) && data.Length > 0
 				? data
 				: null;
-
 			if (@object == null && data.Length > 0)
 				try
 				{
@@ -799,7 +695,6 @@ namespace net.vieapps.Components.Caching
 					}
 				}
 
-			// return object
 			return @object;
 		}
 		#endregion
@@ -807,7 +702,6 @@ namespace net.vieapps.Components.Caching
 		#region Remove
 		bool _Remove(string key, bool doPush = true)
 		{
-			// remove
 			var success = false;
 			if (!string.IsNullOrWhiteSpace(key))
 				try
@@ -819,8 +713,7 @@ namespace net.vieapps.Components.Caching
 					Helper.WriteLogs(this.Name, $"Error occurred while removing an object from cache storage [{key}]", ex);
 				}
 
-			// update mapping key when removed successful
-			if (success && this._updateKeys)
+			if (success)
 			{
 				if (!this._removedKeys.Contains(key))
 					try
@@ -842,13 +735,11 @@ namespace net.vieapps.Components.Caching
 					this._UpdateKeys(123);
 			}
 
-			// return state
 			return success;
 		}
 
 		async Task<bool> _RemoveAsync(string key, bool doPush = true)
 		{
-			// remove
 			var success = false;
 			if (!string.IsNullOrWhiteSpace(key))
 				try
@@ -860,8 +751,7 @@ namespace net.vieapps.Components.Caching
 					Helper.WriteLogs(this.Name, $"Error occurred while removing an object from cache storage [{key}]", ex);
 				}
 
-			// update mapping key when removed successful
-			if (success && this._updateKeys)
+			if (success)
 			{
 				if (!this._removedKeys.Contains(key))
 					try
@@ -883,7 +773,6 @@ namespace net.vieapps.Components.Caching
 					this._UpdateKeys(123);
 			}
 
-			// return state
 			return success;
 		}
 		#endregion
@@ -891,35 +780,19 @@ namespace net.vieapps.Components.Caching
 		#region Remove (Multiple)
 		void _Remove(IEnumerable<string> keys, string keyPrefix = null)
 		{
-			// check
-			if (keys == null)
-				return;
-
-			// remove
-			foreach (string key in keys)
-				if (!string.IsNullOrWhiteSpace(key))
-					this._Remove((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + key, false);
-
-			// update keys
-			if (this._updateKeys && this._removedKeys.Count > 0)
+			if (keys != null)
+				keys.Where(key => !string.IsNullOrWhiteSpace(key)).ToList().ForEach(key => this._Remove((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + key, false));
+			if (this._storeKeys && this._removedKeys.Count > 0)
 				this._UpdateKeys(123);
 		}
 
 		async Task _RemoveAsync(IEnumerable<string> keys, string keyPrefix = null)
 		{
-			// check
-			if (keys == null)
-				return;
-
-			// remove
-			var tasks = new List<Task>();
-			foreach (string key in keys)
-				if (!string.IsNullOrWhiteSpace(key))
-					tasks.Add(this._RemoveAsync((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + key, false));
-			await Task.WhenAll(tasks);
-
-			// update keys
-			if (this._updateKeys && this._removedKeys.Count > 0)
+			await Task.WhenAll(keys == null
+				? keys.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => this._RemoveAsync((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + key, false))
+				: new List<Task<bool>>()
+			);
+			if (this._storeKeys && this._removedKeys.Count > 0)
 				this._UpdateKeys(123);
 		}
 		#endregion
@@ -958,11 +831,10 @@ namespace net.vieapps.Components.Caching
 		#region Clear
 		void _Clear()
 		{
-			// remove
 			this._Remove(this._GetKeys());
 			Memcached.Client.Remove(this._RegionKey);
 
-			if (this._updateKeys)
+			if (this._storeKeys)
 				try
 				{
 					this._locker.EnterWriteLock();
@@ -979,14 +851,13 @@ namespace net.vieapps.Components.Caching
 
 		async Task _ClearAsync()
 		{
-			// remove
 			var keys = await this._GetKeysAsync();
 			await Task.WhenAll(
 				this._RemoveAsync(keys),
 				Memcached.Client.RemoveAsync(this._RegionKey)
 			);
 
-			if (this._updateKeys)
+			if (this._storeKeys)
 				try
 				{
 					this._locker.EnterWriteLock();
@@ -1050,12 +921,10 @@ namespace net.vieapps.Components.Caching
 
 		internal static HashSet<string> FetchKeys(string key)
 		{
-			// get info
 			var info = Memcached.Client.Get<Fragment>(key);
 			if (object.ReferenceEquals(info, null))
 				return new HashSet<string>();
 
-			// get all fragments
 			var fragments = new byte[0];
 			var length = 0;
 			for (var index = 0; index < info.TotalFragments; index++)
@@ -1070,7 +939,6 @@ namespace net.vieapps.Components.Caching
 				}
 			}
 
-			// deserialize
 			try
 			{
 				return fragments.Length > 0
@@ -1085,18 +953,15 @@ namespace net.vieapps.Components.Caching
 
 		internal static async Task<HashSet<string>> FetchKeysAsync(string key)
 		{
-			// get info
 			var info = await Memcached.Client.GetAsync<Fragment>(key);
 			if (object.ReferenceEquals(info, null))
 				return new HashSet<string>();
 
-			// get all fragments
 			var fragments = Enumerable.Repeat(new byte[0], info.TotalFragments).ToList();
 			Func<int, Task> func = async (index) =>
 			{
 				fragments[index] = await Memcached.Client.GetAsync<byte[]>(key + ":" + index);
 			};
-
 			var tasks = new List<Task>();
 			for (var index = 0; index < info.TotalFragments; index++)
 				tasks.Add(func(index));
@@ -1112,7 +977,6 @@ namespace net.vieapps.Components.Caching
 					length += bytes.Length;
 				}
 
-			// deserialize
 			try
 			{
 				return data.Length > 0
@@ -1143,7 +1007,6 @@ namespace net.vieapps.Components.Caching
 
 		static async Task RegisterRegionAsync(string name)
 		{
-			// wait for other
 			var attempt = 0;
 			while (attempt < 123 && await Memcached.Client.ExistsAsync(Helper.RegionsKey + "-Registering"))
 			{
@@ -1151,20 +1014,13 @@ namespace net.vieapps.Components.Caching
 				attempt++;
 			}
 
-			// set flag
 			await Memcached.Client.StoreAsync(StoreMode.Set, Helper.RegionsKey + "-Registering", "v", TimeSpan.FromSeconds(13));
-
-			// fetch regions
 			var regions = await Memcached.FetchKeysAsync(Helper.RegionsKey);
-
-			// register
 			if (!regions.Contains(name))
 			{
 				regions.Add(name);
 				await Memcached.SetKeysAsync(Helper.RegionsKey, regions);
 			}
-
-			// remove flag
 			await Memcached.Client.RemoveAsync(Helper.RegionsKey + "-Registering");
 		}
 		#endregion
