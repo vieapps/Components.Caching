@@ -285,7 +285,7 @@ namespace net.vieapps.Components.Caching
 				foreach (XmlNode server in nodes)
 				{
 					var address = server.Attributes["address"]?.Value ?? "localhost";
-					var port = Convert.ToInt32(server.Attributes["address"]?.Value ?? "6379");
+					var port = Convert.ToInt32(server.Attributes["port"]?.Value ?? "6379");
 					connectionString += (connectionString != "" ? "," : "") + address + ":" + port.ToString();
 				}
 
