@@ -11,13 +11,6 @@ namespace net.vieapps.Components.Caching
 {
 	public static class RedisExtensions
 	{
-		public static bool Set(this IDatabase redis, string key, object value)
-		{
-			return string.IsNullOrWhiteSpace(key)
-				? false
-				: redis.StringSet(key, Helper.Serialize(value));
-		}
-
 		public static bool Set(this IDatabase redis, string key, object value, TimeSpan validFor)
 		{
 			return string.IsNullOrWhiteSpace(key)
@@ -27,16 +20,12 @@ namespace net.vieapps.Components.Caching
 
 		public static bool Set(this IDatabase redis, string key, object value, DateTime expiresAt)
 		{
-			return string.IsNullOrWhiteSpace(key)
-				? false
-				: redis.StringSet(key, Helper.Serialize(value), expiresAt.ToTimeSpan());
+			return redis.Set(key, value, expiresAt.ToTimeSpan());
 		}
 
-		public static Task<bool> SetAsync(this IDatabase redis, string key, object value)
+		public static bool Set(this IDatabase redis, string key, object value, int expirationTime = 0)
 		{
-			return string.IsNullOrWhiteSpace(key)
-				? Task.FromResult(false)
-				: redis.StringSetAsync(key, Helper.Serialize(value));
+			return redis.Set(key, value, expirationTime > 0 ? TimeSpan.FromMinutes(expirationTime) : TimeSpan.Zero);
 		}
 
 		public static Task<bool> SetAsync(this IDatabase redis, string key, object value, TimeSpan validFor)
@@ -48,16 +37,12 @@ namespace net.vieapps.Components.Caching
 
 		public static Task<bool> SetAsync(this IDatabase redis, string key, object value, DateTime expiresAt)
 		{
-			return string.IsNullOrWhiteSpace(key)
-				? Task.FromResult(false)
-				: redis.StringSetAsync(key, Helper.Serialize(value), expiresAt.ToTimeSpan());
+			return redis.SetAsync(key, value, expiresAt.ToTimeSpan());
 		}
 
-		public static bool Add(this IDatabase redis, string key, object value)
+		public static Task<bool> SetAsync(this IDatabase redis, string key, object value, int expirationTime = 0)
 		{
-			return string.IsNullOrWhiteSpace(key) || redis.Exists(key)
-				? false
-				: redis.Set(key, value);
+			return redis.SetAsync(key, value, expirationTime > 0 ? TimeSpan.FromMinutes(expirationTime) : TimeSpan.Zero);
 		}
 
 		public static bool Add(this IDatabase redis, string key, object value, TimeSpan validFor)
@@ -69,16 +54,11 @@ namespace net.vieapps.Components.Caching
 
 		public static bool Add(this IDatabase redis, string key, object value, DateTime expiresAt)
 		{
-			return string.IsNullOrWhiteSpace(key) || redis.Exists(key)
-				? false
-				: redis.Set(key, value, expiresAt);
+			return redis.Add(key, value, expiresAt.ToTimeSpan());
 		}
-
-		public static async Task<bool> AddAsync(this IDatabase redis, string key, object value)
+		public static bool Add(this IDatabase redis, string key, object value, int expirationTime = 0)
 		{
-			return string.IsNullOrWhiteSpace(key) || await redis.ExistsAsync(key)
-				? false
-				: await redis.SetAsync(key, value);
+			return redis.Add(key, value, expirationTime > 0 ? TimeSpan.FromMinutes(expirationTime) : TimeSpan.Zero);
 		}
 
 		public static async Task<bool> AddAsync(this IDatabase redis, string key, object value, TimeSpan validFor)
@@ -88,18 +68,14 @@ namespace net.vieapps.Components.Caching
 				: await redis.SetAsync(key, value, validFor);
 		}
 
-		public static async Task<bool> AddAsync(this IDatabase redis, string key, object value, DateTime expiresAt)
+		public static Task<bool> AddAsync(this IDatabase redis, string key, object value, DateTime expiresAt)
 		{
-			return string.IsNullOrWhiteSpace(key) || await redis.ExistsAsync(key)
-				? false
-				: await redis.SetAsync(key, value, expiresAt);
+			return redis.AddAsync(key, value, expiresAt.ToTimeSpan());
 		}
 
-		public static bool Replace(this IDatabase redis, string key, object value)
+		public static Task<bool> AddAsync(this IDatabase redis, string key, object value, int expirationTime = 0)
 		{
-			return string.IsNullOrWhiteSpace(key) || !redis.Exists(key)
-				? false
-				: redis.Set(key, value);
+			return redis.AddAsync(key, value, expirationTime > 0 ? TimeSpan.FromMinutes(expirationTime) : TimeSpan.Zero);
 		}
 
 		public static bool Replace(this IDatabase redis, string key, object value, TimeSpan validFor)
@@ -111,16 +87,12 @@ namespace net.vieapps.Components.Caching
 
 		public static bool Replace(this IDatabase redis, string key, object value, DateTime expiresAt)
 		{
-			return string.IsNullOrWhiteSpace(key) || !redis.Exists(key)
-				? false
-				: redis.Set(key, value, expiresAt);
+			return redis.Replace(key, value, expiresAt.ToTimeSpan());
 		}
 
-		public static async Task<bool> ReplaceAsync(this IDatabase redis, string key, object value)
+		public static bool Replace(this IDatabase redis, string key, object value, int expirationTime = 0)
 		{
-			return string.IsNullOrWhiteSpace(key) || !await redis.ExistsAsync(key)
-				? false
-				: await redis.SetAsync(key, value);
+			return redis.Replace(key, value, expirationTime > 0 ? TimeSpan.FromMinutes(expirationTime) : TimeSpan.Zero);
 		}
 
 		public static async Task<bool> ReplaceAsync(this IDatabase redis, string key, object value, TimeSpan validFor)
@@ -130,18 +102,31 @@ namespace net.vieapps.Components.Caching
 				: await redis.SetAsync(key, value, validFor);
 		}
 
-		public static async Task<bool> ReplaceAsync(this IDatabase redis, string key, object value, DateTime expiresAt)
+		public static Task<bool> ReplaceAsync(this IDatabase redis, string key, object value, DateTime expiresAt)
 		{
-			return string.IsNullOrWhiteSpace(key) || !await redis.ExistsAsync(key)
-				? false
-				: await redis.SetAsync(key, value, expiresAt);
+			return redis.ReplaceAsync(key, value, expiresAt.ToTimeSpan());
+		}
+
+		public static Task<bool> ReplaceAsync(this IDatabase redis, string key, object value, int expirationTime = 0)
+		{
+			return redis.ReplaceAsync(key, value, expirationTime > 0 ? TimeSpan.FromMinutes(expirationTime) : TimeSpan.Zero);
 		}
 
 		public static object Get(this IDatabase redis, string key)
 		{
-			if (string.IsNullOrWhiteSpace(key))
-				return null;
-			var value = (byte[])redis.StringGet(key);
+			var value = !string.IsNullOrWhiteSpace(key)
+				? (byte[])redis.StringGet(key)
+				: null;
+			return value != null
+				? Helper.Deserialize(value)
+				: null;
+		}
+
+		public static async Task<object> GetAsync(this IDatabase redis, string key)
+		{
+			var value = !string.IsNullOrWhiteSpace(key)
+				? (byte[])await redis.StringGetAsync(key)
+				: null;
 			return value != null
 				? Helper.Deserialize(value)
 				: null;
@@ -149,43 +134,61 @@ namespace net.vieapps.Components.Caching
 
 		public static T Get<T>(this IDatabase redis, string key)
 		{
-			var value = redis.Get(key);
-			return value != null && value is T
-				? (T)value
-				: default(T);
-		}
-
-		public static async Task<object> GetAsync(this IDatabase redis, string key)
-		{
-			if (string.IsNullOrWhiteSpace(key))
-				return null;
-			var value = (byte[])await redis.StringGetAsync(key);
-			return value != null
-				? Helper.Deserialize(value)
+			var value = !string.IsNullOrWhiteSpace(key)
+				? (byte[])redis.StringGet(key)
 				: null;
+			return value != null
+				? Helper.Deserialize<T>(value)
+				: default(T);
 		}
 
 		public static async Task<T> GetAsync<T>(this IDatabase redis, string key)
 		{
-			var value = await redis.GetAsync(key);
-			return value != null && value is T
-				? (T)value
+			var value = !string.IsNullOrWhiteSpace(key)
+				? (byte[])await redis.StringGetAsync(key)
+				: null;
+			return value != null
+				? Helper.Deserialize<T>(value)
 				: default(T);
 		}
 
 		public static IDictionary<string, object> Get(this IDatabase redis, IEnumerable<string> keys)
 		{
 			var objects = new Dictionary<string, object>();
-			if (keys != null)
-				keys.Where(key => !string.IsNullOrWhiteSpace(key)).ToList().ForEach(key => objects[key] = redis.Get(key));
+			var tasks = keys != null
+				? keys.Where(key => !string.IsNullOrWhiteSpace(key)).Select(async (key) => objects[key] = await redis.GetAsync(key))
+				: new List<Task<object>>();
+			Task.WaitAll(tasks.ToArray(), 13000);
 			return objects;
 		}
 
 		public static async Task<IDictionary<string, object>> GetAsync(this IDatabase redis, IEnumerable<string> keys)
 		{
 			var objects = new Dictionary<string, object>();
-			if (keys != null)
-				await Task.WhenAll(keys.Where(key => !string.IsNullOrWhiteSpace(key)).Select(async (key) => objects[key] = await redis.GetAsync(key)));
+			var tasks = keys != null
+				? keys.Where(key => !string.IsNullOrWhiteSpace(key)).Select(async (key) => objects[key] = await redis.GetAsync(key))
+				: new List<Task<object>>();
+			await Task.WhenAll(tasks);
+			return objects;
+		}
+
+		public static IDictionary<string, T> Get<T>(this IDatabase redis, IEnumerable<string> keys)
+		{
+			var objects = new Dictionary<string, T>();
+			var tasks = keys != null
+				? keys.Where(key => !string.IsNullOrWhiteSpace(key)).Select(async (key) => objects[key] = await redis.GetAsync<T>(key))
+				: new List<Task<T>>();
+			Task.WaitAll(tasks.ToArray(), 13000);
+			return objects;
+		}
+
+		public static async Task<IDictionary<string, T>> GetAsync<T>(this IDatabase redis, IEnumerable<string> keys)
+		{
+			var objects = new Dictionary<string, T>();
+			var tasks = keys != null
+				? keys.Where(key => !string.IsNullOrWhiteSpace(key)).Select(async (key) => objects[key] = await redis.GetAsync<T>(key))
+				: new List<Task<T>>();
+			await Task.WhenAll(tasks);
 			return objects;
 		}
 
