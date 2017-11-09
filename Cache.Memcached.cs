@@ -858,7 +858,6 @@ namespace net.vieapps.Components.Caching
 					tasks.Add(Memcached.Client.StoreAsync(StoreMode.Set, key + ":" + index, new ArraySegment<byte>(fragments[index])));
 				await Task.WhenAll(tasks);
 			}
-
 			return success;
 		}
 
