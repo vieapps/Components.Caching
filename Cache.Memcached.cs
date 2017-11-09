@@ -323,20 +323,39 @@ namespace net.vieapps.Components.Caching
 		#region Set (Fragment)
 		bool _SetFragments(string key, Type type, List<byte[]> fragments, int expirationTime = 0, StoreMode mode = StoreMode.Set)
 		{
-			var fragment = new Fragment()
-			{
-				Key = key,
-				Type = type.ToString() + "," + type.Assembly.FullName,
-				TotalFragments = fragments.Count
-			};
+			var success = fragments != null && fragments.Count > 0
+				? this._Set(this._GetFragmentKey(key, 0) , new ArraySegment<byte>(fragments[0]), expirationTime, false, mode)
+				: false;
 
-			var success = this._Set(fragment.Key, fragment, expirationTime, false, mode);
-			if (success)
+			if (success && fragments.Count > 1)
 			{
 				var items = new Dictionary<string, object>();
-				for (var index = 0; index < fragments.Count; index++)
-					items.Add(this._GetFragmentKey(fragment.Key, index), new ArraySegment<byte>(fragments[index]));
+				for (var index = 1; index < fragments.Count; index++)
+					items.Add(this._GetFragmentKey(key, index), new ArraySegment<byte>(fragments[index]));
 				this._Set(items, null, expirationTime, mode);
+			}
+
+			return success;
+		}
+
+		bool _SetAsFragments(string key, object value, int expirationTime = 0, bool setSecondary = false, StoreMode mode = StoreMode.Set)
+		{
+			if (value == null)
+				return false;
+
+			var success = this._SetFragments(key, value.GetType(), Helper.Split(Helper.Serialize(value)), expirationTime, mode);
+			if (success)
+			{
+				if (setSecondary && !(value is byte[]))
+					try
+					{
+						this._Set(key + ":(Secondary-Pure-Object)", value, expirationTime, false, mode);
+					}
+					catch (Exception ex)
+					{
+						Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache (pure object of fragments) [{key}:(Secondary-Pure-Object)]", ex);
+					}
+				this._UpdateKeys(key, true);
 			}
 
 			return success;
@@ -358,40 +377,6 @@ namespace net.vieapps.Components.Caching
 				for (var index = 0; index < fragments.Count; index++)
 					items.Add(this._GetFragmentKey(fragment.Key, index), new ArraySegment<byte>(fragments[index]));
 				await this._SetAsync(items, null, expirationTime, mode);
-			}
-
-			return success;
-		}
-
-		bool _SetAsFragments(string key, object value, int expirationTime = 0, bool setSecondary = false, StoreMode mode = StoreMode.Set)
-		{
-			if (value == null)
-				return false;
-
-			var bytes = value is byte[]
-				? value as byte[]
-				: value is ArraySegment<byte>
-					? ((ArraySegment<byte>)value).Array
-					: null;
-			if (bytes == null)
-				bytes = Helper.Serialize(value);
-			if (bytes == null || bytes.Length < 1)
-				return false;
-
-			var fragments = Helper.Split(bytes);
-			var success = this._SetFragments(key, value.GetType(), fragments, expirationTime, mode);
-			if (success)
-			{
-				if (setSecondary && !(value is byte[]))
-					try
-					{
-						this._Set(key + ":(Secondary-Pure-Object)", value, expirationTime, false, mode);
-					}
-					catch (Exception ex)
-					{
-						Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache (pure object of fragments) [{key}:(Secondary-Pure-Object)]", ex);
-					}
-				this._UpdateKeys(key, true);
 			}
 
 			return success;
