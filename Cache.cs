@@ -1,15 +1,8 @@
 #region Related components
 using System;
-using System.Linq;
 using System.Collections.Generic;
-using System.Threading;
 using System.Threading.Tasks;
-using System.Configuration;
 using System.Diagnostics;
-
-using Enyim.Caching;
-using Enyim.Caching.Memcached;
-using Enyim.Caching.Configuration;
 #endregion
 
 namespace net.vieapps.Components.Caching
@@ -27,8 +20,8 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		/// <param name="name">The string that presents name of isolated region</param>
 		/// <param name="expirationTime">Time for caching an item (in minutes)</param>
-		/// <param name="updateKeys">true to active update keys of the region (to clear or using with other purpose further)</param>
-		public Cache(string name = null, int expirationTime = 0, bool updateKeys = false) : this(name, expirationTime, updateKeys, null) { }
+		/// <param name="storeKeys">true to active store keys of the region (to clear or using with other purpose further)</param>
+		public Cache(string name = null, int expirationTime = 0, bool storeKeys = false) : this(name, expirationTime, storeKeys, null) { }
 
 		/// <summary>
 		/// Create new an instance of  distributed cache with isolated region
@@ -43,13 +36,13 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		/// <param name="name">The string that presents name of isolated region</param>
 		/// <param name="expirationTime">Time for caching an item (in minutes)</param>
-		/// <param name="updateKeys">true to active update keys of the region (to clear or using with other purpose further)</param>
-		/// <param name="provider">The string that presents the caching provider (memcached or redis), the default provider is memcached</param>
-		public Cache(string name, int expirationTime, bool updateKeys, string provider)
+		/// <param name="storeKeys">true to active store keys of the region (to clear or using with other purpose further)</param>
+		/// <param name="provider">The string that presents the caching provider (posible value is 'memcached' or 'redis' - the default provider is 'memcached')</param>
+		public Cache(string name, int expirationTime, bool storeKeys, string provider)
 		{
 			this._cache = !string.IsNullOrWhiteSpace(provider) && provider.Trim().ToLower().Equals("redis")
-				? new Redis(name, expirationTime, updateKeys) as ICacheProvider
-				: new Memcached(name, expirationTime, updateKeys) as ICacheProvider;
+				? new Redis(name, expirationTime, storeKeys) as ICacheProvider
+				: new Memcached(name, expirationTime, storeKeys) as ICacheProvider;
 		}
 
 		#region Properties
@@ -258,11 +251,10 @@ namespace net.vieapps.Components.Caching
 		/// <param name="key">The string that presents key of item</param>
 		/// <param name="value">The object that is to be cached</param>
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
-		/// <param name="setSecondary">true to add secondary item as pure object</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
-		public bool SetAsFragments(string key, object value, int expirationTime = 0, bool setSecondary = false)
+		public bool SetAsFragments(string key, object value, int expirationTime = 0)
 		{
-			return this._cache.SetAsFragments(key, value, expirationTime, setSecondary);
+			return this._cache.SetAsFragments(key, value, expirationTime);
 		}
 
 		/// <summary>
@@ -271,11 +263,10 @@ namespace net.vieapps.Components.Caching
 		/// <param name="key">The string that presents key of item</param>
 		/// <param name="value">The object that is to be cached</param>
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
-		/// <param name="setSecondary">true to add secondary item as pure object</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
-		public Task<bool> SetAsFragmentsAsync(string key, object value, int expirationTime = 0, bool setSecondary = false)
+		public Task<bool> SetAsFragmentsAsync(string key, object value, int expirationTime = 0)
 		{
-			return this._cache.SetAsFragmentsAsync(key, value, expirationTime, setSecondary);
+			return this._cache.SetAsFragmentsAsync(key, value, expirationTime);
 		}
 		#endregion
 

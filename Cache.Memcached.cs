@@ -29,7 +29,7 @@ namespace net.vieapps.Components.Caching
 		{
 			// region name
 			this._name = string.IsNullOrWhiteSpace(name)
-				? "VIEApps-NGX-Cache"
+				? Helper.RegionName
 				: System.Text.RegularExpressions.Regex.Replace(name, "[^0-9a-zA-Z:-]+", "");
 
 			// expiration time
@@ -46,10 +46,7 @@ namespace net.vieapps.Components.Caching
 			}
 
 			// register the region
-			Task.Run(async () =>
-			{
-				await Memcached.RegisterRegionAsync(this.Name).ConfigureAwait(false);
-			}).ConfigureAwait(false);
+			Task.Run(async () => await Memcached.RegisterRegionAsync(this.Name).ConfigureAwait(false)).ConfigureAwait(false);
 		}
 
 		#region Attributes
@@ -324,7 +321,7 @@ namespace net.vieapps.Components.Caching
 		bool _SetFragments(string key, List<byte[]> fragments, int expirationTime = 0, StoreMode mode = StoreMode.Set)
 		{
 			var success = fragments != null && fragments.Count > 0
-				? this._Set(key, new ArraySegment<byte>(Helper.Combine(BitConverter.GetBytes(Helper.FragmentDataFlag), BitConverter.GetBytes(fragments.Sum(f => f.Length)), fragments[0])), expirationTime, false, mode)
+				? this._Set(key, new ArraySegment<byte>(Helper.Combine(BitConverter.GetBytes(Helper.FlagOfFirstFragmentBlock), BitConverter.GetBytes(fragments.Sum(f => f.Length)), fragments[0])), expirationTime, false, mode)
 				: false;
 
 			if (success)
@@ -346,7 +343,7 @@ namespace net.vieapps.Components.Caching
 		async Task<bool> _SetFragmentsAsync(string key, List<byte[]> fragments, int expirationTime = 0, StoreMode mode = StoreMode.Set)
 		{
 			var success = fragments != null && fragments.Count > 0
-				? await this._SetAsync(key, new ArraySegment<byte>(Helper.Combine(BitConverter.GetBytes(Helper.FragmentDataFlag), BitConverter.GetBytes(fragments.Sum(f => f.Length)), fragments[0])), expirationTime, false, mode)
+				? await this._SetAsync(key, new ArraySegment<byte>(Helper.Combine(BitConverter.GetBytes(Helper.FlagOfFirstFragmentBlock), BitConverter.GetBytes(fragments.Sum(f => f.Length)), fragments[0])), expirationTime, false, mode)
 				: false;
 
 			if (success)
@@ -365,42 +362,18 @@ namespace net.vieapps.Components.Caching
 			return success;
 		}
 
-		bool _SetAsFragments(string key, object value, int expirationTime = 0, bool setSecondary = false, StoreMode mode = StoreMode.Set)
+		bool _SetAsFragments(string key, object value, int expirationTime = 0, StoreMode mode = StoreMode.Set)
 		{
-			if (value == null)
-				return false;
-
-			var success = this._SetFragments(key, Helper.Split(Helper.Serialize(value, false)), expirationTime, mode);
-			if (success && setSecondary && !(value is byte[]))
-				try
-				{
-					this._Set(key + ":(Secondary-Pure-Object)", value, expirationTime, true, mode);
-				}
-				catch (Exception ex)
-				{
-					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache (pure object of fragments) [{key}:(Secondary-Pure-Object)]", ex);
-				}
-
-			return success;
+			return value == null
+				? false
+				: this._SetFragments(key, Helper.Split(Helper.Serialize(value, false)), expirationTime, mode);
 		}
 
-		async Task<bool> _SetAsFragmentsAsync(string key, object value, int expirationTime = 0, bool setSecondary = false, StoreMode mode = StoreMode.Set)
+		Task<bool> _SetAsFragmentsAsync(string key, object value, int expirationTime = 0, StoreMode mode = StoreMode.Set)
 		{
-			if (value == null)
-				return false;
-
-			var success = await this._SetFragmentsAsync(key, Helper.Split(Helper.Serialize(value, false)), expirationTime, mode);
-			if (success && setSecondary && !(value is byte[]))
-				try
-				{
-					await this._SetAsync(key + ":(Secondary-Pure-Object)", value, expirationTime, true, mode);
-				}
-				catch (Exception ex)
-				{
-					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache (pure object of fragments) [{key}:(Secondary-Pure-Object)]", ex);
-				}
-
-			return success;
+			return value == null
+				? Task.FromResult(false)
+				: this._SetFragmentsAsync(key, Helper.Split(Helper.Serialize(value, false)), expirationTime, mode);
 		}
 		#endregion
 
@@ -420,20 +393,16 @@ namespace net.vieapps.Components.Caching
 				Helper.WriteLogs(this.Name, $"Error occurred while fetching an object from cache storage [{key}]", ex);
 			}
 
-			if (autoGetFragments && value != null && value is byte[] && (value as byte[]).Length > 8)
-			{
-				var info = Helper.GetFlags(value as byte[]);
-				if (info.Item1.Equals(Helper.FragmentDataFlag))
-					try
-					{
-						value = this._GetFromFragments(key, value as byte[]);
-					}
-					catch (Exception ex)
-					{
-						Helper.WriteLogs(this.Name, $"Error occurred while fetching an objects' fragments from cache storage [{key}]", ex);
-						value = null;
-					}
-			}
+			if (autoGetFragments && value != null && value is byte[] && (value as byte[]).Length > 8 && Helper.GetFlags(value as byte[]).Item1.Equals(Helper.FlagOfFirstFragmentBlock))
+				try
+				{
+					value = this._GetFromFragments(key, value as byte[]);
+				}
+				catch (Exception ex)
+				{
+					Helper.WriteLogs(this.Name, $"Error occurred while fetching an objects' fragments from cache storage [{key}]", ex);
+					value = null;
+				}
 
 			return value;
 		}
@@ -453,20 +422,16 @@ namespace net.vieapps.Components.Caching
 				Helper.WriteLogs(this.Name, $"Error occurred while fetching an object from cache storage [{key}]", ex);
 			}
 
-			if (autoGetFragments && value != null && value is byte[] && (value as byte[]).Length > 8)
-			{
-				var info = Helper.GetFlags(value as byte[]);
-				if (info.Item1.Equals(Helper.FragmentDataFlag))
-					try
-					{
-						value = await this._GetFromFragmentsAsync(key, value as byte[]);
-					}
-					catch (Exception ex)
-					{
-						Helper.WriteLogs(this.Name, $"Error occurred while fetching an objects' fragments from cache storage [{key}]", ex);
-						value = null;
-					}
-			}
+			if (autoGetFragments && value != null && value is byte[] && (value as byte[]).Length > 8 && Helper.GetFlags(value as byte[]).Item1.Equals(Helper.FlagOfFirstFragmentBlock))
+				try
+				{
+					value = await this._GetFromFragmentsAsync(key, value as byte[]);
+				}
+				catch (Exception ex)
+				{
+					Helper.WriteLogs(this.Name, $"Error occurred while fetching an objects' fragments from cache storage [{key}]", ex);
+					value = null;
+				}
 
 			return value;
 		}
@@ -624,15 +589,13 @@ namespace net.vieapps.Components.Caching
 
 		object _GetFromFragments(string key, byte[] firstBlock)
 		{
-			var info = this._GetFragments(firstBlock);
-			var indexes = new List<int>();
-			if (info.Item1 > 1)
-				for (var index = 1; index < info.Item1; index++)
-					indexes.Add(index);
-
-			var data = Helper.Combine(firstBlock, this._GetAsFragments(key, indexes));
 			try
 			{
+				var info = this._GetFragments(firstBlock);
+				var indexes = new List<int>();
+				for (var index = 1; index < info.Item1; index++)
+					indexes.Add(index);
+				var data = Helper.Combine(firstBlock, this._GetAsFragments(key, indexes));
 				return Helper.Deserialize(data, 8, data.Length - 8);
 			}
 			catch (Exception ex)
@@ -644,15 +607,13 @@ namespace net.vieapps.Components.Caching
 
 		async Task<object> _GetFromFragmentsAsync(string key, byte[] firstBlock)
 		{
-			var info = this._GetFragments(firstBlock);
-			var indexes = new List<int>();
-			if (info.Item1 > 1)
-				for (var index = 1; index < info.Item1; index++)
-					indexes.Add(index);
-
-			var data = Helper.Combine(firstBlock, await this._GetAsFragmentsAsync(key, indexes));
 			try
 			{
+				var info = this._GetFragments(firstBlock);
+				var indexes = new List<int>();
+				for (var index = 1; index < info.Item1; index++)
+					indexes.Add(index);
+				var data = Helper.Combine(firstBlock, await this._GetAsFragmentsAsync(key, indexes));
 				return Helper.Deserialize(data, 8, data.Length - 8);
 			}
 			catch (Exception ex)
@@ -764,7 +725,7 @@ namespace net.vieapps.Components.Caching
 		#region Remove (Fragment)
 		void _RemoveFragments(string key, int max = 100)
 		{
-			var keys = new List<string>() { key, key + ":(Secondary-Pure-Object)" };
+			var keys = new List<string>() { key };
 			for (var index = 1; index < max; index++)
 				keys.Add(this._GetFragmentKey(key, index));
 			this._Remove(keys);
@@ -772,7 +733,7 @@ namespace net.vieapps.Components.Caching
 
 		Task _RemoveFragmentsAsync(string key, int max = 100)
 		{
-			var keys = new List<string>() { key, key + ":(Secondary-Pure-Object)" };
+			var keys = new List<string>() { key };
 			for (var index = 1; index < max; index++)
 				keys.Add(this._GetFragmentKey(key, index));
 			return this._RemoveAsync(keys);
@@ -1179,11 +1140,10 @@ namespace net.vieapps.Components.Caching
 		/// <param name="key">The string that presents key of item</param>
 		/// <param name="value">The object that is to be cached</param>
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
-		/// <param name="setSecondary">true to add secondary item as pure object</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
-		public bool SetAsFragments(string key, object value, int expirationTime = 0, bool setSecondary = false)
+		public bool SetAsFragments(string key, object value, int expirationTime = 0)
 		{
-			return this._SetAsFragments(key, value, expirationTime, setSecondary);
+			return this._SetAsFragments(key, value, expirationTime);
 		}
 
 		/// <summary>
@@ -1192,11 +1152,10 @@ namespace net.vieapps.Components.Caching
 		/// <param name="key">The string that presents key of item</param>
 		/// <param name="value">The object that is to be cached</param>
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
-		/// <param name="setSecondary">true to add secondary item as pure object</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
-		public Task<bool> SetAsFragmentsAsync(string key, object value, int expirationTime = 0, bool setSecondary = false)
+		public Task<bool> SetAsFragmentsAsync(string key, object value, int expirationTime = 0)
 		{
-			return this._SetAsFragmentsAsync(key, value, expirationTime, setSecondary);
+			return this._SetAsFragmentsAsync(key, value, expirationTime);
 		}
 		#endregion
 

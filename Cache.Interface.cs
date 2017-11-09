@@ -1,15 +1,7 @@
 #region Related components
 using System;
-using System.Linq;
 using System.Collections.Generic;
-using System.Threading;
 using System.Threading.Tasks;
-using System.Configuration;
-using System.Diagnostics;
-
-using Enyim.Caching;
-using Enyim.Caching.Memcached;
-using Enyim.Caching.Configuration;
 #endregion
 
 namespace net.vieapps.Components.Caching
@@ -166,9 +158,8 @@ namespace net.vieapps.Components.Caching
 		/// <param name="key">The string that presents key of item</param>
 		/// <param name="value">The object that is to be cached</param>
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
-		/// <param name="setSecondary">true to add secondary item as pure object</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
-		bool SetAsFragments(string key, object value, int expirationTime = 0, bool setSecondary = false);
+		bool SetAsFragments(string key, object value, int expirationTime = 0);
 
 		/// <summary>
 		/// Serializes object into array of bytes, splits into one or more fragments and updates into cache with a specified key (if the key is already existed, then old cached item will be overriden)
@@ -176,9 +167,8 @@ namespace net.vieapps.Components.Caching
 		/// <param name="key">The string that presents key of item</param>
 		/// <param name="value">The object that is to be cached</param>
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
-		/// <param name="setSecondary">true to add secondary item as pure object</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
-		Task<bool> SetAsFragmentsAsync(string key, object value, int expirationTime = 0, bool setSecondary = false);
+		Task<bool> SetAsFragmentsAsync(string key, object value, int expirationTime = 0);
 		#endregion
 
 		#region Add

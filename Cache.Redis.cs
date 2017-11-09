@@ -6,9 +6,6 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Configuration;
 using System.Diagnostics;
-
-using Newtonsoft.Json.Linq;
-using StackExchange.Redis;
 #endregion
 
 namespace net.vieapps.Components.Caching
@@ -29,7 +26,7 @@ namespace net.vieapps.Components.Caching
 		{
 			// region name
 			this._name = string.IsNullOrWhiteSpace(name)
-				? "VIEApps-NGX-Cache"
+				? Helper.RegionName
 				: System.Text.RegularExpressions.Regex.Replace(name, "[^0-9a-zA-Z:-]+", "");
 
 			// expiration time
@@ -41,23 +38,16 @@ namespace net.vieapps.Components.Caching
 			this._storeKeys = storeKeys;
 
 			// register the region
-			Task.Run(async () =>
-			{
-				try
-				{
-					await Redis.Client.UpdateSetMembersAsync(Helper.RegionsKey, this._name);
-				}
-				catch { }
-			});
+			Task.Run(async () => await Redis.RegisterRegionAsync(this.Name).ConfigureAwait(false)).ConfigureAwait(false);
 		}
 
 		#region Attributes
-		static IDatabase _Client = null;
+		static StackExchange.Redis.IDatabase _Client = null;
 
 		/// <summary>
 		/// Gets the instance of redis client
 		/// </summary>
-		public static IDatabase Client
+		public static StackExchange.Redis.IDatabase Client
 		{
 			get
 			{
@@ -274,14 +264,14 @@ namespace net.vieapps.Components.Caching
 		{
 			var validFor = TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime);
 			var success = fragments != null && fragments.Count > 0
-				? Redis.Client.Set(this._GetKey(key), Helper.Combine(BitConverter.GetBytes(Helper.FragmentDataFlag), BitConverter.GetBytes(fragments.Sum(f => f.Length)), fragments[0]), validFor)
+				? Redis.Client.Set(this._GetKey(key), Helper.Combine(BitConverter.GetBytes(Helper.FlagOfFirstFragmentBlock), BitConverter.GetBytes(fragments.Sum(f => f.Length)), fragments[0]), validFor)
 				: false;
 
 			if (success && fragments.Count > 1)
 			{
 				var items = new Dictionary<string, byte[]>();
 				for (var index = 1; index < fragments.Count; index++)
-					items.Add(this._GetKey(this._GetFragmentKey(key, index)), fragments[index]);
+					items[this._GetKey(this._GetFragmentKey(key, index))] = fragments[index];
 				Redis.Client.Set(items, validFor);
 			}
 
@@ -292,56 +282,32 @@ namespace net.vieapps.Components.Caching
 		{
 			var validFor = TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime);
 			var success = fragments != null && fragments.Count > 0
-				? await Redis.Client.SetAsync(this._GetKey(key), Helper.Combine(BitConverter.GetBytes(Helper.FragmentDataFlag), BitConverter.GetBytes(fragments.Sum(f => f.Length)), fragments[0]), validFor)
+				? await Redis.Client.SetAsync(this._GetKey(key), Helper.Combine(BitConverter.GetBytes(Helper.FlagOfFirstFragmentBlock), BitConverter.GetBytes(fragments.Sum(f => f.Length)), fragments[0]), validFor)
 				: false;
 
 			if (success && fragments.Count > 1)
 			{
 				var items = new Dictionary<string, byte[]>();
 				for (var index = 1; index < fragments.Count; index++)
-					items.Add(this._GetKey(this._GetFragmentKey(key, index)), fragments[index]);
+					items[this._GetKey(this._GetFragmentKey(key, index))] = fragments[index];
 				await Redis.Client.SetAsync(items, validFor);
 			}
 
 			return success;
 		}
 
-		bool _SetAsFragments(string key, object value, int expirationTime = 0, bool setSecondary = false)
+		bool _SetAsFragments(string key, object value, int expirationTime = 0)
 		{
-			if (value == null)
-				return false;
-
-			var success = this._SetFragments(key, Helper.Split(Helper.Serialize(value, false)), expirationTime);
-			if (success && setSecondary && !(value is byte[]))
-				try
-				{
-					this._Set(key + ":(Secondary-Pure-Object)", value, expirationTime);
-				}
-				catch (Exception ex)
-				{
-					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache (pure object of fragments) [{key}:(Secondary-Pure-Object)]", ex);
-				}
-
-			return success;
+			return value == null
+				? false
+				: this._SetFragments(key, Helper.Split(Helper.Serialize(value, false)), expirationTime);
 		}
 
-		async Task<bool> _SetAsFragmentsAsync(string key, object value, int expirationTime = 0, bool setSecondary = false)
+		Task<bool> _SetAsFragmentsAsync(string key, object value, int expirationTime = 0)
 		{
-			if (value == null)
-				return false;
-
-			var success = await this._SetFragmentsAsync(key, Helper.Split(Helper.Serialize(value, false)), expirationTime);
-			if (success && setSecondary && !(value is byte[]))
-				try
-				{
-					await this._SetAsync(key + ":(Secondary-Pure-Object)", value, expirationTime);
-				}
-				catch (Exception ex)
-				{
-					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache (pure object of fragments) [{key}:(Secondary-Pure-Object)]", ex);
-				}
-
-			return success;
+			return value == null
+				? Task.FromResult(false)
+				: this._SetFragmentsAsync(key, Helper.Split(Helper.Serialize(value, false)), expirationTime);
 		}
 		#endregion
 
@@ -571,7 +537,7 @@ namespace net.vieapps.Components.Caching
 
 			if (value != null && (value as byte[]).Length > 8)
 			{
-				if (autoGetFragments && Helper.GetFlags(value as byte[]).Item1.Equals(Helper.FragmentDataFlag))
+				if (autoGetFragments && Helper.GetFlags(value as byte[]).Item1.Equals(Helper.FlagOfFirstFragmentBlock))
 					try
 					{
 						value = this._GetFromFragments(key, value as byte[]);
@@ -605,7 +571,7 @@ namespace net.vieapps.Components.Caching
 
 			if (value != null && (value as byte[]).Length > 8)
 			{
-				if (autoGetFragments && Helper.GetFlags(value as byte[]).Item1.Equals(Helper.FragmentDataFlag))
+				if (autoGetFragments && Helper.GetFlags(value as byte[]).Item1.Equals(Helper.FlagOfFirstFragmentBlock))
 					try
 					{
 						value = await this._GetFromFragmentsAsync(key, value as byte[]);
@@ -854,7 +820,7 @@ namespace net.vieapps.Components.Caching
 		#region Remove (Fragment)
 		void _RemoveFragments(string key, int max = 100)
 		{
-			var keys = new List<string>() { key, key + ":(Secondary-Pure-Object)" };
+			var keys = new List<string>() { key };
 			for (var index = 1; index < max; index++)
 				keys.Add(this._GetFragmentKey(key, index));
 			this._Remove(keys);
@@ -862,7 +828,7 @@ namespace net.vieapps.Components.Caching
 
 		Task _RemoveFragmentsAsync(string key, int max = 100)
 		{
-			var keys = new List<string>() { key, key + ":(Secondary-Pure-Object)" };
+			var keys = new List<string>() { key };
 			for (var index = 1; index < max; index++)
 				keys.Add(this._GetFragmentKey(key, index));
 			return this._RemoveAsync(keys);
@@ -923,6 +889,15 @@ namespace net.vieapps.Components.Caching
 		public static Task<HashSet<string>> GetRegionsAsync()
 		{
 			return Redis.Client.GetSetMembersAsync(Helper.RegionsKey);
+		}
+
+		static async Task RegisterRegionAsync(string name)
+		{
+			try
+			{
+				await Redis.Client.UpdateSetMembersAsync(Helper.RegionsKey, name);
+			}
+			catch { }
 		}
 		#endregion
 
@@ -1134,11 +1109,10 @@ namespace net.vieapps.Components.Caching
 		/// <param name="key">The string that presents key of item</param>
 		/// <param name="value">The object that is to be cached</param>
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
-		/// <param name="setSecondary">true to add secondary item as pure object</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
-		public bool SetAsFragments(string key, object value, int expirationTime = 0, bool setSecondary = false)
+		public bool SetAsFragments(string key, object value, int expirationTime = 0)
 		{
-			return this._SetAsFragments(key, value, expirationTime, setSecondary);
+			return this._SetAsFragments(key, value, expirationTime);
 		}
 
 		/// <summary>
@@ -1147,11 +1121,10 @@ namespace net.vieapps.Components.Caching
 		/// <param name="key">The string that presents key of item</param>
 		/// <param name="value">The object that is to be cached</param>
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
-		/// <param name="setSecondary">true to add secondary item as pure object</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
-		public Task<bool> SetAsFragmentsAsync(string key, object value, int expirationTime = 0, bool setSecondary = false)
+		public Task<bool> SetAsFragmentsAsync(string key, object value, int expirationTime = 0)
 		{
-			return this._SetAsFragmentsAsync(key, value, expirationTime, setSecondary);
+			return this._SetAsFragmentsAsync(key, value, expirationTime);
 		}
 		#endregion
 

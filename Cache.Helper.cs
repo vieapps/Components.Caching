@@ -18,12 +18,14 @@ namespace net.vieapps.Components.Caching
 	{
 
 		#region Data
-		public static readonly int RawDataFlag = 0xfa52;
-		public static readonly int FragmentDataFlag = 0xfb52;
+		public static readonly int FlagOfRawData = 0xfa52;
+		public static readonly int FlagOfFirstFragmentBlock = 0xfb52;
 		public static readonly DateTime UnixEpoch = new DateTime(1970, 1, 1);
 		public static readonly int ExpirationTime = 30;
-		internal static readonly int FragmentSize = (1024 * 1024) - 512;
+
+		internal static readonly int FragmentSize = (1024 * 1024) - 128;
 		internal static readonly string RegionsKey = "VIEApps-NGX-Regions";
+		internal static readonly string RegionName = "VIEApps-NGX-Cache";
 
 		public static TimeSpan ToTimeSpan(this DateTime value)
 		{
@@ -76,11 +78,6 @@ namespace net.vieapps.Components.Caching
 				}
 			}
 			return blocks;
-		}
-
-		public static List<byte[]> Split(object @object, int size = 0)
-		{
-			return Helper.Split(Helper.Serialize(@object), size);
 		}
 		#endregion
 
@@ -174,7 +171,7 @@ namespace net.vieapps.Components.Caching
 				default:
 					if (value is byte[] || value is ArraySegment<byte>)
 					{
-						typeFlag = Helper.RawDataFlag;
+						typeFlag = Helper.FlagOfRawData;
 						data = value is byte[] ? value as byte[] : ((ArraySegment<byte>)value).Array;
 					}
 					else
@@ -219,9 +216,9 @@ namespace net.vieapps.Components.Caching
 			var dataLength = info.Item2;
 
 			var tmp = new byte[0];
-			if (typeFlag.Equals(Helper.RawDataFlag))
+			if (typeFlag.Equals(Helper.FlagOfRawData))
 			{
-				tmp = new byte[info.Item2];
+				tmp = new byte[dataLength];
 				Buffer.BlockCopy(data, 8, tmp, 0, dataLength);
 				return tmp;
 			}
@@ -229,7 +226,7 @@ namespace net.vieapps.Components.Caching
 			var typeCode = (TypeCode)(typeFlag & 0xff);
 			if (!typeCode.Equals(TypeCode.Empty) && !typeCode.Equals(TypeCode.DBNull) && !typeCode.Equals(TypeCode.Decimal) && !typeCode.Equals(TypeCode.Object))
 			{
-				tmp = new byte[info.Item2];
+				tmp = new byte[dataLength];
 				Buffer.BlockCopy(data, 8, tmp, 0, dataLength);
 			}
 
@@ -282,20 +279,14 @@ namespace net.vieapps.Components.Caching
 					return BitConverter.ToDouble(tmp, 0);
 
 				default:
-					return data.Length > 8
-						? Helper.Deserialize(data, 8, dataLength)
-						: null;
+					return data.Length > 8 ? Helper.Deserialize(data, 8, dataLength) : null;
 			}
 		}
 
 		public static T Deserialize<T>(byte[] data)
 		{
-			var value = data != null && data.Length > 8
-				? Helper.Deserialize(data)
-				: default(T);
-			return value != null && value is T
-				? (T)value
-				: default(T);
+			var value = data != null && data.Length > 8 ? Helper.Deserialize(data) : default(T);
+			return value != null && value is T ? (T)value : default(T);
 		}
 		#endregion
 
