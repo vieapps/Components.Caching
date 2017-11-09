@@ -1170,7 +1170,7 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		/// <param name="key">The string that presents key of fragment information</param>
 		/// <returns>The information of fragments, first element is total number of fragments, second element is total length of data</returns>
-		public Tuple<int, uint> GetFragments(string key)
+		public Tuple<int, int> GetFragments(string key)
 		{
 			throw new NotSupportedException();
 		}
@@ -1180,7 +1180,7 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		/// <param name="key">The string that presents key of fragment information</param>
 		/// <returns>The information of fragments, first element is total number of fragments, second element is total length of data</returns>
-		public Task<Tuple<int, uint>> GetFragmentsAsync(string key)
+		public Task<Tuple<int, int>> GetFragmentsAsync(string key)
 		{
 			throw new NotSupportedException();
 		}

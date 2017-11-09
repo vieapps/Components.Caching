@@ -538,7 +538,7 @@ namespace net.vieapps.Components.Caching
 		#endregion
 
 		#region Get (Fragment)
-		Tuple<int, uint> _GetFragments(byte[] data)
+		Tuple<int, int> _GetFragments(byte[] data)
 		{
 			var info = Helper.GetFlags(data);
 			if (info == null)
@@ -551,10 +551,10 @@ namespace net.vieapps.Components.Caching
 				blocks++;
 				offset += Helper.FragmentSize;
 			}
-			return new Tuple<int, uint>(blocks, (uint)info.Item2);
+			return new Tuple<int, int>(blocks, info.Item2);
 		}
 
-		Tuple<int, uint> _GetFragments(string key)
+		Tuple<int, int> _GetFragments(string key)
 		{
 			var data = this._Get(key, false) as byte[];
 			return data != null
@@ -562,7 +562,7 @@ namespace net.vieapps.Components.Caching
 				: null;
 		}
 
-		async Task<Tuple<int, uint>> _GetFragmentsAsync(string key)
+		async Task<Tuple<int, int>> _GetFragmentsAsync(string key)
 		{
 			var data = await this._GetAsync(key, false) as byte[];
 			return data != null
@@ -1451,7 +1451,7 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		/// <param name="key">The string that presents key of fragment information</param>
 		/// <returns>The information of fragments, first element is total number of fragments, second element is total length of data</returns>
-		public Tuple<int, uint> GetFragments(string key)
+		public Tuple<int, int> GetFragments(string key)
 		{
 			return this._GetFragments(key);
 		}
@@ -1461,7 +1461,7 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		/// <param name="key">The string that presents key of fragment information</param>
 		/// <returns>The information of fragments, first element is total number of fragments, second element is total length of data</returns>
-		public Task<Tuple<int, uint>> GetFragmentsAsync(string key)
+		public Task<Tuple<int, int>> GetFragmentsAsync(string key)
 		{
 			return this._GetFragmentsAsync(key);
 		}

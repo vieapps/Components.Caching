@@ -365,14 +365,14 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		/// <param name="key">The string that presents key of fragment information</param>
 		/// <returns>The information of fragments, first element is total number of fragments, second element is total length of data</returns>
-		Tuple<int, uint> GetFragments(string key);
+		Tuple<int, int> GetFragments(string key);
 
 		/// <summary>
 		/// Gets fragment information that associates with the key (only available when working with distributed cache)
 		/// </summary>
 		/// <param name="key">The string that presents key of fragment information</param>
 		/// <returns>The information of fragments, first element is total number of fragments, second element is total length of data</returns>
-		Task<Tuple<int, uint>> GetFragmentsAsync(string key);
+		Task<Tuple<int, int>> GetFragmentsAsync(string key);
 
 		/// <summary>
 		/// Gets cached of fragmented items that associates with the key and indexes (only available when working with distributed cache)
