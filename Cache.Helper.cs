@@ -1,20 +1,15 @@
 #region Related components
 using System;
 using System.IO;
+using System.Text;
 using System.Xml;
+using System.Linq;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Diagnostics;
 using System.Configuration;
-
-using Newtonsoft.Json.Linq;
-
-using Enyim.Caching;
-using Enyim.Caching.Configuration;
-using Enyim.Caching.Memcached;
-
-using StackExchange.Redis;
+using System.Runtime.Serialization.Formatters.Binary;
 #endregion
 
 namespace net.vieapps.Components.Caching
@@ -23,6 +18,7 @@ namespace net.vieapps.Components.Caching
 	{
 
 		#region Data
+		public static readonly uint RawDataFlag = 0xfa52;
 		public static readonly DateTime UnixEpoch = new DateTime(1970, 1, 1);
 		public static readonly int ExpirationTime = 30;
 		internal static readonly int FragmentSize = (1024 * 1024) - 512;
@@ -34,98 +30,251 @@ namespace net.vieapps.Components.Caching
 		}
 		#endregion
 
-		#region Split into fragments
-		internal static List<byte[]> Split(byte[] data, int fragmentSize = 0)
+		#region Split & Combine
+		public static byte[] Combine(params byte[][] arrays)
 		{
-			var fragments = new List<byte[]>();
-			if (data != null && data.Length > 0)
+			var combined = new byte[arrays.Sum(a => a.Length)];
+			var offset = 0;
+			foreach (var array in arrays)
 			{
-				fragmentSize = fragmentSize > 0 ? fragmentSize : Helper.FragmentSize;
-				int index = 0, length = data.Length;
-				while (index < data.Length)
-				{
-					var size = fragmentSize > length
-						? length
-						: fragmentSize;
-
-					var fragment = new byte[size];
-					Array.Copy(data, index, fragment, 0, size);
-					fragments.Add(fragment);
-
-					index += size;
-					length -= size;
-				}
+				Buffer.BlockCopy(array, 0, combined, offset, array.Length);
+				offset += array.Length;
 			}
-			return fragments;
+			return combined;
 		}
 
-		internal static List<byte[]> Split(object @object, int fragmentSize = 0)
+		public static List<byte[]> Split(byte[] data, int size = 0)
 		{
-			return Helper.Split(Helper.Serialize(@object), fragmentSize);
+			var blocks = new List<byte[]>();
+			if (data != null && data.Length > 0)
+			{
+				size = size > 0 ? size : Helper.FragmentSize;
+				var offset = 0;
+				var length = data.Length;
+				while (offset < data.Length)
+				{
+					var count = size > length ? length : size;
+					var block = new byte[count];
+					Buffer.BlockCopy(data, offset, block, 0, count);
+					blocks.Add(block);
+					offset += count;
+					length -= count;
+				}
+			}
+			return blocks;
+		}
+
+		public static List<byte[]> Split(object @object, int size = 0)
+		{
+			return Helper.Split(Helper.Serialize(@object), size);
 		}
 		#endregion
 
 		#region Serialize & Deserialize
-		static DefaultTranscoder _Transcoder = null;
-
-		internal static DefaultTranscoder Transcoder
-		{
-			get
-			{
-				return Helper._Transcoder ?? (Helper._Transcoder = new DefaultTranscoder());
-			}
-		}
-
 		public static byte[] Serialize(object value)
 		{
-			return value == null
-				? new byte[0]
-				: value is byte[]
-					? (byte[])value
-					: value is ArraySegment<byte>
-						? ((ArraySegment<byte>)value).Array
-						: Helper.Transcoder.SerializeObject(value).Array;
+			var data = new byte[0];
+			var typeCode = value == null ? TypeCode.DBNull : Type.GetTypeCode(value.GetType());
+			var typeFlag = (uint)((int)typeCode | 0x0100);
+			switch (typeCode)
+			{
+				case TypeCode.Empty:
+				case TypeCode.DBNull:
+					break;
+
+				case TypeCode.Boolean:
+					data = BitConverter.GetBytes((bool)value);
+					break;
+
+				case TypeCode.DateTime:
+					data = BitConverter.GetBytes(((DateTime)value).ToBinary());
+					break;
+
+				case TypeCode.Char:
+					data = BitConverter.GetBytes((char)value);
+					break;
+
+				case TypeCode.String:
+					data = Encoding.UTF8.GetBytes((string)value);
+					break;
+
+				case TypeCode.Byte:
+					data = BitConverter.GetBytes((byte)value);
+					break;
+
+				case TypeCode.SByte:
+					data = BitConverter.GetBytes((sbyte)value);
+					break;
+
+				case TypeCode.Int16:
+					data = BitConverter.GetBytes((short)value);
+					break;
+
+				case TypeCode.UInt16:
+					data = BitConverter.GetBytes((ushort)value);
+					break;
+
+				case TypeCode.Int32:
+					data = BitConverter.GetBytes((int)value);
+					break;
+
+				case TypeCode.UInt32:
+					data = BitConverter.GetBytes((uint)value);
+					break;
+
+				case TypeCode.Int64:
+					data = BitConverter.GetBytes((long)value);
+					break;
+
+				case TypeCode.UInt64:
+					data = BitConverter.GetBytes((ulong)value);
+					break;
+
+				case TypeCode.Single:
+					data = BitConverter.GetBytes((float)value);
+					break;
+
+				case TypeCode.Double:
+					data = BitConverter.GetBytes((double)value);
+					break;
+
+				default:
+					if (value is byte[] || value is ArraySegment<byte>)
+					{
+						typeFlag = Helper.RawDataFlag;
+						data = value is byte[] ? value as byte[] : ((ArraySegment<byte>)value).Array;
+					}
+					else
+					{
+						if (value.GetType().IsSerializable)
+							using (var stream = new MemoryStream())
+							{
+								(new BinaryFormatter()).Serialize(stream, value);
+								data = stream.GetBuffer();
+							}
+						else
+							throw new ArgumentException($"The type '{value.GetType()}' must have Serializable attribute or implemented the ISerializable interface");
+					}
+					break;
+			}
+
+			return Helper.Combine(BitConverter.GetBytes(typeFlag), BitConverter.GetBytes((uint)data.Length), data);
 		}
 
 		public static object Deserialize(byte[] data)
 		{
-			return data == null || data.Length < 1
-				? null
-				: Helper.Transcoder.DeserializeObject(new ArraySegment<byte>(data));
+			if (data == null || data.Length < 9)
+				return null;
+
+			var tmp = new byte[4];
+			Buffer.BlockCopy(data, 0, tmp, 0, 4);
+			var typeFlag = BitConverter.ToUInt32(tmp, 0);
+
+			var typeCode = (TypeCode)(typeFlag & 0xff);
+			if (!typeCode.Equals(TypeCode.Empty) && !typeCode.Equals(TypeCode.DBNull) && !typeCode.Equals(TypeCode.Decimal) && !typeCode.Equals(TypeCode.Object))
+			{
+				tmp = new byte[data.Length - 8];
+				Buffer.BlockCopy(data, 8, tmp, 0, data.Length - 8);
+			}
+
+			if (typeFlag.Equals(Helper.RawDataFlag))
+				return tmp;
+
+			switch (typeCode)
+			{
+				case TypeCode.Empty:
+				case TypeCode.DBNull:
+					return null;
+
+				case TypeCode.Boolean:
+					return BitConverter.ToBoolean(tmp, 0);
+
+				case TypeCode.DateTime:
+					return DateTime.FromBinary(BitConverter.ToInt64(tmp, 0));
+
+				case TypeCode.Char:
+					return BitConverter.ToChar(tmp, 0);
+
+				case TypeCode.String:
+					return Encoding.UTF8.GetString(tmp, 0, tmp.Length);
+
+				case TypeCode.Byte:
+					return tmp[0];
+
+				case TypeCode.SByte:
+					return (sbyte)tmp[0];
+
+				case TypeCode.Int16:
+					return BitConverter.ToInt16(tmp, 0);
+
+				case TypeCode.UInt16:
+					return BitConverter.ToUInt16(tmp, 0);
+
+				case TypeCode.Int32:
+					return BitConverter.ToInt32(tmp, 0);
+
+				case TypeCode.UInt32:
+					return BitConverter.ToUInt32(tmp, 0);
+
+				case TypeCode.Int64:
+					return BitConverter.ToInt64(tmp, 0);
+
+				case TypeCode.UInt64:
+					return BitConverter.ToUInt64(tmp, 0);
+
+				case TypeCode.Single:
+					return BitConverter.ToSingle(tmp, 0);
+
+				case TypeCode.Double:
+					return BitConverter.ToDouble(tmp, 0);
+
+				default:
+					if (data.Length < 9)
+						return null;
+					else
+						using (var stream = new MemoryStream(data, 8, data.Length - 8))
+						{
+							return (new BinaryFormatter()).Deserialize(stream);
+						}
+			}
 		}
 
-		public static T Deserialize<T>(byte[] value)
+		public static T Deserialize<T>(byte[] data)
 		{
-			if (typeof(T).Equals(typeof(byte[])))
-				return (T)((object)value);
+			if (data == null || data.Length < 9)
+				return default(T);
 
-			if (typeof(T).Equals(typeof(ArraySegment<byte>)))
-				return (T)((object)new ArraySegment<byte>(value));
-
-			var data = Helper.Deserialize(value);
-			return data != null && data is T
-				? (T)data
-				: default(T);
-		}
-
-		internal static T Clone<T>(T @object)
-		{
-			return Helper.Deserialize<T>(Helper.Serialize(@object));
+			var tmp = new byte[4];
+			Buffer.BlockCopy(data, 0, tmp, 0, 4);
+			var typeFlag = BitConverter.ToUInt32(tmp, 0);
+			if (typeFlag.Equals(Helper.RawDataFlag))
+			{
+				tmp = new byte[data.Length - 8];
+				Buffer.BlockCopy(data, 0, tmp, 8, data.Length - 8);
+				return (T)(object)tmp;
+			}
+			else
+			{
+				var @object = Helper.Deserialize(data);
+				return @object != null && @object is T
+					? (T)@object
+					: default(T);
+			}
 		}
 		#endregion
 
 		#region Get client of a cache provider
-		internal static MemcachedClient GetMemcachedClient()
+		internal static Enyim.Caching.MemcachedClient GetMemcachedClient()
 		{
-			var configuration = ConfigurationManager.GetSection("memcached") as MemcachedClientConfigurationSectionHandler;
+			var configuration = ConfigurationManager.GetSection("memcached") as Enyim.Caching.Configuration.MemcachedClientConfigurationSectionHandler;
 			if (configuration == null)
 				throw new ConfigurationErrorsException("The section named 'memcached' is not found, please check your configuration file (app.config or web.config");
 			return new Enyim.Caching.MemcachedClient(configuration);
 		}
 
-		internal static ConnectionMultiplexer RedisConnection = null;
+		internal static StackExchange.Redis.ConnectionMultiplexer RedisConnection = null;
 
-		internal static IDatabase GetRedisClient()
+		internal static StackExchange.Redis.IDatabase GetRedisClient()
 		{
 			var configuration = ConfigurationManager.GetSection("redis") as RedisClientConfigurationSectionHandler;
 			if (configuration == null)
@@ -135,9 +284,8 @@ namespace net.vieapps.Components.Caching
 			if (configuration.Section.SelectNodes("servers/add") is XmlNodeList nodes)
 				foreach (XmlNode server in nodes)
 				{
-					var info = configuration.GetJson(server);
-					var address = (info["address"] as JValue).Value as string;
-					var port = Convert.ToInt32(info["port"] != null ? (info["port"] as JValue).Value as string : "6379");
+					var address = server.Attributes["address"]?.Value ?? "localhost";
+					var port = Convert.ToInt32(server.Attributes["address"]?.Value ?? "6379");
 					connectionString += (connectionString != "" ? "," : "") + address + ":" + port.ToString();
 				}
 
@@ -146,7 +294,7 @@ namespace net.vieapps.Components.Caching
 					if (!string.IsNullOrWhiteSpace(option.Value))
 						connectionString += (connectionString != "" ? "," : "") + option.Name + "=" + option.Value;
 
-			Helper.RedisConnection = Helper.RedisConnection ?? ConnectionMultiplexer.Connect(connectionString);
+			Helper.RedisConnection = Helper.RedisConnection ?? StackExchange.Redis.ConnectionMultiplexer.Connect(connectionString);
 			return Helper.RedisConnection.GetDatabase();
 		}
 		#endregion
