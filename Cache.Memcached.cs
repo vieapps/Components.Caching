@@ -575,14 +575,14 @@ namespace net.vieapps.Components.Caching
 
 		List<byte[]> _GetAsFragments(string key, params int[] indexes)
 		{
-			return string.IsNullOrWhiteSpace(key) || indexes != null || indexes.Length < 1
+			return string.IsNullOrWhiteSpace(key) || indexes == null || indexes.Length < 1
 				? null
 				: this._GetAsFragments(key, indexes.ToList());
 		}
 
 		Task<List<byte[]>> _GetAsFragmentsAsync(string key, params int[] indexes)
 		{
-			return string.IsNullOrWhiteSpace(key) || indexes != null || indexes.Length < 1
+			return string.IsNullOrWhiteSpace(key) || indexes == null || indexes.Length < 1
 				? Task.FromResult<List<byte[]>>(null)
 				: this._GetAsFragmentsAsync(key, indexes.ToList());
 		}
