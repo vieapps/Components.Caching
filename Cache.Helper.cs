@@ -82,7 +82,7 @@ namespace net.vieapps.Components.Caching
 		#endregion
 
 		#region Serialize & Deserialize
-		public static Tuple<int, int> GetFlags(byte[] data)
+		internal static Tuple<int, int> GetFlags(byte[] data)
 		{
 			if (data == null || data.Length < 4)
 				return null;

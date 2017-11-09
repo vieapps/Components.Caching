@@ -211,10 +211,10 @@ namespace net.vieapps.Components.Caching
 		public static async Task<IDictionary<string, object>> GetAsync(this IDatabase redis, IEnumerable<string> keys)
 		{
 			var objects = new Dictionary<string, object>();
-			var tasks = keys != null
+			await Task.WhenAll(keys != null
 				? keys.Where(key => !string.IsNullOrWhiteSpace(key)).Select(async (key) => objects[key] = await redis.GetAsync(key))
-				: new List<Task<object>>();
-			await Task.WhenAll(tasks);
+				: new List<Task<object>>()
+			);
 			return objects;
 		}
 
@@ -229,10 +229,10 @@ namespace net.vieapps.Components.Caching
 		public static async Task<IDictionary<string, T>> GetAsync<T>(this IDatabase redis, IEnumerable<string> keys)
 		{
 			var objects = new Dictionary<string, T>();
-			var tasks = keys != null
+			await Task.WhenAll(keys != null
 				? keys.Where(key => !string.IsNullOrWhiteSpace(key)).Select(async (key) => objects[key] = await redis.GetAsync<T>(key))
-				: new List<Task<T>>();
-			await Task.WhenAll(tasks);
+				: new List<Task<T>>()
+			);
 			return objects;
 		}
 

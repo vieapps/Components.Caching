@@ -364,14 +364,14 @@ namespace net.vieapps.Components.Caching
 
 		bool _SetAsFragments(string key, object value, int expirationTime = 0, StoreMode mode = StoreMode.Set)
 		{
-			return value == null
+			return string.IsNullOrWhiteSpace(key) || value == null
 				? false
 				: this._SetFragments(key, Helper.Split(Helper.Serialize(value, false)), expirationTime, mode);
 		}
 
 		Task<bool> _SetAsFragmentsAsync(string key, object value, int expirationTime = 0, StoreMode mode = StoreMode.Set)
 		{
-			return value == null
+			return string.IsNullOrWhiteSpace(key) || value == null
 				? Task.FromResult(false)
 				: this._SetFragmentsAsync(key, Helper.Split(Helper.Serialize(value, false)), expirationTime, mode);
 		}

@@ -152,25 +152,7 @@ namespace net.vieapps.Components.Caching
 
 		bool _Set(string key, object value, DateTime expiresAt)
 		{
-			var success = false;
-			if (!string.IsNullOrWhiteSpace(key) && value != null)
-				try
-				{
-					success = Redis.Client.Set(this._GetKey(key), value, expiresAt);
-				}
-				catch (ArgumentException)
-				{
-					throw;
-				}
-				catch (Exception ex)
-				{
-					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
-				}
-
-			if (success)
-				this._UpdateKey(key);
-
-			return success;
+			return this._Set(key, value, expiresAt.ToTimeSpan());
 		}
 
 		async Task<bool> _SetAsync(string key, object value, TimeSpan validFor)
@@ -202,27 +184,9 @@ namespace net.vieapps.Components.Caching
 			return this._SetAsync(key, value, TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime));
 		}
 
-		async Task<bool> _SetAsync(string key, object value, DateTime expiresAt)
+		Task<bool> _SetAsync(string key, object value, DateTime expiresAt)
 		{
-			var success = false;
-			if (!string.IsNullOrWhiteSpace(key) && value != null)
-				try
-				{
-					success = await Redis.Client.SetAsync(this._GetKey(key), value, expiresAt);
-				}
-				catch (ArgumentException)
-				{
-					throw;
-				}
-				catch (Exception ex)
-				{
-					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
-				}
-
-			if (success)
-				await this._UpdateKeyAsync(key);
-
-			return success;
+			return this._SetAsync(key, value, expiresAt.ToTimeSpan());
 		}
 		#endregion
 
@@ -298,14 +262,14 @@ namespace net.vieapps.Components.Caching
 
 		bool _SetAsFragments(string key, object value, int expirationTime = 0)
 		{
-			return value == null
+			return string.IsNullOrWhiteSpace(key) || value == null
 				? false
 				: this._SetFragments(key, Helper.Split(Helper.Serialize(value, false)), expirationTime);
 		}
 
 		Task<bool> _SetAsFragmentsAsync(string key, object value, int expirationTime = 0)
 		{
-			return value == null
+			return string.IsNullOrWhiteSpace(key) || value == null
 				? Task.FromResult(false)
 				: this._SetFragmentsAsync(key, Helper.Split(Helper.Serialize(value, false)), expirationTime);
 		}
@@ -342,25 +306,7 @@ namespace net.vieapps.Components.Caching
 
 		bool _Add(string key, object value, DateTime expiresAt)
 		{
-			var success = false;
-			if (!string.IsNullOrWhiteSpace(key) && value != null)
-				try
-				{
-					success = Redis.Client.Add(this._GetKey(key), value, expiresAt);
-				}
-				catch (ArgumentException)
-				{
-					throw;
-				}
-				catch (Exception ex)
-				{
-					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
-				}
-
-			if (success)
-				this._UpdateKey(key);
-
-			return success;
+			return this._Add(key, value, expiresAt.ToTimeSpan());
 		}
 
 		async Task<bool> _AddAsync(string key, object value, TimeSpan validFor)
@@ -391,27 +337,9 @@ namespace net.vieapps.Components.Caching
 			return this._AddAsync(key, value, TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime));
 		}
 
-		async Task<bool> _AddAsync(string key, object value, DateTime expiresAt)
+		Task<bool> _AddAsync(string key, object value, DateTime expiresAt)
 		{
-			var success = false;
-			if (!string.IsNullOrWhiteSpace(key) && value != null)
-				try
-				{
-					success = await Redis.Client.AddAsync(this._GetKey(key), value, expiresAt);
-				}
-				catch (ArgumentException)
-				{
-					throw;
-				}
-				catch (Exception ex)
-				{
-					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
-				}
-
-			if (success)
-				await this._UpdateKeyAsync(key);
-
-			return success;
+			return this._AddAsync(key, value, expiresAt.ToTimeSpan());
 		}
 		#endregion
 
@@ -446,25 +374,7 @@ namespace net.vieapps.Components.Caching
 
 		bool _Replace(string key, object value, DateTime expiresAt)
 		{
-			var success = false;
-			if (!string.IsNullOrWhiteSpace(key) && value != null)
-				try
-				{
-					success = Redis.Client.Replace(this._GetKey(key), value, expiresAt);
-				}
-				catch (ArgumentException)
-				{
-					throw;
-				}
-				catch (Exception ex)
-				{
-					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
-				}
-
-			if (success)
-				this._UpdateKey(key);
-
-			return success;
+			return this._Replace(key, value, expiresAt.ToTimeSpan());
 		}
 
 		async Task<bool> _ReplaceAsync(string key, object value, TimeSpan validFor)
@@ -495,27 +405,9 @@ namespace net.vieapps.Components.Caching
 			return this._ReplaceAsync(key, value, TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime));
 		}
 
-		async Task<bool> _ReplaceAsync(string key, object value, DateTime expiresAt)
+		Task<bool> _ReplaceAsync(string key, object value, DateTime expiresAt)
 		{
-			var success = false;
-			if (!string.IsNullOrWhiteSpace(key) && value != null)
-				try
-				{
-					success = await Redis.Client.ReplaceAsync(this._GetKey(key), value, expiresAt);
-				}
-				catch (ArgumentException)
-				{
-					throw;
-				}
-				catch (Exception ex)
-				{
-					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
-				}
-
-			if (success)
-				await this._UpdateKeyAsync(key);
-
-			return success;
+			return this._ReplaceAsync(key, value, expiresAt.ToTimeSpan());
 		}
 		#endregion
 
@@ -548,7 +440,15 @@ namespace net.vieapps.Components.Caching
 						value = null;
 					}
 				else
-					value = Helper.Deserialize(value as byte[]);
+					try
+					{
+						value = Helper.Deserialize(value as byte[]);
+					}
+					catch (Exception ex)
+					{
+						Helper.WriteLogs(this.Name, $"Error occurred while fetching an object from cache storage [{key}]", ex);
+						value = null;
+					}
 			}
 
 			return value;
@@ -582,7 +482,15 @@ namespace net.vieapps.Components.Caching
 						value = null;
 					}
 				else
-					value = Helper.Deserialize(value as byte[]);
+					try
+					{
+						value = Helper.Deserialize(value as byte[]);
+					}
+					catch (Exception ex)
+					{
+						Helper.WriteLogs(this.Name, $"Error occurred while fetching an object from cache storage [{key}]", ex);
+						value = null;
+					}
 			}
 
 			return value;
@@ -605,7 +513,7 @@ namespace net.vieapps.Components.Caching
 				Helper.WriteLogs(this.Name, "Error occurred while fetch a collection of objects from cache storage", ex);
 			}
 
-			var objects = items.ToDictionary(kvp => kvp.Key.Remove(0, this.Name.Length + 1), kvp => kvp.Value);
+			var objects = items?.ToDictionary(kvp => kvp.Key.Remove(0, this.Name.Length + 1), kvp => kvp.Value);
 			return objects != null && objects.Count > 0
 				? objects
 				: null;
@@ -613,9 +521,22 @@ namespace net.vieapps.Components.Caching
 
 		IDictionary<string, T> _Get<T>(IEnumerable<string> keys)
 		{
-			var objects = this._Get(keys);
-			return objects != null
-				? objects.ToDictionary(kvp => kvp.Key, kvp => kvp.Value is T ? (T)kvp.Value : default(T))
+			if (keys == null)
+				return null;
+
+			IDictionary<string, T> items = null;
+			try
+			{
+				items = Redis.Client.Get<T>(keys.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => this._GetKey(key)));
+			}
+			catch (Exception ex)
+			{
+				Helper.WriteLogs(this.Name, "Error occurred while fetch a collection of objects from cache storage", ex);
+			}
+
+			var objects = items?.ToDictionary(kvp => kvp.Key.Remove(0, this.Name.Length + 1), kvp => kvp.Value);
+			return objects != null && objects.Count > 0
+				? objects
 				: null;
 		}
 
@@ -634,7 +555,7 @@ namespace net.vieapps.Components.Caching
 				Helper.WriteLogs(this.Name, "Error occurred while fetch a collection of objects from cache storage", ex);
 			}
 
-			var objects = items.ToDictionary(kvp => kvp.Key.Remove(0, this.Name.Length + 1), kvp => kvp.Value);
+			var objects = items?.ToDictionary(kvp => kvp.Key.Remove(0, this.Name.Length + 1), kvp => kvp.Value);
 			return objects != null && objects.Count > 0
 				? objects
 				: null;
@@ -642,9 +563,22 @@ namespace net.vieapps.Components.Caching
 
 		async Task<IDictionary<string, T>> _GetAsync<T>(IEnumerable<string> keys)
 		{
-			var objects = await this._GetAsync(keys);
-			return objects != null
-				? objects.ToDictionary(kvp => kvp.Key, kvp => kvp.Value is T ? (T)kvp.Value : default(T))
+			if (keys == null)
+				return null;
+
+			IDictionary<string, T> items = null;
+			try
+			{
+				items = await Redis.Client.GetAsync<T>(keys.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => this._GetKey(key)));
+			}
+			catch (Exception ex)
+			{
+				Helper.WriteLogs(this.Name, "Error occurred while fetch a collection of objects from cache storage", ex);
+			}
+
+			var objects = items?.ToDictionary(kvp => kvp.Key.Remove(0, this.Name.Length + 1), kvp => kvp.Value);
+			return objects != null && objects.Count > 0
+				? objects
 				: null;
 		}
 		#endregion
@@ -657,7 +591,7 @@ namespace net.vieapps.Components.Caching
 				return null;
 
 			var blocks = 0;
-			int offset = 0;
+			var offset = 0;
 			while (offset < info.Item2)
 			{
 				blocks++;
