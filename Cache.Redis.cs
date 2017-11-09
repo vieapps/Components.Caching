@@ -1388,16 +1388,7 @@ namespace net.vieapps.Components.Caching
 		}
 
 		XmlNode _section = null;
-
 		public XmlNode Section { get { return this._section; } }
-
-		public JObject GetJson(XmlNode node)
-		{
-			var settings = new JObject();
-			foreach (XmlAttribute attribute in node.Attributes)
-				settings.Add(new JProperty(attribute.Name, attribute.Value));
-			return settings;
-		}
 	}
 	#endregion
 
