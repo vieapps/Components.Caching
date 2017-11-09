@@ -920,14 +920,22 @@ namespace net.vieapps.Components.Caching
 				await Task.Delay(234);
 				attempt++;
 			}
-
 			await Memcached.Client.StoreAsync(StoreMode.Set, Helper.RegionsKey + "-Registering", "v", TimeSpan.FromSeconds(13));
-			var regions = await Memcached.FetchKeysAsync(Helper.RegionsKey);
-			if (!regions.Contains(name))
+
+			try
 			{
-				regions.Add(name);
-				await Memcached.SetKeysAsync(Helper.RegionsKey, regions);
+				var regions = await Memcached.FetchKeysAsync(Helper.RegionsKey);
+				if (!regions.Contains(name))
+				{
+					regions.Add(name);
+					await Memcached.SetKeysAsync(Helper.RegionsKey, regions);
+				}
 			}
+			catch (Exception ex)
+			{
+				Helper.WriteLogs(name, $"Error occurred while registering a region: {ex.Message}", ex);
+			}
+
 			await Memcached.Client.RemoveAsync(Helper.RegionsKey + "-Registering");
 		}
 		#endregion

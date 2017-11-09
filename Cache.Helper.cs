@@ -285,7 +285,7 @@ namespace net.vieapps.Components.Caching
 
 		public static T Deserialize<T>(byte[] data)
 		{
-			var value = data != null && data.Length > 8 ? Helper.Deserialize(data) : default(T);
+			var value = data != null && data.Length > 8 ? Helper.Deserialize(data) : null;
 			return value != null && value is T ? (T)value : default(T);
 		}
 		#endregion
