@@ -146,21 +146,19 @@ namespace net.vieapps.Components.Caching
 		/// Adds an item (as fragments) into cache with a specified key (if the key is already existed, then old cached item will be overriden)
 		/// </summary>
 		/// <param name="key">The string that presents key of item</param>
-		/// <param name="type">The object that presents type of object that serialized as all fragments</param>
 		/// <param name="fragments">The collection that contains all fragments (object that serialized as binary - array bytes)</param>
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
-		bool SetFragments(string key, Type type, List<byte[]> fragments, int expirationTime = 0);
+		bool SetFragments(string key, List<byte[]> fragments, int expirationTime = 0);
 
 		/// <summary>
 		/// Adds an item (as fragments) into cache with a specified key (if the key is already existed, then old cached item will be overriden)
 		/// </summary>
 		/// <param name="key">The string that presents key of item</param>
-		/// <param name="type">The object that presents type of object that serialized as all fragments</param>
 		/// <param name="fragments">The collection that contains all fragments (object that serialized as binary - array bytes)</param>
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
-		Task<bool> SetFragmentsAsync(string key, Type type, List<byte[]> fragments, int expirationTime = 0);
+		Task<bool> SetFragmentsAsync(string key, List<byte[]> fragments, int expirationTime = 0);
 
 		/// <summary>
 		/// Serializes object into array of bytes, splits into one or more fragments and updates into cache with a specified key (if the key is already existed, then old cached item will be overriden)
@@ -366,15 +364,15 @@ namespace net.vieapps.Components.Caching
 		/// Gets fragment information that associates with the key (only available when working with distributed cache)
 		/// </summary>
 		/// <param name="key">The string that presents key of fragment information</param>
-		/// <returns>The <see cref="Fragment">Fragment</see> object that presents information of all fragmented items in the cache storage</returns>
-		Fragment GetFragment(string key);
+		/// <returns>The information of fragments, first element is total number of fragments, second element is total length of data</returns>
+		Tuple<int, uint> GetFragments(string key);
 
 		/// <summary>
 		/// Gets fragment information that associates with the key (only available when working with distributed cache)
 		/// </summary>
 		/// <param name="key">The string that presents key of fragment information</param>
-		/// <returns>The <see cref="Fragment">Fragment</see> object that presents information of all fragmented items in the cache storage</returns>
-		Task<Fragment> GetFragmentAsync(string key);
+		/// <returns>The information of fragments, first element is total number of fragments, second element is total length of data</returns>
+		Task<Tuple<int, uint>> GetFragmentsAsync(string key);
 
 		/// <summary>
 		/// Gets cached of fragmented items that associates with the key and indexes (only available when working with distributed cache)
@@ -390,7 +388,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="key">The string that presents key of all fragmented items</param>
 		/// <param name="indexes">The collection that presents indexes of all fragmented items need to get</param>
 		/// <returns>The collection of array of bytes that presents serialized information of fragmented items</returns>
-		List<byte[]> GetAsFragments(string key, params int[] indexes);
+		Task<List<byte[]>> GetAsFragmentsAsync(string key, List<int> indexes);
 
 		/// <summary>
 		/// Gets cached of fragmented items that associates with the key and indexes (only available when working with distributed cache)
@@ -398,7 +396,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="key">The string that presents key of all fragmented items</param>
 		/// <param name="indexes">The collection that presents indexes of all fragmented items need to get</param>
 		/// <returns>The collection of array of bytes that presents serialized information of fragmented items</returns>
-		Task<List<byte[]>> GetAsFragmentsAsync(string key, List<int> indexes);
+		List<byte[]> GetAsFragments(string key, params int[] indexes);
 
 		/// <summary>
 		/// Gets cached of fragmented items that associates with the key and indexes (only available when working with distributed cache)
@@ -449,22 +447,10 @@ namespace net.vieapps.Components.Caching
 		void RemoveFragments(string key);
 
 		/// <summary>
-		/// Removes all fragmented items from cache storage
-		/// </summary>
-		/// <param name="fragment">The <see cref="Fragment">Fragment</see> object that presents information of all fragmented items in the cache storage need to be removed</param>
-		void RemoveFragments(Fragment fragment);
-
-		/// <summary>
 		/// Removes a cached item (with first 100 fragments) from cache storage
 		/// </summary>
 		/// <param name="key">The string that presents key of fragmented items need to be removed</param>
 		Task RemoveFragmentsAsync(string key);
-
-		/// <summary>
-		/// Removes all fragmented items from cache storage
-		/// </summary>
-		/// <param name="fragment">The <see cref="Fragment">Fragment</see> object that presents information of all fragmented items in the cache storage need to be removed</param>
-		Task RemoveFragmentsAsync(Fragment fragment);
 		#endregion
 
 		#region Exists

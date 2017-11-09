@@ -239,12 +239,12 @@ namespace net.vieapps.Components.Caching
 		#endregion
 
 		#region Set (Fragment)
-		bool _SetFragments(string key, Type type, List<byte[]> fragments, int expirationTime = 0)
+		bool _SetFragments(string key, List<byte[]> fragments, int expirationTime = 0)
 		{
 			throw new NotSupportedException();
 		}
 
-		Task<bool> _SetFragmentsAsync(string key, Type type, List<byte[]> fragments, int expirationTime = 0)
+		Task<bool> _SetFragmentsAsync(string key, List<byte[]> fragments, int expirationTime = 0)
 		{
 			throw new NotSupportedException();
 		}
@@ -893,26 +893,24 @@ namespace net.vieapps.Components.Caching
 		/// Adds an item (as fragments) into cache with a specified key (if the key is already existed, then old cached item will be overriden)
 		/// </summary>
 		/// <param name="key">The string that presents key of item</param>
-		/// <param name="type">The object that presents type of object that serialized as all fragments</param>
 		/// <param name="fragments">The collection that contains all fragments (object that serialized as binary - array bytes)</param>
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
-		public bool SetFragments(string key, Type type, List<byte[]> fragments, int expirationTime = 0)
+		public bool SetFragments(string key, List<byte[]> fragments, int expirationTime = 0)
 		{
-			return this._SetFragments(key, type, fragments, expirationTime);
+			return this._SetFragments(key, fragments, expirationTime);
 		}
 
 		/// <summary>
 		/// Adds an item (as fragments) into cache with a specified key (if the key is already existed, then old cached item will be overriden)
 		/// </summary>
 		/// <param name="key">The string that presents key of item</param>
-		/// <param name="type">The object that presents type of object that serialized as all fragments</param>
 		/// <param name="fragments">The collection that contains all fragments (object that serialized as binary - array bytes)</param>
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
-		public Task<bool> SetFragmentsAsync(string key, Type type, List<byte[]> fragments, int expirationTime = 0)
+		public Task<bool> SetFragmentsAsync(string key, List<byte[]> fragments, int expirationTime = 0)
 		{
-			return this._SetFragmentsAsync(key, type, fragments, expirationTime);
+			return this._SetFragmentsAsync(key, fragments, expirationTime);
 		}
 
 		/// <summary>
@@ -1191,8 +1189,8 @@ namespace net.vieapps.Components.Caching
 		/// Gets fragment information that associates with the key (only available when working with distributed cache)
 		/// </summary>
 		/// <param name="key">The string that presents key of fragment information</param>
-		/// <returns>The <see cref="Fragment">Fragment</see> object that presents information of all fragmented items in the cache storage</returns>
-		public Fragment GetFragment(string key)
+		/// <returns>The information of fragments, first element is total number of fragments, second element is total length of data</returns>
+		public Tuple<int, uint> GetFragments(string key)
 		{
 			throw new NotSupportedException();
 		}
@@ -1201,8 +1199,8 @@ namespace net.vieapps.Components.Caching
 		/// Gets fragment information that associates with the key (only available when working with distributed cache)
 		/// </summary>
 		/// <param name="key">The string that presents key of fragment information</param>
-		/// <returns>The <see cref="Fragment">Fragment</see> object that presents information of all fragmented items in the cache storage</returns>
-		public Task<Fragment> GetFragmentAsync(string key)
+		/// <returns>The information of fragments, first element is total number of fragments, second element is total length of data</returns>
+		public Task<Tuple<int, uint>> GetFragmentsAsync(string key)
 		{
 			throw new NotSupportedException();
 		}
@@ -1307,30 +1305,12 @@ namespace net.vieapps.Components.Caching
 		}
 
 		/// <summary>
-		/// Removes all fragmented items from cache storage
-		/// </summary>
-		/// <param name="fragment">The <see cref="Fragment">Fragment</see> object that presents information of all fragmented items in the cache storage need to be removed</param>
-		public void RemoveFragments(Fragment fragment)
-		{
-			this._RemoveFragments(fragment);
-		}
-
-		/// <summary>
 		/// Removes a cached item (with first 100 fragments) from cache storage
 		/// </summary>
 		/// <param name="key">The string that presents key of fragmented items need to be removed</param>
 		public Task RemoveFragmentsAsync(string key)
 		{
 			return this._RemoveFragmentsAsync(key);
-		}
-
-		/// <summary>
-		/// Removes all fragmented items from cache storage
-		/// </summary>
-		/// <param name="fragment">The <see cref="Fragment">Fragment</see> object that presents information of all fragmented items in the cache storage need to be removed</param>
-		public Task RemoveFragmentsAsync(Fragment fragment)
-		{
-			return this._RemoveFragmentsAsync(fragment);
 		}
 		#endregion
 
