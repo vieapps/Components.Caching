@@ -869,7 +869,7 @@ namespace net.vieapps.Components.Caching
 
 			var tmp = new byte[4];
 			Buffer.BlockCopy(data, 0, tmp, 0, 4);
-			var fragments = Enumerable.Repeat(new byte[0], BitConverter.ToInt32(tmp, 0) - 1).ToList();
+			var fragments = Enumerable.Repeat(new byte[0], BitConverter.ToInt32(tmp, 0)).ToList();
 			if (fragments.Count > 1)
 			{
 				Func<int, Task> func = async (index) =>
@@ -906,7 +906,7 @@ namespace net.vieapps.Components.Caching
 
 			var tmp = new byte[4];
 			Buffer.BlockCopy(data, 0, tmp, 0, 4);
-			var fragments = Enumerable.Repeat(new byte[0], BitConverter.ToInt32(tmp, 0) - 1).ToList();
+			var fragments = Enumerable.Repeat(new byte[0], BitConverter.ToInt32(tmp, 0)).ToList();
 			if (fragments.Count > 1)
 			{
 				Func<int, Task> func = async (index) =>

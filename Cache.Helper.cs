@@ -104,7 +104,7 @@ namespace net.vieapps.Components.Caching
 			return new Tuple<int, int>(typeFlag, length);
 		}
 
-		public static byte[] Serialize(object value, bool addFlags = true)
+		internal static byte[] Serialize(object value, bool addFlags)
 		{
 			var data = new byte[0];
 			var typeCode = value == null ? TypeCode.DBNull : Type.GetTypeCode(value.GetType());
@@ -196,6 +196,11 @@ namespace net.vieapps.Components.Caching
 				: data;
 		}
 
+		public static byte[] Serialize(object value)
+		{
+			return Helper.Serialize(value, true);
+		}
+
 		internal static object Deserialize(byte[] data, int start, int count)
 		{
 			using (var stream = new MemoryStream(data, start, count))
@@ -277,19 +282,19 @@ namespace net.vieapps.Components.Caching
 					return BitConverter.ToDouble(tmp, 0);
 
 				default:
-					return data.Length < 9
-						? null
-						: Helper.Deserialize(data, 8, dataLength);
+					return data.Length > 8
+						? Helper.Deserialize(data, 8, dataLength)
+						: null;
 			}
 		}
 
 		public static T Deserialize<T>(byte[] data)
 		{
-			var @object = data == null || data.Length < 9
-				? default(T)
-				: Helper.Deserialize(data);
-			return @object != null && @object is T
-				? (T)@object
+			var value = data != null && data.Length > 8
+				? Helper.Deserialize(data)
+				: default(T);
+			return value != null && value is T
+				? (T)value
 				: default(T);
 		}
 		#endregion
