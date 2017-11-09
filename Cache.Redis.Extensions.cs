@@ -150,12 +150,12 @@ namespace net.vieapps.Components.Caching
 			return redis.ReplaceAsync(key, value, expirationTime > 0 ? TimeSpan.FromMinutes(expirationTime) : TimeSpan.Zero);
 		}
 
-		internal static object Get(this IDatabase redis, string key, bool doSerialize)
+		internal static object Get(this IDatabase redis, string key, bool doDeserialize)
 		{
 			var value = !string.IsNullOrWhiteSpace(key)
 				? (byte[])redis.StringGet(key)
 				: null;
-			return value != null && doSerialize
+			return value != null && doDeserialize
 				? Helper.Deserialize(value)
 				: value;
 		}
@@ -165,12 +165,12 @@ namespace net.vieapps.Components.Caching
 			return redis.Get(key, true);
 		}
 
-		internal static async Task<object> GetAsync(this IDatabase redis, string key, bool doSerialize)
+		internal static async Task<object> GetAsync(this IDatabase redis, string key, bool doDeserialize)
 		{
 			var value = !string.IsNullOrWhiteSpace(key)
 				? (byte[])await redis.StringGetAsync(key)
 				: null;
-			return value != null && doSerialize
+			return value != null && doDeserialize
 				? Helper.Deserialize(value)
 				: value;
 		}
