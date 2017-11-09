@@ -324,7 +324,7 @@ namespace net.vieapps.Components.Caching
 		bool _SetFragments(string key, List<byte[]> fragments, int expirationTime = 0, StoreMode mode = StoreMode.Set)
 		{
 			var success = fragments != null && fragments.Count > 0
-				? this._Set(key, new ArraySegment<byte>(Helper.Combine(BitConverter.GetBytes(Helper.FragmentDataFlag), BitConverter.GetBytes((uint)fragments.Sum(f => f.Length)), fragments[0])), expirationTime, false, mode)
+				? this._Set(key, new ArraySegment<byte>(Helper.Combine(BitConverter.GetBytes(Helper.FragmentDataFlag), BitConverter.GetBytes(fragments.Sum(f => f.Length)), fragments[0])), expirationTime, false, mode)
 				: false;
 
 			if (success)
@@ -346,7 +346,7 @@ namespace net.vieapps.Components.Caching
 		async Task<bool> _SetFragmentsAsync(string key, List<byte[]> fragments, int expirationTime = 0, StoreMode mode = StoreMode.Set)
 		{
 			var success = fragments != null && fragments.Count > 0
-				? await this._SetAsync(key, new ArraySegment<byte>(Helper.Combine(BitConverter.GetBytes(Helper.FragmentDataFlag), BitConverter.GetBytes((uint)fragments.Sum(f => f.Length)), fragments[0])), expirationTime, false, mode)
+				? await this._SetAsync(key, new ArraySegment<byte>(Helper.Combine(BitConverter.GetBytes(Helper.FragmentDataFlag), BitConverter.GetBytes(fragments.Sum(f => f.Length)), fragments[0])), expirationTime, false, mode)
 				: false;
 
 			if (success)

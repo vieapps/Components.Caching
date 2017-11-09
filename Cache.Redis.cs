@@ -84,6 +84,29 @@ namespace net.vieapps.Components.Caching
 				: Task.CompletedTask;
 		}
 
+		void _UpdateKeys<T>(IDictionary<string, T> items, string keyPrefix = null)
+		{
+			if (this._storeKeys)
+				Redis.Client.UpdateSetMembers(
+					this._RegionKey,
+					items != null
+						? items.Where(kvp => kvp.Key != null).Select(kvp => this._GetKey((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + kvp.Key)).ToArray()
+						: new string[] { }
+				);
+		}
+
+		Task _UpdateKeysAsync<T>(IDictionary<string, T> items, string keyPrefix = null)
+		{
+			return this._storeKeys
+				? Redis.Client.UpdateSetMembersAsync(
+					this._RegionKey,
+					items != null
+						? items.Where(kvp => kvp.Key != null).Select(kvp => this._GetKey((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + kvp.Key)).ToArray()
+						: new string[] { }
+					)
+				: Task.CompletedTask;
+		}
+
 		void _RemoveKey(string key)
 		{
 			if (this._storeKeys)
@@ -216,8 +239,12 @@ namespace net.vieapps.Components.Caching
 		#region Set (Multiple)
 		void _Set<T>(IDictionary<string, T> items, string keyPrefix = null, int expirationTime = 0)
 		{
-			if (items != null)
-				items.Where(kvp => kvp.Key != null).ToList().ForEach(kvp => this._Set((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + kvp.Key, kvp.Value, expirationTime));
+			Redis.Client.Set(items != null
+					? items.Where(kvp => kvp.Key != null).ToDictionary(kvp => this._GetKey((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + kvp.Key), kvp => kvp.Value)
+					: new Dictionary<string, T>(),
+				TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime)
+			);
+			this._UpdateKeys(items, keyPrefix);
 		}
 
 		void _Set(IDictionary<string, object> items, string keyPrefix = null, int expirationTime = 0)
@@ -227,9 +254,13 @@ namespace net.vieapps.Components.Caching
 
 		Task _SetAsync<T>(IDictionary<string, T> items, string keyPrefix = null, int expirationTime = 0)
 		{
-			return items != null
-				? Task.WhenAll(items.Where(kvp => kvp.Key != null).Select(kvp => this._SetAsync((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + kvp.Key, kvp.Value, expirationTime)))
-				: Task.CompletedTask;
+			return Task.WhenAll(
+				Redis.Client.SetAsync(items != null
+					? items.Where(kvp => kvp.Key != null).ToDictionary(kvp => this._GetKey((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + kvp.Key), kvp => kvp.Value)
+					: new Dictionary<string, T>(),
+				TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime)),
+				this._UpdateKeysAsync(items, keyPrefix)
+			);
 		}
 
 		Task _SetAsync(IDictionary<string, object> items, string keyPrefix = null, int expirationTime = 0)
@@ -241,22 +272,76 @@ namespace net.vieapps.Components.Caching
 		#region Set (Fragment)
 		bool _SetFragments(string key, List<byte[]> fragments, int expirationTime = 0)
 		{
-			throw new NotSupportedException();
+			var validFor = TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime);
+			var success = fragments != null && fragments.Count > 0
+				? Redis.Client.Set(this._GetKey(key), Helper.Combine(BitConverter.GetBytes(Helper.FragmentDataFlag), BitConverter.GetBytes(fragments.Sum(f => f.Length)), fragments[0]), validFor)
+				: false;
+
+			if (success && fragments.Count > 1)
+			{
+				var items = new Dictionary<string, byte[]>();
+				for (var index = 1; index < fragments.Count; index++)
+					items.Add(this._GetKey(this._GetFragmentKey(key, index)), fragments[index]);
+				Redis.Client.Set(items, validFor);
+			}
+
+			return success;
 		}
 
-		Task<bool> _SetFragmentsAsync(string key, List<byte[]> fragments, int expirationTime = 0)
+		async Task<bool> _SetFragmentsAsync(string key, List<byte[]> fragments, int expirationTime = 0)
 		{
-			throw new NotSupportedException();
+			var validFor = TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime);
+			var success = fragments != null && fragments.Count > 0
+				? await Redis.Client.SetAsync(this._GetKey(key), Helper.Combine(BitConverter.GetBytes(Helper.FragmentDataFlag), BitConverter.GetBytes(fragments.Sum(f => f.Length)), fragments[0]), validFor)
+				: false;
+
+			if (success && fragments.Count > 1)
+			{
+				var items = new Dictionary<string, byte[]>();
+				for (var index = 1; index < fragments.Count; index++)
+					items.Add(this._GetKey(this._GetFragmentKey(key, index)), fragments[index]);
+				await Redis.Client.SetAsync(items, validFor);
+			}
+
+			return success;
 		}
 
 		bool _SetAsFragments(string key, object value, int expirationTime = 0, bool setSecondary = false)
 		{
-			return this._Set(key, value, expirationTime);
+			if (value == null)
+				return false;
+
+			var success = this._SetFragments(key, Helper.Split(Helper.Serialize(value, false)), expirationTime);
+			if (success && setSecondary && !(value is byte[]))
+				try
+				{
+					this._Set(key + ":(Secondary-Pure-Object)", value, expirationTime);
+				}
+				catch (Exception ex)
+				{
+					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache (pure object of fragments) [{key}:(Secondary-Pure-Object)]", ex);
+				}
+
+			return success;
 		}
 
-		Task<bool> _SetAsFragmentsAsync(string key, object value, int expirationTime = 0, bool setSecondary = false)
+		async Task<bool> _SetAsFragmentsAsync(string key, object value, int expirationTime = 0, bool setSecondary = false)
 		{
-			return this._SetAsync(key, value, expirationTime);
+			if (value == null)
+				return false;
+
+			var success = await this._SetFragmentsAsync(key, Helper.Split(Helper.Serialize(value, false)), expirationTime);
+			if (success && setSecondary && !(value is byte[]))
+				try
+				{
+					await this._SetAsync(key + ":(Secondary-Pure-Object)", value, expirationTime);
+				}
+				catch (Exception ex)
+				{
+					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache (pure object of fragments) [{key}:(Secondary-Pure-Object)]", ex);
+				}
+
+			return success;
 		}
 		#endregion
 
@@ -473,30 +558,68 @@ namespace net.vieapps.Components.Caching
 		{
 			if (string.IsNullOrWhiteSpace(key))
 				throw new ArgumentNullException(key);
+
+			object value = null;
 			try
 			{
-				return Redis.Client.Get(this._GetKey(key));
+				value = Redis.Client.Get(this._GetKey(key), false);
 			}
 			catch (Exception ex)
 			{
 				Helper.WriteLogs(this.Name, $"Error occurred while fetching an object from cache storage [{key}]", ex);
-				return null;
 			}
+
+			if (value != null && (value as byte[]).Length > 8)
+			{
+				if (autoGetFragments && Helper.GetFlags(value as byte[]).Item1.Equals(Helper.FragmentDataFlag))
+					try
+					{
+						value = this._GetFromFragments(key, value as byte[]);
+					}
+					catch (Exception ex)
+					{
+						Helper.WriteLogs(this.Name, $"Error occurred while fetching an objects' fragments from cache storage [{key}]", ex);
+						value = null;
+					}
+				else
+					value = Helper.Deserialize(value as byte[]);
+			}
+
+			return value;
 		}
 
 		async Task<object> _GetAsync(string key, bool autoGetFragments = true)
 		{
 			if (string.IsNullOrWhiteSpace(key))
 				throw new ArgumentNullException(key);
+
+			object value = null;
 			try
 			{
-				return await Redis.Client.GetAsync(this._GetKey(key));
+				value = await Redis.Client.GetAsync(this._GetKey(key), false);
 			}
 			catch (Exception ex)
 			{
 				Helper.WriteLogs(this.Name, $"Error occurred while fetching an object from cache storage [{key}]", ex);
-				return null;
 			}
+
+			if (value != null && (value as byte[]).Length > 8)
+			{
+				if (autoGetFragments && Helper.GetFlags(value as byte[]).Item1.Equals(Helper.FragmentDataFlag))
+					try
+					{
+						value = await this._GetFromFragmentsAsync(key, value as byte[]);
+					}
+					catch (Exception ex)
+					{
+						Helper.WriteLogs(this.Name, $"Error occurred while fetching an objects' fragments from cache storage [{key}]", ex);
+						value = null;
+					}
+				else
+					value = Helper.Deserialize(value as byte[]);
+			}
+
+			return value;
 		}
 		#endregion
 
@@ -561,14 +684,115 @@ namespace net.vieapps.Components.Caching
 		#endregion
 
 		#region Get (Fragment)
-		List<byte[]> _GetAsFragments(string key, List<int> indexes)
+		Tuple<int, int> _GetFragments(byte[] data)
 		{
-			throw new NotSupportedException();
+			var info = Helper.GetFlags(data);
+			if (info == null)
+				return null;
+
+			var blocks = 0;
+			int offset = 0;
+			while (offset < info.Item2)
+			{
+				blocks++;
+				offset += Helper.FragmentSize;
+			}
+			return new Tuple<int, int>(blocks, info.Item2);
 		}
 
-		Task<List<byte[]>> _GetAsFragmentsAsync(string key, List<int> indexes)
+		Tuple<int, int> _GetFragments(string key)
 		{
-			throw new NotSupportedException();
+			var data = this._Get(key, false) as byte[];
+			return data != null
+				? this._GetFragments(data)
+				: null;
+		}
+
+		async Task<Tuple<int, int>> _GetFragmentsAsync(string key)
+		{
+			var data = await this._GetAsync(key, false) as byte[];
+			return data != null
+				? this._GetFragments(data)
+				: null;
+		}
+
+		List<byte[]> _GetAsFragments(string key, List<int> indexes)
+		{
+			if (string.IsNullOrWhiteSpace(key) || indexes == null || indexes.Count < 1)
+				return new List<byte[]>();
+
+			var fragments = Enumerable.Repeat(new byte[0], indexes.Count).ToList();
+			for (var index = 0; index < indexes.Count; index++)
+				fragments[index] = Redis.Client.Get(this._GetKey(indexes[index] > 0 ? this._GetFragmentKey(key, indexes[index]) : key), false) as byte[];
+			return fragments;
+		}
+
+		async Task<List<byte[]>> _GetAsFragmentsAsync(string key, List<int> indexes)
+		{
+			if (string.IsNullOrWhiteSpace(key) || indexes == null || indexes.Count < 1)
+				return new List<byte[]>();
+
+			var fragments = Enumerable.Repeat(new byte[0], indexes.Count).ToList();
+			Func<int, Task> func = async (index) =>
+			{
+				fragments[index] = await Redis.Client.GetAsync(this._GetKey(indexes[index] > 0 ? this._GetFragmentKey(key, indexes[index]) : key), false) as byte[];
+			};
+			var tasks = new List<Task>();
+			for (var index = 0; index < indexes.Count; index++)
+				tasks.Add(func(index));
+			await Task.WhenAll(tasks);
+
+			return fragments;
+		}
+
+		List<byte[]> _GetAsFragments(string key, params int[] indexes)
+		{
+			return string.IsNullOrWhiteSpace(key) || indexes != null || indexes.Length < 1
+				? null
+				: this._GetAsFragments(key, indexes.ToList());
+		}
+
+		Task<List<byte[]>> _GetAsFragmentsAsync(string key, params int[] indexes)
+		{
+			return string.IsNullOrWhiteSpace(key) || indexes != null || indexes.Length < 1
+				? Task.FromResult<List<byte[]>>(null)
+				: this._GetAsFragmentsAsync(key, indexes.ToList());
+		}
+
+		object _GetFromFragments(string key, byte[] firstBlock)
+		{
+			try
+			{
+				var info = this._GetFragments(firstBlock);
+				var indexes = new List<int>();
+				for (var index = 1; index < info.Item1; index++)
+					indexes.Add(index);
+				var data = Helper.Combine(firstBlock, this._GetAsFragments(key, indexes));
+				return Helper.Deserialize(data, 8, data.Length - 8);
+			}
+			catch (Exception ex)
+			{
+				Helper.WriteLogs(this.Name, $"Error occurred while serializing an object from fragmented data [{key}]", ex);
+				return null;
+			}
+		}
+
+		async Task<object> _GetFromFragmentsAsync(string key, byte[] firstBlock)
+		{
+			try
+			{
+				var info = this._GetFragments(firstBlock);
+				var indexes = new List<int>();
+				for (var index = 1; index < info.Item1; index++)
+					indexes.Add(index);
+				var data = Helper.Combine(firstBlock, await this._GetAsFragmentsAsync(key, indexes));
+				return Helper.Deserialize(data, 8, data.Length - 8);
+			}
+			catch (Exception ex)
+			{
+				Helper.WriteLogs(this.Name, $"Error occurred while serializing an object from fragmented data [{key}]", ex);
+				return null;
+			}
 		}
 		#endregion
 
@@ -630,12 +854,18 @@ namespace net.vieapps.Components.Caching
 		#region Remove (Fragment)
 		void _RemoveFragments(string key, int max = 100)
 		{
-			throw new NotSupportedException();
+			var keys = new List<string>() { key, key + ":(Secondary-Pure-Object)" };
+			for (var index = 1; index < max; index++)
+				keys.Add(this._GetFragmentKey(key, index));
+			this._Remove(keys);
 		}
 
 		Task _RemoveFragmentsAsync(string key, int max = 100)
 		{
-			throw new NotSupportedException();
+			var keys = new List<string>() { key, key + ":(Secondary-Pure-Object)" };
+			for (var index = 1; index < max; index++)
+				keys.Add(this._GetFragmentKey(key, index));
+			return this._RemoveAsync(keys);
 		}
 		#endregion
 
@@ -662,6 +892,11 @@ namespace net.vieapps.Components.Caching
 		string _GetKey(string key)
 		{
 			return this.Name + "@" + key.Replace(" ", "-");
+		}
+
+		string _GetFragmentKey(string key, int index)
+		{
+			return key.Replace(" ", "-") + "$[Fragment<" + index.ToString() + ">]";
 		}
 
 		string _RegionKey
@@ -1172,7 +1407,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns>The information of fragments, first element is total number of fragments, second element is total length of data</returns>
 		public Tuple<int, int> GetFragments(string key)
 		{
-			throw new NotSupportedException();
+			return this._GetFragments(key);
 		}
 
 		/// <summary>
@@ -1182,7 +1417,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns>The information of fragments, first element is total number of fragments, second element is total length of data</returns>
 		public Task<Tuple<int, int>> GetFragmentsAsync(string key)
 		{
-			throw new NotSupportedException();
+			return this._GetFragmentsAsync(key);
 		}
 
 		/// <summary>
@@ -1193,18 +1428,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns>The collection of array of bytes that presents serialized information of fragmented items</returns>
 		public List<byte[]> GetAsFragments(string key, List<int> indexes)
 		{
-			throw new NotSupportedException();
-		}
-
-		/// <summary>
-		/// Gets cached of fragmented items that associates with the key and indexes (only available when working with distributed cache)
-		/// </summary>
-		/// <param name="key">The string that presents key of all fragmented items</param>
-		/// <param name="indexes">The collection that presents indexes of all fragmented items need to get</param>
-		/// <returns>The collection of array of bytes that presents serialized information of fragmented items</returns>
-		public List<byte[]> GetAsFragments(string key, params int[] indexes)
-		{
-			throw new NotSupportedException();
+			return this._GetAsFragments(key, indexes);
 		}
 
 		/// <summary>
@@ -1215,7 +1439,18 @@ namespace net.vieapps.Components.Caching
 		/// <returns>The collection of array of bytes that presents serialized information of fragmented items</returns>
 		public Task<List<byte[]>> GetAsFragmentsAsync(string key, List<int> indexes)
 		{
-			throw new NotSupportedException();
+			return this._GetAsFragmentsAsync(key, indexes);
+		}
+
+		/// <summary>
+		/// Gets cached of fragmented items that associates with the key and indexes (only available when working with distributed cache)
+		/// </summary>
+		/// <param name="key">The string that presents key of all fragmented items</param>
+		/// <param name="indexes">The collection that presents indexes of all fragmented items need to get</param>
+		/// <returns>The collection of array of bytes that presents serialized information of fragmented items</returns>
+		public List<byte[]> GetAsFragments(string key, params int[] indexes)
+		{
+			return this._GetAsFragments(key, indexes);
 		}
 
 		/// <summary>
@@ -1226,7 +1461,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns>The collection of array of bytes that presents serialized information of fragmented items</returns>
 		public Task<List<byte[]>> GetAsFragmentsAsync(string key, params int[] indexes)
 		{
-			throw new NotSupportedException();
+			return this._GetAsFragmentsAsync(key, indexes);
 		}
 		#endregion
 
