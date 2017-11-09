@@ -324,15 +324,20 @@ namespace net.vieapps.Components.Caching
 		bool _SetFragments(string key, List<byte[]> fragments, int expirationTime = 0, StoreMode mode = StoreMode.Set)
 		{
 			var success = fragments != null && fragments.Count > 0
-				? this._Set(this._GetFragmentKey(key, 0) , new ArraySegment<byte>(fragments[0]), expirationTime, false, mode)
+				? this._Set(key, new ArraySegment<byte>(Helper.Combine(BitConverter.GetBytes(Helper.FragmentDataFlag), BitConverter.GetBytes((uint)fragments.Sum(f => f.Length)), fragments[0])), expirationTime, false, mode)
 				: false;
 
-			if (success && fragments.Count > 1)
+			if (success)
 			{
-				var items = new Dictionary<string, object>();
-				for (var index = 1; index < fragments.Count; index++)
-					items.Add(this._GetFragmentKey(key, index), new ArraySegment<byte>(fragments[index]));
-				this._Set(items, null, expirationTime, mode);
+				if (fragments.Count > 1)
+				{
+					var items = new Dictionary<string, object>();
+					for (var index = 1; index < fragments.Count; index++)
+						items.Add(this._GetFragmentKey(key, index), new ArraySegment<byte>(fragments[index]));
+					this._Set(items, null, expirationTime, mode);
+				}
+				else
+					this._UpdateKeys(key, true);
 			}
 
 			return success;
@@ -340,7 +345,24 @@ namespace net.vieapps.Components.Caching
 
 		async Task<bool> _SetFragmentsAsync(string key, List<byte[]> fragments, int expirationTime = 0, StoreMode mode = StoreMode.Set)
 		{
-			return true;
+			var success = fragments != null && fragments.Count > 0
+				? await this._SetAsync(key, new ArraySegment<byte>(Helper.Combine(BitConverter.GetBytes(Helper.FragmentDataFlag), BitConverter.GetBytes((uint)fragments.Sum(f => f.Length)), fragments[0])), expirationTime, false, mode)
+				: false;
+
+			if (success)
+			{
+				if (fragments.Count > 1)
+				{
+					var items = new Dictionary<string, object>();
+					for (var index = 1; index < fragments.Count; index++)
+						items.Add(this._GetFragmentKey(key, index), new ArraySegment<byte>(fragments[index]));
+					await this._SetAsync(items, null, expirationTime, mode);
+				}
+				else
+					this._UpdateKeys(key, true);
+			}
+
+			return success;
 		}
 
 		bool _SetAsFragments(string key, object value, int expirationTime = 0, bool setSecondary = false, StoreMode mode = StoreMode.Set)
@@ -348,20 +370,16 @@ namespace net.vieapps.Components.Caching
 			if (value == null)
 				return false;
 
-			var success = this._SetFragments(key, value.GetType(), Helper.Split(Helper.Serialize(value)), expirationTime, mode);
-			if (success)
-			{
-				if (setSecondary && !(value is byte[]))
-					try
-					{
-						this._Set(key + ":(Secondary-Pure-Object)", value, expirationTime, false, mode);
-					}
-					catch (Exception ex)
-					{
-						Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache (pure object of fragments) [{key}:(Secondary-Pure-Object)]", ex);
-					}
-				this._UpdateKeys(key, true);
-			}
+			var success = this._SetFragments(key, Helper.Split(Helper.Serialize(value, false)), expirationTime, mode);
+			if (success && setSecondary && !(value is byte[]))
+				try
+				{
+					this._Set(key + ":(Secondary-Pure-Object)", value, expirationTime, true, mode);
+				}
+				catch (Exception ex)
+				{
+					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache (pure object of fragments) [{key}:(Secondary-Pure-Object)]", ex);
+				}
 
 			return success;
 		}
@@ -371,31 +389,16 @@ namespace net.vieapps.Components.Caching
 			if (value == null)
 				return false;
 
-			var bytes = value is byte[]
-				? value as byte[]
-				: value is ArraySegment<byte>
-					? ((ArraySegment<byte>)value).Array
-					: null;
-			if (bytes == null)
-				bytes = Helper.Serialize(value);
-			if (bytes == null || bytes.Length < 1)
-				return false;
-
-			var fragments = Helper.Split(bytes);
-			var success = await this._SetFragmentsAsync(key, value.GetType(), fragments, expirationTime, mode);
-			if (success)
-			{
-				if (setSecondary && !(value is byte[]))
-					try
-					{
-						await this._SetAsync(key + ":(Secondary-Pure-Object)", value, expirationTime, false, mode);
-					}
-					catch (Exception ex)
-					{
-						Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache (pure object of fragments) [{key}:(Secondary-Pure-Object)" + "]", ex);
-					}
-				this._UpdateKeys(key, true);
-			}
+			var success = await this._SetFragmentsAsync(key, Helper.Split(Helper.Serialize(value, false)), expirationTime, mode);
+			if (success && setSecondary && !(value is byte[]))
+				try
+				{
+					await this._SetAsync(key + ":(Secondary-Pure-Object)", value, expirationTime, true, mode);
+				}
+				catch (Exception ex)
+				{
+					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache (pure object of fragments) [{key}:(Secondary-Pure-Object)]", ex);
+				}
 
 			return success;
 		}
@@ -417,16 +420,20 @@ namespace net.vieapps.Components.Caching
 				Helper.WriteLogs(this.Name, $"Error occurred while fetching an object from cache storage [{key}]", ex);
 			}
 
-			if (autoGetFragments && value != null && value is Fragment)
-				try
-				{
-					value = this._GetAsFragments((Fragment)value);
-				}
-				catch (Exception ex)
-				{
-					Helper.WriteLogs(this.Name, $"Error occurred while fetching an objects' fragments from cache storage [{key}]", ex);
-					value = null;
-				}
+			if (autoGetFragments && value != null && value is byte[] && (value as byte[]).Length > 8)
+			{
+				var info = Helper.GetFlags(value as byte[]);
+				if (info.Item1.Equals(Helper.FragmentDataFlag))
+					try
+					{
+						value = this._GetFromFragments(key, value as byte[]);
+					}
+					catch (Exception ex)
+					{
+						Helper.WriteLogs(this.Name, $"Error occurred while fetching an objects' fragments from cache storage [{key}]", ex);
+						value = null;
+					}
+			}
 
 			return value;
 		}
@@ -446,16 +453,20 @@ namespace net.vieapps.Components.Caching
 				Helper.WriteLogs(this.Name, $"Error occurred while fetching an object from cache storage [{key}]", ex);
 			}
 
-			if (autoGetFragments && value != null && value is Fragment)
-				try
-				{
-					value = await this._GetAsFragmentsAsync((Fragment)value);
-				}
-				catch (Exception ex)
-				{
-					Helper.WriteLogs(this.Name, $"Error occurred while fetching an objects' fragments from cache storage [{key}]", ex);
-					value = null;
-				}
+			if (autoGetFragments && value != null && value is byte[] && (value as byte[]).Length > 8)
+			{
+				var info = Helper.GetFlags(value as byte[]);
+				if (info.Item1.Equals(Helper.FragmentDataFlag))
+					try
+					{
+						value = await this._GetFromFragmentsAsync(key, value as byte[]);
+					}
+					catch (Exception ex)
+					{
+						Helper.WriteLogs(this.Name, $"Error occurred while fetching an objects' fragments from cache storage [{key}]", ex);
+						value = null;
+					}
+			}
 
 			return value;
 		}
@@ -479,7 +490,7 @@ namespace net.vieapps.Components.Caching
 			}
 
 			var objects = items != null
-				? items.ToDictionary(kvp => kvp.Key.Remove(0, this.Name.Length + 1), kvp => kvp.Value != null && kvp.Value is Fragment ? this._GetAsFragments((Fragment)kvp.Value) : kvp.Value)
+				? items.ToDictionary(kvp => kvp.Key.Remove(0, this.Name.Length + 1), kvp => kvp.Value)
 				: null;
 			return objects != null && objects.Count > 0
 				? objects
@@ -509,12 +520,10 @@ namespace net.vieapps.Components.Caching
 				Helper.WriteLogs(this.Name, "Error occurred while fetch a collection of objects from cache storage", ex);
 			}
 
-			var objects = new Dictionary<string, object>();
-			await Task.WhenAll(items != null
-				? items.Select(async (kvp) => objects[kvp.Key.Remove(0, this.Name.Length + 1)] = kvp.Value != null && kvp.Value is Fragment ? await this._GetAsFragmentsAsync((Fragment)kvp.Value) : kvp.Value)
-				: new List<Task<object>>()
-			);
-			return objects != null && objects.Count >0
+			var objects = items != null
+				? items.ToDictionary(kvp => kvp.Key.Remove(0, this.Name.Length + 1), kvp => kvp.Value)
+				: null;
+			return objects != null && objects.Count > 0
 				? objects
 				: null;
 		}
@@ -529,85 +538,68 @@ namespace net.vieapps.Components.Caching
 		#endregion
 
 		#region Get (Fragment)
+		Tuple<int, uint> _GetFragments(byte[] data)
+		{
+			var info = Helper.GetFlags(data);
+			if (info == null)
+				return null;
+
+			var blocks = 0;
+			int offset = 0;
+			while (offset < info.Item2)
+			{
+				blocks++;
+				offset += Helper.FragmentSize;
+			}
+			return new Tuple<int, uint>(blocks, (uint)info.Item2);
+		}
+
+		Tuple<int, uint> _GetFragments(string key)
+		{
+			var data = this._Get(key, false) as byte[];
+			return data != null
+				? this._GetFragments(data)
+				: null;
+		}
+
+		async Task<Tuple<int, uint>> _GetFragmentsAsync(string key)
+		{
+			var data = await this._GetAsync(key, false) as byte[];
+			return data != null
+				? this._GetFragments(data)
+				: null;
+		}
+
 		List<byte[]> _GetAsFragments(string key, List<int> indexes)
 		{
-			if (string.IsNullOrWhiteSpace(key))
-				return null;
-
-			var fragments = new List<byte[]>();
-			indexes.ForEach(index =>
-			{
-				var bytes = index < 0
-					? null
-					: this._Get(this._GetFragmentKey(key, index), false) as byte[];
-
-				if (bytes != null && bytes.Length > 0)
-					fragments.Add(bytes);
-			});
-			return fragments;
-		}
-
-		object _GetAsFragments(Fragment fragment)
-		{
-			if (object.ReferenceEquals(fragment, null) || string.IsNullOrWhiteSpace(fragment.Key) || string.IsNullOrWhiteSpace(fragment.Type) || fragment.TotalFragments < 1)
-				return null;
-
-			var type = Type.GetType(fragment.Type);
-			if (type == null)
-				return null;
-
-			var fragments = new byte[0];
-			var length = 0;
-			for (var index = 0; index < fragment.TotalFragments; index++)
-			{
-				var bytes = Memcached.Client.Get<byte[]>(this._GetKey(this._GetFragmentKey(fragment.Key, index)));
-
-				if (bytes != null && bytes.Length > 0)
-				{
-					Array.Resize<byte>(ref fragments, length + bytes.Length);
-					Array.Copy(bytes, 0, fragments, length, bytes.Length);
-					length += bytes.Length;
-				}
-			}
-
-			object @object = type.Equals(typeof(byte[])) && fragments.Length > 0
-				? fragments
-				: null;
-			if (@object == null && fragments.Length > 0)
-				try
-				{
-					@object = Helper.Deserialize(fragments);
-				}
-				catch (Exception ex)
-				{
-					Helper.WriteLogs(this.Name, $"Error occurred while trying to get fragmented object (error occured while serializing the object from an array of bytes) [{fragment.Key}]", ex);
-					if (!type.Equals(typeof(byte[])))
-					{
-						@object = this._Get(fragment.Key + ":(Secondary-Pure-Object)", false);
-						if (@object != null && @object is Fragment)
-							@object = null;
-					}
-				}
-
-			return @object;
-		}
-
-		async Task<List<byte[]>> _GetAsFragmentsAsync(string key, List<int> indexes)
-		{
-			if (string.IsNullOrWhiteSpace(key))
-				return null;
+			if (string.IsNullOrWhiteSpace(key) || indexes == null || indexes.Count < 1)
+				return new List<byte[]>();
 
 			var fragments = Enumerable.Repeat(new byte[0], indexes.Count).ToList();
 			Func<int, Task> func = async (index) =>
 			{
-				var bytes = indexes[index] < 0
-					? null
-					: await this._GetAsync(this._GetFragmentKey(key, indexes[index]), false) as byte[];
-
-				if (bytes != null && bytes.Length > 0)
-					fragments[index] = bytes;
+				var fragmentIndex = indexes[index];
+				fragments[index] = fragmentIndex < 0 ? null : await this._GetAsync(fragmentIndex > 0 ? this._GetFragmentKey(key, fragmentIndex) : key, false) as byte[];
 			};
+			var tasks = new List<Task>();
+			for (var index = 0; index < indexes.Count; index++)
+				tasks.Add(func(index));
+			Task.WaitAll(tasks.ToArray(), 13000);
 
+			return fragments;
+		}
+
+		async Task<List<byte[]>> _GetAsFragmentsAsync(string key, List<int> indexes)
+		{
+			if (string.IsNullOrWhiteSpace(key) || indexes == null || indexes.Count < 1)
+				return new List<byte[]>();
+
+			var fragments = Enumerable.Repeat(new byte[0], indexes.Count).ToList();
+			Func<int, Task> func = async (index) =>
+			{
+				var fragmentIndex = indexes[index];
+				fragments[index] = fragmentIndex < 0 ? null : await this._GetAsync(fragmentIndex > 0 ? this._GetFragmentKey(key, fragmentIndex) : key, false) as byte[];
+			};
 			var tasks = new List<Task>();
 			for (var index = 0; index < indexes.Count; index++)
 				tasks.Add(func(index));
@@ -616,55 +608,58 @@ namespace net.vieapps.Components.Caching
 			return fragments;
 		}
 
-		async Task<object> _GetAsFragmentsAsync(Fragment fragment)
+		List<byte[]> _GetAsFragments(string key, params int[] indexes)
 		{
-			if (object.ReferenceEquals(fragment, null) || string.IsNullOrWhiteSpace(fragment.Key) || string.IsNullOrWhiteSpace(fragment.Type) || fragment.TotalFragments < 1)
-				return null;
+			return string.IsNullOrWhiteSpace(key) || indexes != null || indexes.Length < 1
+				? null
+				: this._GetAsFragments(key, indexes.ToList());
+		}
 
-			var type = Type.GetType(fragment.Type);
-			if (type == null)
-				return null;
+		Task<List<byte[]>> _GetAsFragmentsAsync(string key, params int[] indexes)
+		{
+			return string.IsNullOrWhiteSpace(key) || indexes != null || indexes.Length < 1
+				? Task.FromResult<List<byte[]>>(null)
+				: this._GetAsFragmentsAsync(key, indexes.ToList());
+		}
 
-			var fragments = Enumerable.Repeat(new byte[0], fragment.TotalFragments).ToList();
-			Func<int, Task> func = async (index) =>
+		object _GetFromFragments(string key, byte[] firstBlock)
+		{
+			var info = this._GetFragments(firstBlock);
+			var indexes = new List<int>();
+			if (info.Item1 > 1)
+				for (var index = 1; index < info.Item1; index++)
+					indexes.Add(index);
+
+			var data = Helper.Combine(firstBlock, this._GetAsFragments(key, indexes));
+			try
 			{
-				fragments[index] = await Memcached.Client.GetAsync<byte[]>(this._GetKey(this._GetFragmentKey(fragment.Key, index)));
-			};
-			var tasks = new List<Task>();
-			for (var index = 0; index < fragment.TotalFragments; index++)
-				tasks.Add(func(index));
-			await Task.WhenAll(tasks);
+				return Helper.Deserialize(data, 8, data.Length - 8);
+			}
+			catch (Exception ex)
+			{
+				Helper.WriteLogs(this.Name, $"Error occurred while serializing an object from fragmented data [{key}]", ex);
+				return null;
+			}
+		}
 
-			var data = new byte[0];
-			var length = 0;
-			foreach (var bytes in fragments)
-				if (bytes != null && bytes.Length > 0)
-				{
-					Array.Resize<byte>(ref data, length + bytes.Length);
-					Array.Copy(bytes, 0, data, length, bytes.Length);
-					length += bytes.Length;
-				}
+		async Task<object> _GetFromFragmentsAsync(string key, byte[] firstBlock)
+		{
+			var info = this._GetFragments(firstBlock);
+			var indexes = new List<int>();
+			if (info.Item1 > 1)
+				for (var index = 1; index < info.Item1; index++)
+					indexes.Add(index);
 
-			object @object = type.Equals(typeof(byte[])) && data.Length > 0
-				? data
-				: null;
-			if (@object == null && data.Length > 0)
-				try
-				{
-					@object = Helper.Deserialize(data);
-				}
-				catch (Exception ex)
-				{
-					Helper.WriteLogs(this.Name, $"Error occurred while trying to get fragmented object (error occured while serializing the object from an array of bytes) [{fragment.Key}]", ex);
-					if (!type.Equals(typeof(byte[])))
-					{
-						@object = await this._GetAsync(fragment.Key + ":(Secondary-Pure-Object)", false);
-						if (@object != null && @object is Fragment)
-							@object = null;
-					}
-				}
-
-			return @object;
+			var data = Helper.Combine(firstBlock, await this._GetAsFragmentsAsync(key, indexes));
+			try
+			{
+				return Helper.Deserialize(data, 8, data.Length - 8);
+			}
+			catch (Exception ex)
+			{
+				Helper.WriteLogs(this.Name, $"Error occurred while serializing an object from fragmented data [{key}]", ex);
+				return null;
+			}
 		}
 		#endregion
 
@@ -770,30 +765,17 @@ namespace net.vieapps.Components.Caching
 		void _RemoveFragments(string key, int max = 100)
 		{
 			var keys = new List<string>() { key, key + ":(Secondary-Pure-Object)" };
-			for (var index = 0; index < max; index++)
+			for (var index = 1; index < max; index++)
 				keys.Add(this._GetFragmentKey(key, index));
 			this._Remove(keys);
-		}
-
-		void _RemoveFragments(Fragment fragment)
-		{
-			if (!object.ReferenceEquals(fragment, null) && !string.IsNullOrWhiteSpace(fragment.Key) && fragment.TotalFragments > 0)
-				this._RemoveFragments(fragment.Key, fragment.TotalFragments);
 		}
 
 		Task _RemoveFragmentsAsync(string key, int max = 100)
 		{
 			var keys = new List<string>() { key, key + ":(Secondary-Pure-Object)" };
-			for (var index = 0; index < max; index++)
+			for (var index = 1; index < max; index++)
 				keys.Add(this._GetFragmentKey(key, index));
 			return this._RemoveAsync(keys);
-		}
-
-		Task _RemoveFragmentsAsync(Fragment fragment)
-		{
-			return !object.ReferenceEquals(fragment, null) && !string.IsNullOrWhiteSpace(fragment.Key) && fragment.TotalFragments > 0
-				? this._RemoveFragmentsAsync(fragment.Key, fragment.TotalFragments)
-				: Task.CompletedTask;
 		}
 		#endregion
 
@@ -867,51 +849,48 @@ namespace net.vieapps.Components.Caching
 		#region [Static]
 		internal static async Task<bool> SetKeysAsync(string key, HashSet<string> keys)
 		{
-			var fragmentsData = Helper.Split(keys);
-			var fragmentsInfo = new Fragment()
-			{
-				Key = key,
-				Type = keys.GetType().ToString() + "," + keys.GetType().Assembly.FullName,
-				TotalFragments = fragmentsData.Count
-			};
-
-			if (await Memcached.Client.StoreAsync(StoreMode.Set, key, fragmentsInfo))
+			var fragments = Helper.Split(Helper.Serialize(keys, false));
+			var success = await Memcached.Client.StoreAsync(StoreMode.Set, key, new ArraySegment<byte>(Helper.Combine(BitConverter.GetBytes(fragments.Count), fragments[0])));
+			if (success && fragments.Count > 1)
 			{
 				var tasks = new List<Task>();
-				for (int index = 0; index < fragmentsData.Count; index++)
-					tasks.Add(Memcached.Client.StoreAsync(StoreMode.Set, key + ":" + index, fragmentsData[index]));
+				for (var index = 1; index < fragments.Count; index++)
+					tasks.Add(Memcached.Client.StoreAsync(StoreMode.Set, key + ":" + index, new ArraySegment<byte>(fragments[index])));
 				await Task.WhenAll(tasks);
-
-				return true;
 			}
 
-			return false;
+			return success;
 		}
 
 		internal static HashSet<string> FetchKeys(string key)
 		{
-			var info = Memcached.Client.Get<Fragment>(key);
-			if (object.ReferenceEquals(info, null))
+			var data = Memcached.Client.Get<byte[]>(key);
+			if (data == null || data.Length < 4)
 				return new HashSet<string>();
 
-			var fragments = new byte[0];
-			var length = 0;
-			for (var index = 0; index < info.TotalFragments; index++)
+			var tmp = new byte[4];
+			Buffer.BlockCopy(data, 0, tmp, 0, 4);
+			var fragments = Enumerable.Repeat(new byte[0], BitConverter.ToInt32(tmp, 0) - 1).ToList();
+			if (fragments.Count > 1)
 			{
-				var bytes = Memcached.Client.Get<byte[]>(key + ":" + index);
-
-				if (bytes != null && bytes.Length > 0)
+				Func<int, Task> func = async (index) =>
 				{
-					Array.Resize<byte>(ref fragments, length + bytes.Length);
-					Array.Copy(bytes, 0, fragments, length, bytes.Length);
-					length += bytes.Length;
-				}
+					fragments[index] = await Memcached.Client.GetAsync<byte[]>(key + ":" + index);
+				};
+				var tasks = new List<Task>();
+				for (var index = 1; index < fragments.Count; index++)
+					tasks.Add(func(index));
+				Task.WaitAll(tasks.ToArray(), 13000);
 			}
 
+			tmp = new byte[data.Length - 4];
+			Buffer.BlockCopy(data, 4, tmp, 0, data.Length - 4);
+			fragments[0] = tmp;
+			data = Helper.Combine(new byte[0], fragments);
 			try
 			{
-				return fragments.Length > 0
-					? Helper.Deserialize<HashSet<string>>(fragments)
+				return data.Length > 0
+					? Helper.Deserialize(data, 0, data.Length) as HashSet<string>
 					: new HashSet<string>();
 			}
 			catch
@@ -922,34 +901,33 @@ namespace net.vieapps.Components.Caching
 
 		internal static async Task<HashSet<string>> FetchKeysAsync(string key)
 		{
-			var info = await Memcached.Client.GetAsync<Fragment>(key);
-			if (object.ReferenceEquals(info, null))
+			var data = await Memcached.Client.GetAsync<byte[]>(key);
+			if (data == null || data.Length < 4)
 				return new HashSet<string>();
 
-			var fragments = Enumerable.Repeat(new byte[0], info.TotalFragments).ToList();
-			Func<int, Task> func = async (index) =>
+			var tmp = new byte[4];
+			Buffer.BlockCopy(data, 0, tmp, 0, 4);
+			var fragments = Enumerable.Repeat(new byte[0], BitConverter.ToInt32(tmp, 0) - 1).ToList();
+			if (fragments.Count > 1)
 			{
-				fragments[index] = await Memcached.Client.GetAsync<byte[]>(key + ":" + index);
-			};
-			var tasks = new List<Task>();
-			for (var index = 0; index < info.TotalFragments; index++)
-				tasks.Add(func(index));
-			await Task.WhenAll(tasks);
-
-			var data = new byte[0];
-			var length = 0;
-			foreach (var bytes in fragments)
-				if (bytes != null && bytes.Length > 0)
+				Func<int, Task> func = async (index) =>
 				{
-					Array.Resize<byte>(ref data, length + bytes.Length);
-					Array.Copy(bytes, 0, data, length, bytes.Length);
-					length += bytes.Length;
-				}
+					fragments[index] = await Memcached.Client.GetAsync<byte[]>(key + ":" + index);
+				};
+				var tasks = new List<Task>();
+				for (var index = 1; index < fragments.Count; index++)
+					tasks.Add(func(index));
+				await Task.WhenAll(tasks);
+			}
 
+			tmp = new byte[data.Length - 4];
+			Buffer.BlockCopy(data, 4, tmp, 0, data.Length - 4);
+			fragments[0] = tmp;
+			data = Helper.Combine(new byte[0], fragments);
 			try
 			{
 				return data.Length > 0
-					? Helper.Deserialize<HashSet<string>>(data)
+					? Helper.Deserialize(data, 0, data.Length) as HashSet<string>
 					: new HashSet<string>();
 			}
 			catch
@@ -1475,7 +1453,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns>The information of fragments, first element is total number of fragments, second element is total length of data</returns>
 		public Tuple<int, uint> GetFragments(string key)
 		{
-			throw new NotSupportedException();
+			return this._GetFragments(key);
 		}
 
 		/// <summary>
@@ -1485,7 +1463,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns>The information of fragments, first element is total number of fragments, second element is total length of data</returns>
 		public Task<Tuple<int, uint>> GetFragmentsAsync(string key)
 		{
-			throw new NotSupportedException();
+			return this._GetFragmentsAsync(key);
 		}
 
 		/// <summary>
@@ -1496,28 +1474,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns>The collection of array of bytes that presents serialized information of fragmented items</returns>
 		public List<byte[]> GetAsFragments(string key, List<int> indexes)
 		{
-			return string.IsNullOrWhiteSpace(key)
-				? null
-				: this._GetAsFragments(key, indexes);
-		}
-
-		/// <summary>
-		/// Gets cached of fragmented items that associates with the key and indexes (only available when working with distributed cache)
-		/// </summary>
-		/// <param name="key">The string that presents key of all fragmented items</param>
-		/// <param name="indexes">The collection that presents indexes of all fragmented items need to get</param>
-		/// <returns>The collection of array of bytes that presents serialized information of fragmented items</returns>
-		public List<byte[]> GetAsFragments(string key, params int[] indexes)
-		{
-			if (string.IsNullOrWhiteSpace(key))
-				return null;
-
-			var indexesList = new List<int>();
-			if (indexes != null && indexes.Length > 0)
-				foreach (int index in indexes)
-					indexesList.Add(index);
-
-			return this.GetAsFragments(key, indexesList);
+			return this._GetAsFragments(key, indexes);
 		}
 
 		/// <summary>
@@ -1528,9 +1485,18 @@ namespace net.vieapps.Components.Caching
 		/// <returns>The collection of array of bytes that presents serialized information of fragmented items</returns>
 		public Task<List<byte[]>> GetAsFragmentsAsync(string key, List<int> indexes)
 		{
-			return string.IsNullOrWhiteSpace(key)
-				? Task.FromResult<List<byte[]>>(null)
-				: this._GetAsFragmentsAsync(key, indexes);
+			return this._GetAsFragmentsAsync(key, indexes);
+		}
+
+		/// <summary>
+		/// Gets cached of fragmented items that associates with the key and indexes (only available when working with distributed cache)
+		/// </summary>
+		/// <param name="key">The string that presents key of all fragmented items</param>
+		/// <param name="indexes">The collection that presents indexes of all fragmented items need to get</param>
+		/// <returns>The collection of array of bytes that presents serialized information of fragmented items</returns>
+		public List<byte[]> GetAsFragments(string key, params int[] indexes)
+		{
+			return this._GetAsFragments(key, indexes);
 		}
 
 		/// <summary>
@@ -1541,15 +1507,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns>The collection of array of bytes that presents serialized information of fragmented items</returns>
 		public Task<List<byte[]>> GetAsFragmentsAsync(string key, params int[] indexes)
 		{
-			if (string.IsNullOrWhiteSpace(key))
-				return null;
-
-			var indexesList = new List<int>();
-			if (indexes != null && indexes.Length > 0)
-				foreach (int index in indexes)
-					indexesList.Add(index);
-
-			return this.GetAsFragmentsAsync(key, indexesList);
+			return this._GetAsFragmentsAsync(key, indexes);
 		}
 		#endregion
 

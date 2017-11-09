@@ -18,7 +18,8 @@ namespace net.vieapps.Components.Caching
 	{
 
 		#region Data
-		public static readonly uint RawDataFlag = 0xfa52;
+		public static readonly int RawDataFlag = 0xfa52;
+		public static readonly int FragmentDataFlag = 0xfb52;
 		public static readonly DateTime UnixEpoch = new DateTime(1970, 1, 1);
 		public static readonly int ExpirationTime = 30;
 		internal static readonly int FragmentSize = (1024 * 1024) - 512;
@@ -31,6 +32,19 @@ namespace net.vieapps.Components.Caching
 		#endregion
 
 		#region Split & Combine
+		internal static byte[] Combine(byte[] first, IEnumerable<byte[]> arrays)
+		{
+			var combined = new byte[first.Length + arrays.Sum(a => a.Length)];
+			var offset = first.Length;
+			Buffer.BlockCopy(first, 0, combined, 0, offset);
+			foreach (var array in arrays)
+			{
+				Buffer.BlockCopy(array, 0, combined, offset, array.Length);
+				offset += array.Length;
+			}
+			return combined;
+		}
+
 		public static byte[] Combine(params byte[][] arrays)
 		{
 			var combined = new byte[arrays.Sum(a => a.Length)];
@@ -71,11 +85,30 @@ namespace net.vieapps.Components.Caching
 		#endregion
 
 		#region Serialize & Deserialize
-		public static byte[] Serialize(object value)
+		public static Tuple<int, int> GetFlags(byte[] data)
+		{
+			if (data == null || data.Length < 4)
+				return null;
+
+			var tmp = new byte[4];
+			Buffer.BlockCopy(data, 0, tmp, 0, 4);
+			var typeFlag = BitConverter.ToInt32(tmp, 0);
+
+			var length = 0;
+			if (data.Length > 7)
+			{
+				Buffer.BlockCopy(data, 4, tmp, 0, 4);
+				length = BitConverter.ToInt32(tmp, 0);
+			}
+
+			return new Tuple<int, int>(typeFlag, length);
+		}
+
+		public static byte[] Serialize(object value, bool addFlags = true)
 		{
 			var data = new byte[0];
 			var typeCode = value == null ? TypeCode.DBNull : Type.GetTypeCode(value.GetType());
-			var typeFlag = (uint)((int)typeCode | 0x0100);
+			var typeFlag = (int)typeCode | 0x0100;
 			switch (typeCode)
 			{
 				case TypeCode.Empty:
@@ -158,7 +191,17 @@ namespace net.vieapps.Components.Caching
 					break;
 			}
 
-			return Helper.Combine(BitConverter.GetBytes(typeFlag), BitConverter.GetBytes((uint)data.Length), data);
+			return addFlags
+				? Helper.Combine(BitConverter.GetBytes(typeFlag), BitConverter.GetBytes(data.Length), data)
+				: data;
+		}
+
+		internal static object Deserialize(byte[] data, int start, int count)
+		{
+			using (var stream = new MemoryStream(data, start, count))
+			{
+				return (new BinaryFormatter()).Deserialize(stream);
+			}
 		}
 
 		public static object Deserialize(byte[] data)
@@ -166,19 +209,24 @@ namespace net.vieapps.Components.Caching
 			if (data == null || data.Length < 9)
 				return null;
 
-			var tmp = new byte[4];
-			Buffer.BlockCopy(data, 0, tmp, 0, 4);
-			var typeFlag = BitConverter.ToUInt32(tmp, 0);
+			var info = Helper.GetFlags(data);
+			var typeFlag = info.Item1;
+			var dataLength = info.Item2;
+
+			var tmp = new byte[0];
+			if (typeFlag.Equals(Helper.RawDataFlag))
+			{
+				tmp = new byte[info.Item2];
+				Buffer.BlockCopy(data, 8, tmp, 0, dataLength);
+				return tmp;
+			}
 
 			var typeCode = (TypeCode)(typeFlag & 0xff);
 			if (!typeCode.Equals(TypeCode.Empty) && !typeCode.Equals(TypeCode.DBNull) && !typeCode.Equals(TypeCode.Decimal) && !typeCode.Equals(TypeCode.Object))
 			{
-				tmp = new byte[data.Length - 8];
-				Buffer.BlockCopy(data, 8, tmp, 0, data.Length - 8);
+				tmp = new byte[info.Item2];
+				Buffer.BlockCopy(data, 8, tmp, 0, dataLength);
 			}
-
-			if (typeFlag.Equals(Helper.RawDataFlag))
-				return tmp;
 
 			switch (typeCode)
 			{
@@ -229,37 +277,20 @@ namespace net.vieapps.Components.Caching
 					return BitConverter.ToDouble(tmp, 0);
 
 				default:
-					if (data.Length < 9)
-						return null;
-					else
-						using (var stream = new MemoryStream(data, 8, data.Length - 8))
-						{
-							return (new BinaryFormatter()).Deserialize(stream);
-						}
+					return data.Length < 9
+						? null
+						: Helper.Deserialize(data, 8, dataLength);
 			}
 		}
 
 		public static T Deserialize<T>(byte[] data)
 		{
-			if (data == null || data.Length < 9)
-				return default(T);
-
-			var tmp = new byte[4];
-			Buffer.BlockCopy(data, 0, tmp, 0, 4);
-			var typeFlag = BitConverter.ToUInt32(tmp, 0);
-			if (typeFlag.Equals(Helper.RawDataFlag))
-			{
-				tmp = new byte[data.Length - 8];
-				Buffer.BlockCopy(data, 0, tmp, 8, data.Length - 8);
-				return (T)(object)tmp;
-			}
-			else
-			{
-				var @object = Helper.Deserialize(data);
-				return @object != null && @object is T
-					? (T)@object
-					: default(T);
-			}
+			var @object = data == null || data.Length < 9
+				? default(T)
+				: Helper.Deserialize(data);
+			return @object != null && @object is T
+				? (T)@object
+				: default(T);
 		}
 		#endregion
 
@@ -395,13 +426,5 @@ namespace net.vieapps.Components.Caching
 		}
 		#endregion
 
-	}
-
-	[Serializable]
-	public struct Fragment
-	{
-		public string Key;
-		public string Type;
-		public int TotalFragments;
 	}
 }

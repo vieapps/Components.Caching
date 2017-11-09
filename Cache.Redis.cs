@@ -566,17 +566,7 @@ namespace net.vieapps.Components.Caching
 			throw new NotSupportedException();
 		}
 
-		object _GetAsFragments(Fragment fragment)
-		{
-			throw new NotSupportedException();
-		}
-
 		Task<List<byte[]>> _GetAsFragmentsAsync(string key, List<int> indexes)
-		{
-			throw new NotSupportedException();
-		}
-
-		Task<object> _GetAsFragmentsAsync(Fragment fragment)
 		{
 			throw new NotSupportedException();
 		}
@@ -643,17 +633,7 @@ namespace net.vieapps.Components.Caching
 			throw new NotSupportedException();
 		}
 
-		void _RemoveFragments(Fragment fragment)
-		{
-			throw new NotSupportedException();
-		}
-
 		Task _RemoveFragmentsAsync(string key, int max = 100)
-		{
-			throw new NotSupportedException();
-		}
-
-		Task _RemoveFragmentsAsync(Fragment fragment)
 		{
 			throw new NotSupportedException();
 		}
