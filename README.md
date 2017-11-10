@@ -1,6 +1,6 @@
 # VIEApps.Components.Caching
 A .NET Standard 2.0 wrapper library for working with distributed cache
-- Ready with .NET Core 2.0 and .NET Framework 4.7.1 (and higher)
+- Ready with .NET Core 2.0 and .NET Framework 4.6.1 (and higher)
 - Supported: Memcached & Redis
 ## Nuget
 - Package ID: VIEApps.Components.Caching

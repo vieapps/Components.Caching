@@ -8,7 +8,7 @@
 		<AssemblyTitle>VIEApps NGX Caching</AssemblyTitle>
 		<AssemblyVersion>10.1.3.1712</AssemblyVersion>
 		<FileVersion>10.1.3.1712</FileVersion>
-		<InformationalVersion>10.1 (v10.1.nstd-2017.12.01)</InformationalVersion>
+		<InformationalVersion>10.1 (v10.1.nstd-2017)</InformationalVersion>
 		<Product>VIEApps NGX</Product>
 		<Company>VIEApps.net</Company>
 		<GeneratePackageOnBuild>false</GeneratePackageOnBuild>
@@ -44,7 +44,7 @@
 
 	<ItemGroup>
 		<PackageReference Include="StackExchange.Redis" Version="1.2.6" />
-		<PackageReference Include="VIEApps.Enyim.Caching" Version="1.1.2.1711" />
+		<PackageReference Include="VIEApps.Enyim.Caching" Version="1.2.0.1712" />
 	</ItemGroup>
 
 </Project>
