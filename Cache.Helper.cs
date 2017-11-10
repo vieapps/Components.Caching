@@ -168,6 +168,10 @@ namespace net.vieapps.Components.Caching
 					data = BitConverter.GetBytes((double)value);
 					break;
 
+				case TypeCode.Decimal:
+					Decimal.GetBits((decimal)value).ToList().ForEach(i => data = Helper.Combine(data, BitConverter.GetBytes(i)));
+					break;
+
 				default:
 					if (value is byte[] || value is ArraySegment<byte>)
 					{
@@ -183,7 +187,7 @@ namespace net.vieapps.Components.Caching
 								data = stream.GetBuffer();
 							}
 						else
-							throw new ArgumentException($"The type '{value.GetType()}' must have Serializable attribute or implemented the ISerializable interface");
+							throw new ArgumentException($"The type '{value.GetType()}' of '{nameof(value)}' must have Serializable attribute or implemented the ISerializable interface");
 					}
 					break;
 			}
@@ -224,7 +228,7 @@ namespace net.vieapps.Components.Caching
 			}
 
 			var typeCode = (TypeCode)(typeFlag & 0xff);
-			if (!typeCode.Equals(TypeCode.Empty) && !typeCode.Equals(TypeCode.DBNull) && !typeCode.Equals(TypeCode.Decimal) && !typeCode.Equals(TypeCode.Object))
+			if (!typeCode.Equals(TypeCode.Empty) && !typeCode.Equals(TypeCode.DBNull) && !typeCode.Equals(TypeCode.Object))
 			{
 				tmp = new byte[dataLength];
 				Buffer.BlockCopy(data, 8, tmp, 0, dataLength);
@@ -277,6 +281,12 @@ namespace net.vieapps.Components.Caching
 
 				case TypeCode.Double:
 					return BitConverter.ToDouble(tmp, 0);
+
+				case TypeCode.Decimal:
+					var bits = new int[4];
+					for (int index = 0; index <= 15; index += 4)
+						bits[index / 4] = BitConverter.ToInt32(tmp, index);
+					return new decimal(bits);
 
 				default:
 					return data.Length > 8 ? Helper.Deserialize(data, 8, dataLength) : null;

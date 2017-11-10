@@ -27,8 +27,15 @@ namespace net.vieapps.Components.Caching
 		/// Create new an instance of  distributed cache with isolated region
 		/// </summary>
 		/// <param name="name">The string that presents name of isolated region</param>
+		/// <param name="provider">The string that presents the caching provider ('memcached' or 'redis') - the default provider is 'memcached')</param>
+		public Cache(string name, string provider) : this(name, 0, false, provider) { }
+
+		/// <summary>
+		/// Create new an instance of  distributed cache with isolated region
+		/// </summary>
+		/// <param name="name">The string that presents name of isolated region</param>
 		/// <param name="expirationTime">Time for caching an item (in minutes)</param>
-		/// <param name="provider">The string that presents the caching provider, default is memcached</param>
+		/// <param name="provider">The string that presents the caching provider ('memcached' or 'redis') - the default provider is 'memcached')</param>
 		public Cache(string name, int expirationTime, string provider) : this(name, expirationTime, false, provider) { }
 
 		/// <summary>
@@ -37,7 +44,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="name">The string that presents name of isolated region</param>
 		/// <param name="expirationTime">Time for caching an item (in minutes)</param>
 		/// <param name="storeKeys">true to active store keys of the region (to clear or using with other purpose further)</param>
-		/// <param name="provider">The string that presents the caching provider (posible value is 'memcached' or 'redis' - the default provider is 'memcached')</param>
+		/// <param name="provider">The string that presents the caching provider ('memcached' or 'redis') - the default provider is 'memcached')</param>
 		public Cache(string name, int expirationTime, bool storeKeys, string provider)
 		{
 			this._cache = !string.IsNullOrWhiteSpace(provider) && provider.Trim().ToLower().Equals("redis")
@@ -510,7 +517,7 @@ namespace net.vieapps.Components.Caching
 
 		#region Get (Fragment)
 		/// <summary>
-		/// Gets fragment information that associates with the key (only available when working with distributed cache)
+		/// Gets fragment information that associates with the key
 		/// </summary>
 		/// <param name="key">The string that presents key of fragment information</param>
 		/// <returns>The information of fragments, first element is total number of fragments, second element is total length of data</returns>
@@ -520,7 +527,7 @@ namespace net.vieapps.Components.Caching
 		}
 
 		/// <summary>
-		/// Gets fragment information that associates with the key (only available when working with distributed cache)
+		/// Gets fragment information that associates with the key
 		/// </summary>
 		/// <param name="key">The string that presents key of fragment information</param>
 		/// <returns>The information of fragments, first element is total number of fragments, second element is total length of data</returns>
@@ -530,7 +537,7 @@ namespace net.vieapps.Components.Caching
 		}
 
 		/// <summary>
-		/// Gets cached of fragmented items that associates with the key and indexes (only available when working with distributed cache)
+		/// Gets cached of fragmented items that associates with the key and indexes
 		/// </summary>
 		/// <param name="key">The string that presents key of all fragmented items</param>
 		/// <param name="indexes">The collection that presents indexes of all fragmented items need to get</param>
@@ -541,7 +548,7 @@ namespace net.vieapps.Components.Caching
 		}
 
 		/// <summary>
-		/// Gets cached of fragmented items that associates with the key and indexes (only available when working with distributed cache)
+		/// Gets cached of fragmented items that associates with the key and indexes
 		/// </summary>
 		/// <param name="key">The string that presents key of all fragmented items</param>
 		/// <param name="indexes">The collection that presents indexes of all fragmented items need to get</param>
@@ -552,7 +559,7 @@ namespace net.vieapps.Components.Caching
 		}
 
 		/// <summary>
-		/// Gets cached of fragmented items that associates with the key and indexes (only available when working with distributed cache)
+		/// Gets cached of fragmented items that associates with the key and indexes
 		/// </summary>
 		/// <param name="key">The string that presents key of all fragmented items</param>
 		/// <param name="indexes">The collection that presents indexes of all fragmented items need to get</param>
@@ -563,7 +570,7 @@ namespace net.vieapps.Components.Caching
 		}
 
 		/// <summary>
-		/// Gets cached of fragmented items that associates with the key and indexes (only available when working with distributed cache)
+		/// Gets cached of fragmented items that associates with the key and indexes
 		/// </summary>
 		/// <param name="key">The string that presents key of all fragmented items</param>
 		/// <param name="indexes">The collection that presents indexes of all fragmented items need to get</param>

@@ -351,21 +351,21 @@ namespace net.vieapps.Components.Caching
 
 		#region Get (Fragment)
 		/// <summary>
-		/// Gets fragment information that associates with the key (only available when working with distributed cache)
+		/// Gets fragment information that associates with the key
 		/// </summary>
 		/// <param name="key">The string that presents key of fragment information</param>
 		/// <returns>The information of fragments, first element is total number of fragments, second element is total length of data</returns>
 		Tuple<int, int> GetFragments(string key);
 
 		/// <summary>
-		/// Gets fragment information that associates with the key (only available when working with distributed cache)
+		/// Gets fragment information that associates with the key
 		/// </summary>
 		/// <param name="key">The string that presents key of fragment information</param>
 		/// <returns>The information of fragments, first element is total number of fragments, second element is total length of data</returns>
 		Task<Tuple<int, int>> GetFragmentsAsync(string key);
 
 		/// <summary>
-		/// Gets cached of fragmented items that associates with the key and indexes (only available when working with distributed cache)
+		/// Gets cached of fragmented items that associates with the key and indexes
 		/// </summary>
 		/// <param name="key">The string that presents key of all fragmented items</param>
 		/// <param name="indexes">The collection that presents indexes of all fragmented items need to get</param>
@@ -373,7 +373,7 @@ namespace net.vieapps.Components.Caching
 		List<byte[]> GetAsFragments(string key, List<int> indexes);
 
 		/// <summary>
-		/// Gets cached of fragmented items that associates with the key and indexes (only available when working with distributed cache)
+		/// Gets cached of fragmented items that associates with the key and indexes
 		/// </summary>
 		/// <param name="key">The string that presents key of all fragmented items</param>
 		/// <param name="indexes">The collection that presents indexes of all fragmented items need to get</param>
@@ -381,7 +381,7 @@ namespace net.vieapps.Components.Caching
 		Task<List<byte[]>> GetAsFragmentsAsync(string key, List<int> indexes);
 
 		/// <summary>
-		/// Gets cached of fragmented items that associates with the key and indexes (only available when working with distributed cache)
+		/// Gets cached of fragmented items that associates with the key and indexes
 		/// </summary>
 		/// <param name="key">The string that presents key of all fragmented items</param>
 		/// <param name="indexes">The collection that presents indexes of all fragmented items need to get</param>
@@ -389,7 +389,7 @@ namespace net.vieapps.Components.Caching
 		List<byte[]> GetAsFragments(string key, params int[] indexes);
 
 		/// <summary>
-		/// Gets cached of fragmented items that associates with the key and indexes (only available when working with distributed cache)
+		/// Gets cached of fragmented items that associates with the key and indexes
 		/// </summary>
 		/// <param name="key">The string that presents key of all fragmented items</param>
 		/// <param name="indexes">The collection that presents indexes of all fragmented items need to get</param>

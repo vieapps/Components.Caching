@@ -454,9 +454,7 @@ namespace net.vieapps.Components.Caching
 				Helper.WriteLogs(this.Name, "Error occurred while fetch a collection of objects from cache storage", ex);
 			}
 
-			var objects = items != null
-				? items.ToDictionary(kvp => kvp.Key.Remove(0, this.Name.Length + 1), kvp => kvp.Value)
-				: null;
+			var objects = items?.ToDictionary(kvp => kvp.Key.Substring(this.Name.Length), kvp => kvp.Value);
 			return objects != null && objects.Count > 0
 				? objects
 				: null;
@@ -464,10 +462,7 @@ namespace net.vieapps.Components.Caching
 
 		IDictionary<string, T> _Get<T>(IEnumerable<string> keys)
 		{
-			var objects = this._Get(keys);
-			return objects != null
-				? objects.ToDictionary(kvp => kvp.Key, kvp => kvp.Value is T ? (T)kvp.Value : default(T))
-				: null;
+			return this._Get(keys)?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value is T ? (T)kvp.Value : default(T));
 		}
 
 		async Task<IDictionary<string, object>> _GetAsync(IEnumerable<string> keys)
@@ -485,9 +480,7 @@ namespace net.vieapps.Components.Caching
 				Helper.WriteLogs(this.Name, "Error occurred while fetch a collection of objects from cache storage", ex);
 			}
 
-			var objects = items != null
-				? items.ToDictionary(kvp => kvp.Key.Remove(0, this.Name.Length + 1), kvp => kvp.Value)
-				: null;
+			var objects = items?.ToDictionary(kvp => kvp.Key.Substring(this.Name.Length), kvp => kvp.Value);
 			return objects != null && objects.Count > 0
 				? objects
 				: null;
@@ -495,10 +488,7 @@ namespace net.vieapps.Components.Caching
 
 		async Task<IDictionary<string, T>> _GetAsync<T>(IEnumerable<string> keys)
 		{
-			var objects = await this._GetAsync(keys);
-			return objects != null
-				? objects.ToDictionary(kvp => kvp.Key, kvp => kvp.Value is T ? (T)kvp.Value : default(T))
-				: null;
+			return (await this._GetAsync(keys))?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value is T ? (T)kvp.Value : default(T));
 		}
 		#endregion
 
@@ -510,7 +500,7 @@ namespace net.vieapps.Components.Caching
 				return null;
 
 			var blocks = 0;
-			int offset = 0;
+			var offset = 0;
 			while (offset < info.Item2)
 			{
 				blocks++;
@@ -592,10 +582,7 @@ namespace net.vieapps.Components.Caching
 			try
 			{
 				var info = this._GetFragments(firstBlock);
-				var indexes = new List<int>();
-				for (var index = 1; index < info.Item1; index++)
-					indexes.Add(index);
-				var data = Helper.Combine(firstBlock, this._GetAsFragments(key, indexes));
+				var data = Helper.Combine(firstBlock, this._GetAsFragments(key, Enumerable.Range(1, info.Item1 - 1).ToList()));
 				return Helper.Deserialize(data, 8, data.Length - 8);
 			}
 			catch (Exception ex)
@@ -610,10 +597,7 @@ namespace net.vieapps.Components.Caching
 			try
 			{
 				var info = this._GetFragments(firstBlock);
-				var indexes = new List<int>();
-				for (var index = 1; index < info.Item1; index++)
-					indexes.Add(index);
-				var data = Helper.Combine(firstBlock, await this._GetAsFragmentsAsync(key, indexes));
+				var data = Helper.Combine(firstBlock, await this._GetAsFragmentsAsync(key, Enumerable.Range(1, info.Item1 - 1).ToList()));
 				return Helper.Deserialize(data, 8, data.Length - 8);
 			}
 			catch (Exception ex)
@@ -725,18 +709,12 @@ namespace net.vieapps.Components.Caching
 		#region Remove (Fragment)
 		void _RemoveFragments(string key, int max = 100)
 		{
-			var keys = new List<string>() { key };
-			for (var index = 1; index < max; index++)
-				keys.Add(this._GetFragmentKey(key, index));
-			this._Remove(keys);
+			this._Remove(this._GetFragmentKeys(key, max));
 		}
 
 		Task _RemoveFragmentsAsync(string key, int max = 100)
 		{
-			var keys = new List<string>() { key };
-			for (var index = 1; index < max; index++)
-				keys.Add(this._GetFragmentKey(key, index));
-			return this._RemoveAsync(keys);
+			return this._RemoveAsync(this._GetFragmentKeys(key, max));
 		}
 		#endregion
 
@@ -796,6 +774,14 @@ namespace net.vieapps.Components.Caching
 		string _GetFragmentKey(string key, int index)
 		{
 			return key.Replace(" ", "-") + "$[Fragment<" + index.ToString() + ">]";
+		}
+
+		List<string> _GetFragmentKeys(string key, int max)
+		{
+			var keys = new List<string>() { key };
+			for (var index = 1; index < max; index++)
+				keys.Add(this._GetFragmentKey(key, index));
+			return keys;
 		}
 
 		string _RegionKey
@@ -1413,7 +1399,7 @@ namespace net.vieapps.Components.Caching
 
 		#region [Public] Get (Fragment)
 		/// <summary>
-		/// Gets fragment information that associates with the key (only available when working with distributed cache)
+		/// Gets fragment information that associates with the key
 		/// </summary>
 		/// <param name="key">The string that presents key of fragment information</param>
 		/// <returns>The information of fragments, first element is total number of fragments, second element is total length of data</returns>
@@ -1423,7 +1409,7 @@ namespace net.vieapps.Components.Caching
 		}
 
 		/// <summary>
-		/// Gets fragment information that associates with the key (only available when working with distributed cache)
+		/// Gets fragment information that associates with the key
 		/// </summary>
 		/// <param name="key">The string that presents key of fragment information</param>
 		/// <returns>The information of fragments, first element is total number of fragments, second element is total length of data</returns>
@@ -1433,7 +1419,7 @@ namespace net.vieapps.Components.Caching
 		}
 
 		/// <summary>
-		/// Gets cached of fragmented items that associates with the key and indexes (only available when working with distributed cache)
+		/// Gets cached of fragmented items that associates with the key and indexes
 		/// </summary>
 		/// <param name="key">The string that presents key of all fragmented items</param>
 		/// <param name="indexes">The collection that presents indexes of all fragmented items need to get</param>
@@ -1444,7 +1430,7 @@ namespace net.vieapps.Components.Caching
 		}
 
 		/// <summary>
-		/// Gets cached of fragmented items that associates with the key and indexes (only available when working with distributed cache)
+		/// Gets cached of fragmented items that associates with the key and indexes
 		/// </summary>
 		/// <param name="key">The string that presents key of all fragmented items</param>
 		/// <param name="indexes">The collection that presents indexes of all fragmented items need to get</param>
@@ -1455,7 +1441,7 @@ namespace net.vieapps.Components.Caching
 		}
 
 		/// <summary>
-		/// Gets cached of fragmented items that associates with the key and indexes (only available when working with distributed cache)
+		/// Gets cached of fragmented items that associates with the key and indexes
 		/// </summary>
 		/// <param name="key">The string that presents key of all fragmented items</param>
 		/// <param name="indexes">The collection that presents indexes of all fragmented items need to get</param>
@@ -1466,7 +1452,7 @@ namespace net.vieapps.Components.Caching
 		}
 
 		/// <summary>
-		/// Gets cached of fragmented items that associates with the key and indexes (only available when working with distributed cache)
+		/// Gets cached of fragmented items that associates with the key and indexes
 		/// </summary>
 		/// <param name="key">The string that presents key of all fragmented items</param>
 		/// <param name="indexes">The collection that presents indexes of all fragmented items need to get</param>
