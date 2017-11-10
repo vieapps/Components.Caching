@@ -284,12 +284,12 @@ namespace net.vieapps.Components.Caching
 
 				case TypeCode.Decimal:
 					var bits = new int[4];
-					for (int index = 0; index <= 15; index += 4)
+					for (var index = 0; index < 16; index += 4)
 						bits[index / 4] = BitConverter.ToInt32(tmp, index);
-					return new decimal(bits);
+					return new Decimal(bits);
 
 				default:
-					return data.Length > 8 ? Helper.Deserialize(data, 8, dataLength) : null;
+					return Helper.Deserialize(data, 8, dataLength);
 			}
 		}
 
@@ -305,7 +305,7 @@ namespace net.vieapps.Components.Caching
 		{
 			var configuration = ConfigurationManager.GetSection("memcached") as Enyim.Caching.Configuration.MemcachedClientConfigurationSectionHandler;
 			if (configuration == null)
-				throw new ConfigurationErrorsException("The section named 'memcached' is not found, please check your configuration file (app.config or web.config");
+				throw new ConfigurationErrorsException("The section named 'memcached' is not found, please check your configuration file (app.config/web.config)");
 			return new Enyim.Caching.MemcachedClient(configuration);
 		}
 
@@ -315,19 +315,19 @@ namespace net.vieapps.Components.Caching
 		{
 			var configuration = ConfigurationManager.GetSection("redis") as RedisClientConfigurationSectionHandler;
 			if (configuration == null)
-				throw new ConfigurationErrorsException("The section named 'redis' is not found, please check your configuration file (app.config or web.config");
+				throw new ConfigurationErrorsException("The section named 'redis' is not found, please check your configuration file (app.config/web.config)");
 
 			var connectionString = "";
-			if (configuration.Section.SelectNodes("servers/add") is XmlNodeList nodes)
-				foreach (XmlNode server in nodes)
+			if (configuration.Section.SelectNodes("servers/add") is XmlNodeList servers)
+				foreach (XmlNode server in servers)
 				{
 					var address = server.Attributes["address"]?.Value ?? "localhost";
 					var port = Convert.ToInt32(server.Attributes["port"]?.Value ?? "6379");
 					connectionString += (connectionString != "" ? "," : "") + address + ":" + port.ToString();
 				}
 
-			if (configuration.Section.SelectSingleNode("options") is XmlNode node)
-				foreach (XmlAttribute option in node.Attributes)
+			if (configuration.Section.SelectSingleNode("options") is XmlNode options)
+				foreach (XmlAttribute option in options.Attributes)
 					if (!string.IsNullOrWhiteSpace(option.Value))
 						connectionString += (connectionString != "" ? "," : "") + option.Name + "=" + option.Value;
 
