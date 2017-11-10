@@ -61,30 +61,30 @@ public class CreativeService
 ```
 ## Listing of all methods
 ```cs
-bool Set(string key, object value, int expirationTime);
+bool Set(string key, object value, int expirationTime = 0);
 bool Set(string key, object value, TimeSpan validFor);
 bool Set(string key, object value, DateTime expiresAt);
-Task<bool> SetAsync(string key, object value, int expirationTime);
+Task<bool> SetAsync(string key, object value, int expirationTime = 0);
 Task<bool> SetAsync(string key, object value, TimeSpan validFor);
 Task<bool> SetAsync(string key, object value, DateTime expiresAt);
-void Set(IDictionary<string, object> items, string keyPrefix = null, int expirationTime);
-void Set<T>(IDictionary<string, T> items, string keyPrefix = null, int expirationTime);
-Task SetAsync(IDictionary<string, object> items, string keyPrefix = null, int expirationTime);
-Task SetAsync<T>(IDictionary<string, T> items, string keyPrefix = null, int expirationTime);
-bool SetFragments(string key, List<byte[]> fragments, int expirationTime);
-Task<bool> SetFragmentsAsync(string key, List<byte[]> fragments, int expirationTime);
-bool SetAsFragments(string key, object value, int expirationTime);
-Task<bool> SetAsFragmentsAsync(string key, object value, int expirationTime);
-bool Add(string key, object value, int expirationTime);
+void Set(IDictionary<string, object> items, string keyPrefix = null, int expirationTime = 0);
+void Set<T>(IDictionary<string, T> items, string keyPrefix = null, int expirationTime = 0);
+Task SetAsync(IDictionary<string, object> items, string keyPrefix = null, int expirationTime = 0);
+Task SetAsync<T>(IDictionary<string, T> items, string keyPrefix = null, int expirationTime = 0);
+bool SetFragments(string key, List<byte[]> fragments, int expirationTime = 0);
+Task<bool> SetFragmentsAsync(string key, List<byte[]> fragments, int expirationTime = 0);
+bool SetAsFragments(string key, object value, int expirationTime = 0);
+Task<bool> SetAsFragmentsAsync(string key, object value, int expirationTime = 0);
+bool Add(string key, object value, int expirationTime = 0);
 bool Add(string key, object value, TimeSpan validFor);
 bool Add(string key, object value, DateTime expiresAt);
-Task<bool> AddAsync(string key, object value, int expirationTime);
+Task<bool> AddAsync(string key, object value, int expirationTime = 0);
 Task<bool> AddAsync(string key, object value, TimeSpan validFor);
 Task<bool> AddAsync(string key, object value, DateTime expiresAt);
-bool Replace(string key, object value, int expirationTime);
+bool Replace(string key, object value, int expirationTime = 0);
 bool Replace(string key, object value, TimeSpan validFor);
 bool Replace(string key, object value, DateTime expiresAt);
-Task<bool> ReplaceAsync(string key, object value, int expirationTime);
+Task<bool> ReplaceAsync(string key, object value, int expirationTime = 0);
 Task<bool> ReplaceAsync(string key, object value, TimeSpan validFor);
 Task<bool> ReplaceAsync(string key, object value, DateTime expiresAt);
 object Get(string key);
@@ -114,5 +114,5 @@ Task ClearAsync();
 HashSet<string> GetKeys();
 Task<HashSet<string>> GetKeysAsync();
 ```
-## Session State Providers
+## Session State Provider
 - See [VIEApps.Components.Caching.AspNet](https://github.com/vieapps/Components.Caching.AspNet)
