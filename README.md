@@ -59,6 +59,40 @@ public class CreativeService
 	}
 }
 ```
+## Constructors
+```cs
+/// <summary>
+/// Create new an instance of  distributed cache with isolated region
+/// </summary>
+/// <param name="name">The string that presents name of isolated region</param>
+/// <param name="expirationTime">Time for caching an item (in minutes)</param>
+/// <param name="storeKeys">true to active store keys of the region (to clear or using with other purpose further)</param>
+public Cache(string name = null, int expirationTime = 0, bool storeKeys = false);
+
+/// <summary>
+/// Create new an instance of  distributed cache with isolated region
+/// </summary>
+/// <param name="name">The string that presents name of isolated region</param>
+/// <param name="provider">The string that presents the caching provider ('memcached' or 'redis') - the default provider is 'memcached')</param>
+public Cache(string name, string provider);
+
+/// <summary>
+/// Create new an instance of  distributed cache with isolated region
+/// </summary>
+/// <param name="name">The string that presents name of isolated region</param>
+/// <param name="expirationTime">Time for caching an item (in minutes)</param>
+/// <param name="provider">The string that presents the caching provider ('memcached' or 'redis') - the default provider is 'memcached')</param>
+public Cache(string name, int expirationTime, string provider);
+
+/// <summary>
+/// Create new an instance of  distributed cache with isolated region
+/// </summary>
+/// <param name="name">The string that presents name of isolated region</param>
+/// <param name="expirationTime">Time for caching an item (in minutes)</param>
+/// <param name="storeKeys">true to active store keys of the region (to clear or using with other purpose further)</param>
+/// <param name="provider">The string that presents the caching provider ('memcached' or 'redis') - the default provider is 'memcached')</param>
+public Cache(string name, int expirationTime, bool storeKeys, string provider);
+```
 ## Listing of all methods
 ```cs
 bool Set(string key, object value, int expirationTime = 0);
