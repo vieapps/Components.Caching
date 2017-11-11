@@ -57,8 +57,6 @@ namespace net.vieapps.Components.Caching
 						foreach (XmlNode server in servers)
 						{
 							var address = server.Attributes["address"]?.Value ?? "localhost";
-							if (IPAddress.TryParse(address, out IPAddress ip))
-								address = ip.ToString();
 							var port = Convert.ToInt32(server.Attributes["port"]?.Value ?? "6379");
 							connectionString += (connectionString != "" ? "," : "") + address + ":" + port.ToString();
 						}
