@@ -27,9 +27,13 @@ namespace net.vieapps.Components.Caching
 		internal static readonly string RegionsKey = "VIEApps-NGX-Regions";
 		internal static readonly string RegionName = "VIEApps-NGX-Cache";
 
-		public static TimeSpan ToTimeSpan(this DateTime value)
+		public static TimeSpan ToTimeSpan(this DateTime datetime)
 		{
-			return value - Helper.UnixEpoch;
+			return datetime == DateTime.MaxValue
+				? TimeSpan.Zero
+				: datetime < DateTime.Now
+					? TimeSpan.FromMinutes(Helper.ExpirationTime)
+					: datetime - DateTime.Now;
 		}
 		#endregion
 
@@ -297,42 +301,6 @@ namespace net.vieapps.Components.Caching
 		{
 			var value = data != null && data.Length > 8 ? Helper.Deserialize(data) : null;
 			return value != null && value is T ? (T)value : default(T);
-		}
-		#endregion
-
-		#region Get client of a cache provider
-		internal static Enyim.Caching.MemcachedClient GetMemcachedClient()
-		{
-			var configuration = ConfigurationManager.GetSection("memcached") as Enyim.Caching.Configuration.MemcachedClientConfigurationSectionHandler;
-			if (configuration == null)
-				throw new ConfigurationErrorsException("The section named 'memcached' is not found, please check your configuration file (app.config/web.config)");
-			return new Enyim.Caching.MemcachedClient(configuration);
-		}
-
-		internal static StackExchange.Redis.ConnectionMultiplexer RedisConnection = null;
-
-		internal static StackExchange.Redis.IDatabase GetRedisClient()
-		{
-			var configuration = ConfigurationManager.GetSection("redis") as RedisClientConfigurationSectionHandler;
-			if (configuration == null)
-				throw new ConfigurationErrorsException("The section named 'redis' is not found, please check your configuration file (app.config/web.config)");
-
-			var connectionString = "";
-			if (configuration.Section.SelectNodes("servers/add") is XmlNodeList servers)
-				foreach (XmlNode server in servers)
-				{
-					var address = server.Attributes["address"]?.Value ?? "localhost";
-					var port = Convert.ToInt32(server.Attributes["port"]?.Value ?? "6379");
-					connectionString += (connectionString != "" ? "," : "") + address + ":" + port.ToString();
-				}
-
-			if (configuration.Section.SelectSingleNode("options") is XmlNode options)
-				foreach (XmlAttribute option in options.Attributes)
-					if (!string.IsNullOrWhiteSpace(option.Value))
-						connectionString += (connectionString != "" ? "," : "") + option.Name + "=" + option.Value;
-
-			Helper.RedisConnection = Helper.RedisConnection ?? StackExchange.Redis.ConnectionMultiplexer.Connect(connectionString);
-			return Helper.RedisConnection.GetDatabase();
 		}
 		#endregion
 

@@ -47,6 +47,15 @@ namespace net.vieapps.Components.Caching
 
 			// register the region
 			Task.Run(async () => await Memcached.RegisterRegionAsync(this.Name).ConfigureAwait(false)).ConfigureAwait(false);
+
+			// get the client
+			if (Memcached._Client == null)
+			{
+				var configuration = ConfigurationManager.GetSection("memcached") as Enyim.Caching.Configuration.MemcachedClientConfigurationSectionHandler;
+				if (configuration == null)
+					throw new ConfigurationErrorsException("The section named 'memcached' is not found, please check your configuration file (app.config/web.config)");
+				Memcached._Client = new MemcachedClient(configuration);
+			}
 		}
 
 		#region Attributes
@@ -59,7 +68,7 @@ namespace net.vieapps.Components.Caching
 		{
 			get
 			{
-				return Memcached._Client ?? (Memcached._Client = Helper.GetMemcachedClient());
+				return Memcached._Client;
 			}
 		}
 

@@ -2,10 +2,13 @@
 using System;
 using System.Linq;
 using System.Xml;
+using System.Net;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Configuration;
 using System.Diagnostics;
+
+using StackExchange.Redis;
 #endregion
 
 namespace net.vieapps.Components.Caching
@@ -39,19 +42,50 @@ namespace net.vieapps.Components.Caching
 
 			// register the region
 			Task.Run(async () => await Redis.RegisterRegionAsync(this.Name).ConfigureAwait(false)).ConfigureAwait(false);
+
+			// get the client
+			if (Redis._Client == null)
+			{
+				if (Redis._Connection == null)
+				{
+					var configuration = ConfigurationManager.GetSection("redis") as RedisClientConfigurationSectionHandler;
+					if (configuration == null)
+						throw new ConfigurationErrorsException("The section named 'redis' is not found, please check your configuration file (app.config/web.config)");
+
+					var connectionString = "";
+					if (configuration.Section.SelectNodes("servers/add") is XmlNodeList servers)
+						foreach (XmlNode server in servers)
+						{
+							var address = server.Attributes["address"]?.Value ?? "localhost";
+							if (IPAddress.TryParse(address, out IPAddress ip))
+								address = ip.ToString();
+							var port = Convert.ToInt32(server.Attributes["port"]?.Value ?? "6379");
+							connectionString += (connectionString != "" ? "," : "") + address + ":" + port.ToString();
+						}
+
+					if (configuration.Section.SelectSingleNode("options") is XmlNode options)
+						foreach (XmlAttribute option in options.Attributes)
+							if (!string.IsNullOrWhiteSpace(option.Value))
+								connectionString += (connectionString != "" ? "," : "") + option.Name + "=" + option.Value;
+
+					Redis._Connection = ConnectionMultiplexer.Connect(connectionString);
+				}
+				Redis._Client = Redis._Connection.GetDatabase();
+			}
 		}
 
 		#region Attributes
-		static StackExchange.Redis.IDatabase _Client = null;
+		static ConnectionMultiplexer _Connection = null;
+		static IDatabase _Client = null;
 
 		/// <summary>
 		/// Gets the instance of redis client
 		/// </summary>
-		public static StackExchange.Redis.IDatabase Client
+		public static IDatabase Client
 		{
 			get
 			{
-				return Redis._Client ?? (Redis._Client = Helper.GetRedisClient());
+				return Redis._Client;
 			}
 		}
 
