@@ -44,27 +44,27 @@ namespace net.vieapps.Components.Caching
 
 		public string NodeLocator { get; set; } = "";
 
-		public CacheConfiguration(IOptions<CacheOptions> optionsAccessor)
+		public CacheConfiguration(IOptions<CacheOptions> options)
 		{
-			if (optionsAccessor == null)
-				throw new ArgumentNullException(nameof(optionsAccessor));
+			if (options == null)
+				throw new ArgumentNullException(nameof(options));
 
-			var options = optionsAccessor.Value;
+			var configuration = options.Value;
 			
-			this.Provider = options.Provider;
-			this.RegionName = options.RegionName;
-			this.ExpirationTime = options.ExpirationTime;
+			this.Provider = configuration.Provider;
+			this.RegionName = configuration.RegionName;
+			this.ExpirationTime = configuration.ExpirationTime;
 
-			this.Servers = options.Servers;
+			this.Servers = configuration.Servers;
 
-			this.Options = options.Options;
+			this.Options = configuration.Options;
 
-			this.Protocol = options.Protocol;
-			this.SocketPool = options.SocketPool;
-			this.Authentication = options.Authentication;
-			this.KeyTransformer = options.KeyTransformer;
-			this.Transcoder = options.Transcoder;
-			this.NodeLocator = options.NodeLocator;
+			this.Protocol = configuration.Protocol;
+			this.SocketPool = configuration.SocketPool;
+			this.Authentication = configuration.Authentication;
+			this.KeyTransformer = configuration.KeyTransformer;
+			this.Transcoder = configuration.Transcoder;
+			this.NodeLocator = configuration.NodeLocator;
 		}
 
 		public CacheConfiguration(CacheConfigurationSectionHandler configuration)
@@ -79,9 +79,9 @@ namespace net.vieapps.Components.Caching
 			if (configuration.Section.SelectNodes("servers/add") is XmlNodeList servers)
 				foreach (XmlNode server in servers)
 				{
-					var address = server.Attributes["address"]?.Value ?? "localhost";
-					var port = Convert.ToInt32(server.Attributes["port"]?.Value ?? "6379");
 					var type = server.Attributes["type"]?.Value ?? "Redis";
+					var address = server.Attributes["address"]?.Value ?? "localhost";
+					var port = Convert.ToInt32(server.Attributes["port"]?.Value ?? (type.ToLower().Equals("redis") ? "6379" : "11211"));
 					this.Servers.Add(new Server()
 					{
 						Address = address,

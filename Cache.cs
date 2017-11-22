@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Configuration;
 
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Caching.Distributed;
@@ -67,8 +68,10 @@ namespace net.vieapps.Components.Caching
 		{
 			if (Cache._Instance == null)
 			{
-				var configuration = svcProvider.GetService<CacheConfiguration>();
 				var loggerFactory = svcProvider.GetService<ILoggerFactory>();
+				var configuration = svcProvider.GetService<CacheConfiguration>();
+				if (configuration == null)
+					throw new ConfigurationErrorsException($"No configuration is found [{typeof(CacheConfiguration)}]");
 
 				Cache._Instance = new Cache(configuration.RegionName, configuration.ExpirationTime, false, configuration.Provider);
 
@@ -80,7 +83,7 @@ namespace net.vieapps.Components.Caching
 
 				var logger = loggerFactory?.CreateLogger<Cache>();
 				if (logger != null && logger.IsEnabled(LogLevel.Debug))
-					logger.LogInformation($"Create new an instance of VIEApps Cache with integrated configuration - {configuration.Provider}: {configuration.RegionName} ({configuration.ExpirationTime} minutes)");
+					logger.LogInformation($"An instance of VIEApps Cache  was created successful with integrated configuration - {configuration.Provider}: {configuration.RegionName} ({configuration.ExpirationTime} minutes)");
 			}
 			return Cache._Instance;
 		}

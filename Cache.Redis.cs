@@ -83,26 +83,25 @@ namespace net.vieapps.Components.Caching
 			var redisSection = ConfigurationManager.GetSection("redis") as RedisClientConfigurationSectionHandler;
 			if (redisSection != null)
 			{
-
-				var redisConfig = new RedisClientConfiguration();
+				var configuration = new RedisClientConfiguration();
 				if (redisSection.Section.SelectNodes("servers/add") is XmlNodeList servers)
 					foreach (XmlNode server in servers)
 					{
 						var address = server.Attributes["address"]?.Value ?? "localhost";
 						var port = Convert.ToInt32(server.Attributes["port"]?.Value ?? "6379");
-						redisConfig.Servers.Add(Enyim.Caching.Configuration.ConfigurationHelper.ResolveToEndPoint(address, port) as IPEndPoint);
+						configuration.Servers.Add(Enyim.Caching.Configuration.ConfigurationHelper.ResolveToEndPoint(address, port) as IPEndPoint);
 					}
 
 				if (redisSection.Section.SelectSingleNode("options") is XmlNode options)
 					foreach (XmlAttribute option in options.Attributes)
 						if (!string.IsNullOrWhiteSpace(option.Value))
-							redisConfig.Options += (redisConfig.Options != "" ? "," : "") + option.Name + "=" + option.Value;
+							configuration.Options += (configuration.Options != "" ? "," : "") + option.Name + "=" + option.Value;
 
 				var logger = loggerFactory?.CreateLogger<Cache>();
 				if (logger != null && logger.IsEnabled(LogLevel.Debug))
 					logger.LogInformation("Create new an instance of redis with stand-alone configuration (app.config/web.config) at the section named 'redis'");
 
-				return Redis.GetClient(redisConfig, loggerFactory);
+				return Redis.GetClient(configuration, loggerFactory);
 			}
 			else if (ConfigurationManager.GetSection("cache") is CacheConfigurationSectionHandler cacheSection)
 			{
@@ -113,7 +112,7 @@ namespace net.vieapps.Components.Caching
 				return Redis.GetClient((new CacheConfiguration(cacheSection)).GetRedisConfiguration(loggerFactory), loggerFactory);
 			}
 			else
-				throw new ConfigurationErrorsException("The configuration file (app.config/web.config) must have a section named 'memcached' or 'cache'!");
+				throw new ConfigurationErrorsException("The configuration file (app.config/web.config) must have a section named 'redis' or 'cache'!");
 		}
 
 		static IDatabase _Client;
