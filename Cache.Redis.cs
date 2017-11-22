@@ -25,7 +25,7 @@ namespace net.vieapps.Components.Caching
 	public sealed class Redis : ICacheProvider
 	{
 		/// <summary>
-		/// Create new an instance of redis
+		/// Create new instance of redis
 		/// </summary>
 		/// <param name="name">The string that presents name of isolated region of the cache</param>
 		/// <param name="expirationTime">The number that presents times (in minutes) for caching an item</param>
@@ -308,7 +308,7 @@ namespace net.vieapps.Components.Caching
 		{
 			var validFor = TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime);
 			var success = fragments != null && fragments.Count > 0
-				? Redis.Client.Set(this._GetKey(key), CacheUtils.Helper.Combine(BitConverter.GetBytes(Helper.FlagOfFirstFragmentBlock), BitConverter.GetBytes(fragments.Sum(f => f.Length)), fragments[0]), validFor)
+				? Redis.Client.Set(this._GetKey(key), Helper.GetFirstBlock(fragments), validFor)
 				: false;
 
 			if (success && fragments.Count > 1)
@@ -326,7 +326,7 @@ namespace net.vieapps.Components.Caching
 		{
 			var validFor = TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime);
 			var success = fragments != null && fragments.Count > 0
-				? await Redis.Client.SetAsync(this._GetKey(key), CacheUtils.Helper.Combine(BitConverter.GetBytes(Helper.FlagOfFirstFragmentBlock), BitConverter.GetBytes(fragments.Sum(f => f.Length)), fragments[0]), validFor)
+				? await Redis.Client.SetAsync(this._GetKey(key), Helper.GetFirstBlock(fragments), validFor)
 				: false;
 
 			if (success && fragments.Count > 1)
@@ -664,27 +664,11 @@ namespace net.vieapps.Components.Caching
 		#endregion
 
 		#region Get (Fragment)
-		Tuple<int, int> _GetFragments(byte[] data)
-		{
-			var info = Helper.GetFlags(data);
-			if (info == null)
-				return null;
-
-			var blocks = 0;
-			var offset = 0;
-			while (offset < info.Item2)
-			{
-				blocks++;
-				offset += Helper.FragmentSize;
-			}
-			return new Tuple<int, int>(blocks, info.Item2);
-		}
-
 		Tuple<int, int> _GetFragments(string key)
 		{
 			var data = this._Get(key, false) as byte[];
 			return data != null
-				? this._GetFragments(data)
+				? Helper.GetFragments(data)
 				: null;
 		}
 
@@ -692,7 +676,7 @@ namespace net.vieapps.Components.Caching
 		{
 			var data = await this._GetAsync(key, false) as byte[];
 			return data != null
-				? this._GetFragments(data)
+				? Helper.GetFragments(data)
 				: null;
 		}
 
@@ -743,7 +727,7 @@ namespace net.vieapps.Components.Caching
 		{
 			try
 			{
-				var info = this._GetFragments(firstBlock);
+				var info = Helper.GetFragments(firstBlock);
 				var data = Helper.Combine(firstBlock, this._GetAsFragments(key, Enumerable.Range(1, info.Item1 - 1).ToList()));
 				return Helper.Deserialize(data, 8, data.Length - 8);
 			}
@@ -758,7 +742,7 @@ namespace net.vieapps.Components.Caching
 		{
 			try
 			{
-				var info = this._GetFragments(firstBlock);
+				var info = Helper.GetFragments(firstBlock);
 				var data = Helper.Combine(firstBlock, await this._GetAsFragmentsAsync(key, Enumerable.Range(1, info.Item1 - 1).ToList()));
 				return Helper.Deserialize(data, 8, data.Length - 8);
 			}

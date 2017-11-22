@@ -23,7 +23,7 @@ namespace net.vieapps.Components.Caching
 	public sealed class Memcached : ICacheProvider
 	{
 		/// <summary>
-		/// Create new an instance of memcached
+		/// Create new instance of memcached
 		/// </summary>
 		/// <param name="name">The string that presents name of isolated region of the cache</param>
 		/// <param name="expirationTime">The number that presents times (in minutes) for caching an item</param>
@@ -363,7 +363,7 @@ namespace net.vieapps.Components.Caching
 		bool _SetFragments(string key, List<byte[]> fragments, int expirationTime = 0, StoreMode mode = StoreMode.Set)
 		{
 			var success = fragments != null && fragments.Count > 0
-				? this._Set(key, new ArraySegment<byte>(CacheUtils.Helper.Combine(BitConverter.GetBytes(Helper.FlagOfFirstFragmentBlock), BitConverter.GetBytes(fragments.Sum(f => f.Length)), fragments[0])), expirationTime, false, mode)
+				? this._Set(key, new ArraySegment<byte>(Helper.GetFirstBlock(fragments)), expirationTime, false, mode)
 				: false;
 
 			if (success)
@@ -385,7 +385,7 @@ namespace net.vieapps.Components.Caching
 		async Task<bool> _SetFragmentsAsync(string key, List<byte[]> fragments, int expirationTime = 0, StoreMode mode = StoreMode.Set)
 		{
 			var success = fragments != null && fragments.Count > 0
-				? await this._SetAsync(key, new ArraySegment<byte>(CacheUtils.Helper.Combine(BitConverter.GetBytes(Helper.FlagOfFirstFragmentBlock), BitConverter.GetBytes(fragments.Sum(f => f.Length)), fragments[0])), expirationTime, false, mode)
+				? await this._SetAsync(key, new ArraySegment<byte>(Helper.GetFirstBlock(fragments)), expirationTime, false, mode)
 				: false;
 
 			if (success)
@@ -535,27 +535,11 @@ namespace net.vieapps.Components.Caching
 		#endregion
 
 		#region Get (Fragment)
-		Tuple<int, int> _GetFragments(byte[] data)
-		{
-			var info = Helper.GetFlags(data);
-			if (info == null)
-				return null;
-
-			var blocks = 0;
-			var offset = 0;
-			while (offset < info.Item2)
-			{
-				blocks++;
-				offset += Helper.FragmentSize;
-			}
-			return new Tuple<int, int>(blocks, info.Item2);
-		}
-
 		Tuple<int, int> _GetFragments(string key)
 		{
 			var data = this._Get(key, false) as byte[];
 			return data != null
-				? this._GetFragments(data)
+				? Helper.GetFragments(data)
 				: null;
 		}
 
@@ -563,7 +547,7 @@ namespace net.vieapps.Components.Caching
 		{
 			var data = await this._GetAsync(key, false) as byte[];
 			return data != null
-				? this._GetFragments(data)
+				? Helper.GetFragments(data)
 				: null;
 		}
 
@@ -623,7 +607,7 @@ namespace net.vieapps.Components.Caching
 		{
 			try
 			{
-				var info = this._GetFragments(firstBlock);
+				var info = Helper.GetFragments(firstBlock);
 				var data = Helper.Combine(firstBlock, this._GetAsFragments(key, Enumerable.Range(1, info.Item1 - 1).ToList()));
 				return Helper.Deserialize(data, 8, data.Length - 8);
 			}
@@ -638,7 +622,7 @@ namespace net.vieapps.Components.Caching
 		{
 			try
 			{
-				var info = this._GetFragments(firstBlock);
+				var info = Helper.GetFragments(firstBlock);
 				var data = Helper.Combine(firstBlock, await this._GetAsFragmentsAsync(key, Enumerable.Range(1, info.Item1 - 1).ToList()));
 				return Helper.Deserialize(data, 8, data.Length - 8);
 			}

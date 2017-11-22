@@ -24,7 +24,7 @@ namespace net.vieapps.Components.Caching
 		ICacheProvider _cache;
 
 		/// <summary>
-		/// Create new an instance of distributed cache with isolated region
+		/// Create new instance of distributed cache with isolated region
 		/// </summary>
 		/// <param name="name">The string that presents name of isolated region</param>
 		/// <param name="expirationTime">Time for caching an item (in minutes)</param>
@@ -32,14 +32,14 @@ namespace net.vieapps.Components.Caching
 		public Cache(string name = null, int expirationTime = 0, bool storeKeys = false) : this(name, expirationTime, storeKeys, null) { }
 
 		/// <summary>
-		/// Create new an instance of distributed cache with isolated region
+		/// Create new instance of distributed cache with isolated region
 		/// </summary>
 		/// <param name="name">The string that presents name of isolated region</param>
 		/// <param name="provider">The string that presents the caching provider ('memcached' or 'redis') - the default provider is 'redis')</param>
 		public Cache(string name, string provider) : this(name, 0, false, provider) { }
 
 		/// <summary>
-		/// Create new an instance of distributed cache with isolated region
+		/// Create new instance of distributed cache with isolated region
 		/// </summary>
 		/// <param name="name">The string that presents name of isolated region</param>
 		/// <param name="expirationTime">Time for caching an item (in minutes)</param>
@@ -47,7 +47,7 @@ namespace net.vieapps.Components.Caching
 		public Cache(string name, int expirationTime, string provider) : this(name, expirationTime, false, provider) { }
 
 		/// <summary>
-		/// Create new an instance of distributed cache with isolated region
+		/// Create new instance of distributed cache with isolated region
 		/// </summary>
 		/// <param name="name">The string that presents name of isolated region</param>
 		/// <param name="expirationTime">Time for caching an item (in minutes)</param>
@@ -720,12 +720,10 @@ namespace net.vieapps.Components.Caching
 		{
 			if (string.IsNullOrWhiteSpace(key))
 				throw new ArgumentNullException(nameof(key));
-
 			var expiresIn = options == null ? 0 : options.GetExpiration();
 			var expiresAt = expiresIn > 0
 				? CacheUtils.Helper.UnixEpoch.AddSeconds(expiresIn).ToLocalTime()
 				: DateTime.MaxValue;
-
 			if (this.Set(key, value, expiresAt) && expiresIn > 0)
 				this.Set(key.GetIDistributedCacheExpirationKey(), expiresIn, expiresAt);
 		}
@@ -734,12 +732,10 @@ namespace net.vieapps.Components.Caching
 		{
 			if (string.IsNullOrWhiteSpace(key))
 				throw new ArgumentNullException(nameof(key));
-
 			var expiresIn = options == null ? 0 : options.GetExpiration();
 			var expiresAt = expiresIn > 0
 				? CacheUtils.Helper.UnixEpoch.AddSeconds(expiresIn).ToLocalTime()
 				: DateTime.MaxValue;
-
 			if (await this.SetAsync(key, value, expiresAt) && expiresIn > 0)
 				await this.SetAsync(key.GetIDistributedCacheExpirationKey(), expiresIn, expiresAt);
 		}
@@ -748,7 +744,6 @@ namespace net.vieapps.Components.Caching
 		{
 			if (string.IsNullOrWhiteSpace(key))
 				throw new ArgumentNullException(nameof(key));
-
 			return this.Get<byte[]>(key);
 		}
 
@@ -756,7 +751,6 @@ namespace net.vieapps.Components.Caching
 		{
 			if (string.IsNullOrWhiteSpace(key))
 				throw new ArgumentNullException(nameof(key));
-
 			return this.GetAsync<byte[]>(key);
 		}
 
@@ -764,7 +758,6 @@ namespace net.vieapps.Components.Caching
 		{
 			if (string.IsNullOrWhiteSpace(key))
 				throw new ArgumentNullException(nameof(key));
-
 			var value = this.Get<byte[]>(key);
 			var expiresIn = value != null ? this.Get<uint?>(key.GetIDistributedCacheExpirationKey()) : null;
 			if (value != null && expiresIn != null && expiresIn.Value > 0)
@@ -773,7 +766,7 @@ namespace net.vieapps.Components.Caching
 					? DateTime.Now.AddSeconds(expiresIn.Value)
 					: DateTime.MaxValue;
 				if (this.Replace(key, value, expiresAt))
-					this.Replace(key.GetIDistributedCacheExpirationKey(), expiresIn, expiresAt);
+					this.Replace(key.GetIDistributedCacheExpirationKey(), expiresIn.Value, expiresAt);
 			}
 		}
 
@@ -781,7 +774,6 @@ namespace net.vieapps.Components.Caching
 		{
 			if (string.IsNullOrWhiteSpace(key))
 				throw new ArgumentNullException(nameof(key));
-
 			var value = await this.GetAsync<byte[]>(key);
 			var expiresIn = value != null ? await this.GetAsync<uint?>(key.GetIDistributedCacheExpirationKey()) : null;
 			if (value != null && expiresIn != null && expiresIn.Value > 0)
@@ -790,7 +782,7 @@ namespace net.vieapps.Components.Caching
 					? DateTime.Now.AddSeconds(expiresIn.Value)
 					: DateTime.MaxValue;
 				if (await this.ReplaceAsync(key, value, expiresAt))
-					await this.ReplaceAsync(key.GetIDistributedCacheExpirationKey(), expiresIn, expiresAt);
+					await this.ReplaceAsync(key.GetIDistributedCacheExpirationKey(), expiresIn.Value, expiresAt);
 			}
 		}
 
@@ -798,7 +790,6 @@ namespace net.vieapps.Components.Caching
 		{
 			if (string.IsNullOrWhiteSpace(key))
 				throw new ArgumentNullException(nameof(key));
-
 			this.Remove(new List<string>() { key, key.GetIDistributedCacheExpirationKey() });
 		}
 
@@ -806,7 +797,6 @@ namespace net.vieapps.Components.Caching
 		{
 			if (string.IsNullOrWhiteSpace(key))
 				throw new ArgumentNullException(nameof(key));
-
 			return this.RemoveAsync(new List<string>() { key, key.GetIDistributedCacheExpirationKey() });
 		}
 		#endregion

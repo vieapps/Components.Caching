@@ -100,6 +100,28 @@ namespace net.vieapps.Components.Caching
 			return new Tuple<int, int>(typeFlag, length);
 		}
 
+		internal static byte[] GetFirstBlock(List<byte[]> fragments)
+		{
+			return CacheUtils.Helper.Combine(BitConverter.GetBytes(Helper.FlagOfFirstFragmentBlock), BitConverter.GetBytes(fragments.Sum(f => f.Length)), fragments[0]);
+		}
+
+		internal static Tuple<int, int> GetFragments(byte[] data)
+		{
+			var info = Helper.GetFlags(data, true);
+			if (info == null)
+				return null;
+
+			var blocks = 0;
+			var offset = 0;
+			var length = info.Item2;
+			while (offset < length)
+			{
+				blocks++;
+				offset += Helper.FragmentSize;
+			}
+			return new Tuple<int, int>(blocks, length);
+		}
+
 		/// <summary>
 		/// Serializes an object into array of bytes
 		/// </summary>
@@ -156,6 +178,8 @@ namespace net.vieapps.Components.Caching
 				{
 					using (var reader = new BsonDataReader(stream))
 					{
+						if (typeFlag.Equals(Helper.FlagOfJsonArray))
+							reader.ReadRootValueAsArray = true;
 						return (new JsonSerializer()).Deserialize(reader);
 					}
 				}
@@ -173,7 +197,7 @@ namespace net.vieapps.Components.Caching
 		#region Working with logs
 		internal static string GetLogPrefix(string label, string seperator = ":")
 		{
-			return label + seperator + "[" + Process.GetCurrentProcess().Id.ToString() + " : " + AppDomain.CurrentDomain.Id.ToString() + " : " + Thread.CurrentThread.ManagedThreadId.ToString() + "]";
+			return $"{label}{seperator}[{Process.GetCurrentProcess().Id} : {AppDomain.CurrentDomain.Id} : {Thread.CurrentThread.ManagedThreadId}]";
 		}
 
 		static string LogsPath = null;
