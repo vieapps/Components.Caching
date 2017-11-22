@@ -9,6 +9,11 @@ using System.Configuration;
 using System.Diagnostics;
 
 using StackExchange.Redis;
+
+using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging;
+
+using CacheUtils;
 #endregion
 
 namespace net.vieapps.Components.Caching
@@ -28,9 +33,7 @@ namespace net.vieapps.Components.Caching
 		public Redis(string name, int expirationTime, bool storeKeys)
 		{
 			// region name
-			this._name = string.IsNullOrWhiteSpace(name)
-				? Helper.RegionName
-				: System.Text.RegularExpressions.Regex.Replace(name, "[^0-9a-zA-Z:-]+", "");
+			this._name = Helper.GetRegionName(name);
 
 			// expiration time
 			this._expirationTime = expirationTime > 0
@@ -42,39 +45,78 @@ namespace net.vieapps.Components.Caching
 
 			// register the region
 			Task.Run(async () => await Redis.RegisterRegionAsync(this.Name).ConfigureAwait(false)).ConfigureAwait(false);
-
-			// get the client
-			if (Redis._Client == null)
-			{
-				if (Redis._Connection == null)
-				{
-					var configuration = ConfigurationManager.GetSection("redis") as RedisClientConfigurationSectionHandler;
-					if (configuration == null)
-						throw new ConfigurationErrorsException("The section named 'redis' is not found, please check your configuration file (app.config/web.config)");
-
-					var connectionString = "";
-					if (configuration.Section.SelectNodes("servers/add") is XmlNodeList servers)
-						foreach (XmlNode server in servers)
-						{
-							var address = server.Attributes["address"]?.Value ?? "localhost";
-							var port = Convert.ToInt32(server.Attributes["port"]?.Value ?? "6379");
-							connectionString += (connectionString != "" ? "," : "") + address + ":" + port.ToString();
-						}
-
-					if (configuration.Section.SelectSingleNode("options") is XmlNode options)
-						foreach (XmlAttribute option in options.Attributes)
-							if (!string.IsNullOrWhiteSpace(option.Value))
-								connectionString += (connectionString != "" ? "," : "") + option.Name + "=" + option.Value;
-
-					Redis._Connection = ConnectionMultiplexer.Connect(connectionString);
-				}
-				Redis._Client = Redis._Connection.GetDatabase();
-			}
 		}
 
-		#region Attributes
+		#region Get client (singleton)
 		static ConnectionMultiplexer _Connection = null;
-		static IDatabase _Client = null;
+
+		internal static IDatabase GetClient(RedisClientConfiguration configuration, ILoggerFactory loggerFactory = null)
+		{
+			if (Redis._Connection == null)
+			{
+				var connectionString = "";
+				foreach (var server in configuration.Servers)
+					connectionString += (connectionString != "" ? "," : "") + server.Address.ToString() + ":" + server.Port.ToString();
+
+				if (!string.IsNullOrWhiteSpace(configuration.Options))
+					connectionString += (connectionString != "" ? "," : "") + configuration.Options;
+
+				Redis._Connection = string.IsNullOrWhiteSpace(connectionString) ? null : ConnectionMultiplexer.Connect(connectionString);
+			}
+			return Redis._Connection?.GetDatabase();
+		}
+
+		internal static IDatabase GetClient(CacheConfiguration configuration, ILoggerFactory loggerFactory = null)
+		{
+			if (configuration == null)
+				throw new ArgumentNullException(nameof(configuration));
+
+			var logger = loggerFactory?.CreateLogger<Cache>();
+			if (logger != null && logger.IsEnabled(LogLevel.Debug))
+				logger.LogInformation("Create new an instance of redis with integrated configuration (appsettings.json)");
+
+			return Redis.GetClient(configuration.GetRedisConfiguration(loggerFactory), loggerFactory);
+		}
+
+		internal static IDatabase GetClient(ILoggerFactory loggerFactory = null)
+		{
+			var redisSection = ConfigurationManager.GetSection("redis") as RedisClientConfigurationSectionHandler;
+			if (redisSection != null)
+			{
+
+				var redisConfig = new RedisClientConfiguration();
+				if (redisSection.Section.SelectNodes("servers/add") is XmlNodeList servers)
+					foreach (XmlNode server in servers)
+					{
+						var address = server.Attributes["address"]?.Value ?? "localhost";
+						var port = Convert.ToInt32(server.Attributes["port"]?.Value ?? "6379");
+						redisConfig.Servers.Add(Enyim.Caching.Configuration.ConfigurationHelper.ResolveToEndPoint(address, port) as IPEndPoint);
+					}
+
+				if (redisSection.Section.SelectSingleNode("options") is XmlNode options)
+					foreach (XmlAttribute option in options.Attributes)
+						if (!string.IsNullOrWhiteSpace(option.Value))
+							redisConfig.Options += (redisConfig.Options != "" ? "," : "") + option.Name + "=" + option.Value;
+
+				var logger = loggerFactory?.CreateLogger<Cache>();
+				if (logger != null && logger.IsEnabled(LogLevel.Debug))
+					logger.LogInformation("Create new an instance of redis with stand-alone configuration (app.config/web.config) at the section named 'redis'");
+
+				return Redis.GetClient(redisConfig, loggerFactory);
+			}
+			else if (ConfigurationManager.GetSection("cache") is CacheConfigurationSectionHandler cacheSection)
+			{
+				var logger = loggerFactory?.CreateLogger<Cache>();
+				if (logger != null && logger.IsEnabled(LogLevel.Debug))
+					logger.LogInformation("Create new an instance of redis with stand-alone configuration (app.config/web.config) at the section named 'cache'");
+
+				return Redis.GetClient((new CacheConfiguration(cacheSection)).GetRedisConfiguration(loggerFactory), loggerFactory);
+			}
+			else
+				throw new ConfigurationErrorsException("The configuration file (app.config/web.config) must have a section named 'memcached' or 'cache'!");
+		}
+
+		static IDatabase _Client;
 
 		/// <summary>
 		/// Gets the instance of redis client
@@ -83,10 +125,16 @@ namespace net.vieapps.Components.Caching
 		{
 			get
 			{
-				return Redis._Client;
+				return Redis._Client ?? (Redis._Client = Redis.GetClient());
+			}
+			internal set
+			{
+				Redis._Client = value;
 			}
 		}
+		#endregion
 
+		#region Attributes
 		string _name;
 		int _expirationTime;
 		bool _storeKeys;
@@ -260,7 +308,7 @@ namespace net.vieapps.Components.Caching
 		{
 			var validFor = TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime);
 			var success = fragments != null && fragments.Count > 0
-				? Redis.Client.Set(this._GetKey(key), Helper.Combine(BitConverter.GetBytes(Helper.FlagOfFirstFragmentBlock), BitConverter.GetBytes(fragments.Sum(f => f.Length)), fragments[0]), validFor)
+				? Redis.Client.Set(this._GetKey(key), CacheUtils.Helper.Combine(BitConverter.GetBytes(Helper.FlagOfFirstFragmentBlock), BitConverter.GetBytes(fragments.Sum(f => f.Length)), fragments[0]), validFor)
 				: false;
 
 			if (success && fragments.Count > 1)
@@ -278,7 +326,7 @@ namespace net.vieapps.Components.Caching
 		{
 			var validFor = TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime);
 			var success = fragments != null && fragments.Count > 0
-				? await Redis.Client.SetAsync(this._GetKey(key), Helper.Combine(BitConverter.GetBytes(Helper.FlagOfFirstFragmentBlock), BitConverter.GetBytes(fragments.Sum(f => f.Length)), fragments[0]), validFor)
+				? await Redis.Client.SetAsync(this._GetKey(key), CacheUtils.Helper.Combine(BitConverter.GetBytes(Helper.FlagOfFirstFragmentBlock), BitConverter.GetBytes(fragments.Sum(f => f.Length)), fragments[0]), validFor)
 				: false;
 
 			if (success && fragments.Count > 1)
@@ -1501,21 +1549,4 @@ namespace net.vieapps.Components.Caching
 		#endregion
 
 	}
-
-	// -----------------------------------------------------
-
-	#region Configuration section handler
-	public class RedisClientConfigurationSectionHandler : IConfigurationSectionHandler
-	{
-		public object Create(object parent, object configContext, XmlNode section)
-		{
-			this._section = section;
-			return this;
-		}
-
-		XmlNode _section = null;
-		public XmlNode Section { get { return this._section; } }
-	}
-	#endregion
-
 }

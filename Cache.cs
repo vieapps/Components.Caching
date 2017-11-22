@@ -1,22 +1,30 @@
 #region Related components
 using System;
-using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 using System.Diagnostics;
+
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.DependencyInjection;
+
+using CacheUtils;
 #endregion
 
 namespace net.vieapps.Components.Caching
 {
 	/// <summary>
-	/// Manipulates distributed cache in isolated regions
+	/// Manipulates distributed cache in isolated regions - support memcached &amp; redis
 	/// </summary>
 	[DebuggerDisplay("{Name} ({ExpirationTime} minutes)")]
-	public sealed class Cache
+	public sealed class Cache : IDistributedCache
 	{
 		ICacheProvider _cache;
 
 		/// <summary>
-		/// Create new an instance of  distributed cache with isolated region
+		/// Create new an instance of distributed cache with isolated region
 		/// </summary>
 		/// <param name="name">The string that presents name of isolated region</param>
 		/// <param name="expirationTime">Time for caching an item (in minutes)</param>
@@ -24,14 +32,14 @@ namespace net.vieapps.Components.Caching
 		public Cache(string name = null, int expirationTime = 0, bool storeKeys = false) : this(name, expirationTime, storeKeys, null) { }
 
 		/// <summary>
-		/// Create new an instance of  distributed cache with isolated region
+		/// Create new an instance of distributed cache with isolated region
 		/// </summary>
 		/// <param name="name">The string that presents name of isolated region</param>
-		/// <param name="provider">The string that presents the caching provider ('memcached' or 'redis') - the default provider is 'memcached')</param>
+		/// <param name="provider">The string that presents the caching provider ('memcached' or 'redis') - the default provider is 'redis')</param>
 		public Cache(string name, string provider) : this(name, 0, false, provider) { }
 
 		/// <summary>
-		/// Create new an instance of  distributed cache with isolated region
+		/// Create new an instance of distributed cache with isolated region
 		/// </summary>
 		/// <param name="name">The string that presents name of isolated region</param>
 		/// <param name="expirationTime">Time for caching an item (in minutes)</param>
@@ -39,18 +47,44 @@ namespace net.vieapps.Components.Caching
 		public Cache(string name, int expirationTime, string provider) : this(name, expirationTime, false, provider) { }
 
 		/// <summary>
-		/// Create new an instance of  distributed cache with isolated region
+		/// Create new an instance of distributed cache with isolated region
 		/// </summary>
 		/// <param name="name">The string that presents name of isolated region</param>
 		/// <param name="expirationTime">Time for caching an item (in minutes)</param>
 		/// <param name="storeKeys">true to active store keys of the region (to clear or using with other purpose further)</param>
-		/// <param name="provider">The string that presents the caching provider ('memcached' or 'redis') - the default provider is 'memcached')</param>
+		/// <param name="provider">The string that presents the caching provider ('memcached' or 'redis') - the default provider is 'redis')</param>
 		public Cache(string name, int expirationTime, bool storeKeys, string provider)
 		{
-			this._cache = !string.IsNullOrWhiteSpace(provider) && provider.Trim().ToLower().Equals("redis")
-				? new Redis(name, expirationTime, storeKeys) as ICacheProvider
-				: new Memcached(name, expirationTime, storeKeys) as ICacheProvider;
+			this._cache = !string.IsNullOrWhiteSpace(provider) && provider.Trim().ToLower().Equals("memcached")
+				? new Memcached(name, expirationTime, storeKeys) as ICacheProvider
+				: new Redis(name, expirationTime, storeKeys) as ICacheProvider;
 		}
+
+		#region Get instance (singleton)
+		static Cache _Instance = null;
+
+		internal static Cache GetInstance(IServiceProvider svcProvider)
+		{
+			if (Cache._Instance == null)
+			{
+				var configuration = svcProvider.GetService<CacheConfiguration>();
+				var loggerFactory = svcProvider.GetService<ILoggerFactory>();
+
+				Cache._Instance = new Cache(configuration.RegionName, configuration.ExpirationTime, false, configuration.Provider);
+
+				if (configuration.Servers.Where(s => s.Type.ToLower().Equals("redis")).Count() > 0)
+					Redis.Client = Redis.GetClient(configuration, loggerFactory);
+
+				if (configuration.Servers.Where(s => s.Type.ToLower().Equals("memcached")).Count() > 0)
+					Memcached.Client = Memcached.GetClient(configuration, loggerFactory);
+
+				var logger = loggerFactory?.CreateLogger<Cache>();
+				if (logger != null && logger.IsEnabled(LogLevel.Debug))
+					logger.LogInformation($"Create new an instance of VIEApps Cache with integrated configuration - {configuration.Provider}: {configuration.RegionName} ({configuration.ExpirationTime} minutes)");
+			}
+			return Cache._Instance;
+		}
+		#endregion
 
 		#region Properties
 		/// <summary>
@@ -678,6 +712,102 @@ namespace net.vieapps.Components.Caching
 		public Task ClearAsync()
 		{
 			return this._cache.ClearAsync();
+		}
+		#endregion
+
+		#region IDistributedCache 
+		void IDistributedCache.Set(string key, byte[] value, DistributedCacheEntryOptions options)
+		{
+			if (string.IsNullOrWhiteSpace(key))
+				throw new ArgumentNullException(nameof(key));
+
+			var expiresIn = options == null ? 0 : options.GetExpiration();
+			var expiresAt = expiresIn > 0
+				? CacheUtils.Helper.UnixEpoch.AddSeconds(expiresIn).ToLocalTime()
+				: DateTime.MaxValue;
+
+			if (this.Set(key, value, expiresAt) && expiresIn > 0)
+				this.Set(key.GetIDistributedCacheExpirationKey(), expiresIn, expiresAt);
+		}
+
+		async Task IDistributedCache.SetAsync(string key, byte[] value, DistributedCacheEntryOptions options, CancellationToken token = default(CancellationToken))
+		{
+			if (string.IsNullOrWhiteSpace(key))
+				throw new ArgumentNullException(nameof(key));
+
+			var expiresIn = options == null ? 0 : options.GetExpiration();
+			var expiresAt = expiresIn > 0
+				? CacheUtils.Helper.UnixEpoch.AddSeconds(expiresIn).ToLocalTime()
+				: DateTime.MaxValue;
+
+			if (await this.SetAsync(key, value, expiresAt) && expiresIn > 0)
+				await this.SetAsync(key.GetIDistributedCacheExpirationKey(), expiresIn, expiresAt);
+		}
+
+		byte[] IDistributedCache.Get(string key)
+		{
+			if (string.IsNullOrWhiteSpace(key))
+				throw new ArgumentNullException(nameof(key));
+
+			return this.Get<byte[]>(key);
+		}
+
+		Task<byte[]> IDistributedCache.GetAsync(string key, CancellationToken token = default(CancellationToken))
+		{
+			if (string.IsNullOrWhiteSpace(key))
+				throw new ArgumentNullException(nameof(key));
+
+			return this.GetAsync<byte[]>(key);
+		}
+
+		void IDistributedCache.Refresh(string key)
+		{
+			if (string.IsNullOrWhiteSpace(key))
+				throw new ArgumentNullException(nameof(key));
+
+			var value = this.Get<byte[]>(key);
+			var expiresIn = value != null ? this.Get<uint?>(key.GetIDistributedCacheExpirationKey()) : null;
+			if (value != null && expiresIn != null && expiresIn.Value > 0)
+			{
+				var expiresAt = expiresIn > 0
+					? DateTime.Now.AddSeconds(expiresIn.Value)
+					: DateTime.MaxValue;
+				if (this.Replace(key, value, expiresAt))
+					this.Replace(key.GetIDistributedCacheExpirationKey(), expiresIn, expiresAt);
+			}
+		}
+
+		async Task IDistributedCache.RefreshAsync(string key, CancellationToken token = default(CancellationToken))
+		{
+			if (string.IsNullOrWhiteSpace(key))
+				throw new ArgumentNullException(nameof(key));
+
+			var value = await this.GetAsync<byte[]>(key);
+			var expiresIn = value != null ? await this.GetAsync<uint?>(key.GetIDistributedCacheExpirationKey()) : null;
+			if (value != null && expiresIn != null && expiresIn.Value > 0)
+			{
+				var expiresAt = expiresIn > 0
+					? DateTime.Now.AddSeconds(expiresIn.Value)
+					: DateTime.MaxValue;
+				if (await this.ReplaceAsync(key, value, expiresAt))
+					await this.ReplaceAsync(key.GetIDistributedCacheExpirationKey(), expiresIn, expiresAt);
+			}
+		}
+
+		void IDistributedCache.Remove(string key)
+		{
+			if (string.IsNullOrWhiteSpace(key))
+				throw new ArgumentNullException(nameof(key));
+
+			this.Remove(new List<string>() { key, key.GetIDistributedCacheExpirationKey() });
+		}
+
+		Task IDistributedCache.RemoveAsync(string key, CancellationToken token = default(CancellationToken))
+		{
+			if (string.IsNullOrWhiteSpace(key))
+				throw new ArgumentNullException(nameof(key));
+
+			return this.RemoveAsync(new List<string>() { key, key.GetIDistributedCacheExpirationKey() });
 		}
 		#endregion
 

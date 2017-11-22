@@ -10,6 +10,16 @@ using System.Threading.Tasks;
 using System.Diagnostics;
 using System.Configuration;
 using System.Runtime.Serialization.Formatters.Binary;
+
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using Newtonsoft.Json.Bson;
+
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.DependencyInjection;
+
+using net.vieapps.Components.Caching;
 #endregion
 
 namespace net.vieapps.Components.Caching
@@ -18,22 +28,19 @@ namespace net.vieapps.Components.Caching
 	{
 
 		#region Data
-		public static readonly int FlagOfRawData = 0xfa52;
-		public static readonly int FlagOfFirstFragmentBlock = 0xfb52;
-		public static readonly DateTime UnixEpoch = new DateTime(1970, 1, 1);
-		public static readonly int ExpirationTime = 30;
-
+		public const int ExpirationTime = 30;
+		public const int FlagOfJsonObject = 0xfb52;
+		public const int FlagOfJsonArray = 0xfc52;
+		public const int FlagOfFirstFragmentBlock = 0xfd52;
 		internal static readonly int FragmentSize = (1024 * 1024) - 128;
 		internal static readonly string RegionsKey = "VIEApps-NGX-Regions";
 		internal static readonly string RegionName = "VIEApps-NGX-Cache";
 
-		public static TimeSpan ToTimeSpan(this DateTime datetime)
+		internal static string GetRegionName(string name)
 		{
-			return datetime == DateTime.MaxValue
-				? TimeSpan.Zero
-				: datetime < DateTime.Now
-					? TimeSpan.FromMinutes(Helper.ExpirationTime)
-					: datetime - DateTime.Now;
+			return string.IsNullOrWhiteSpace(name)
+				? Helper.RegionName
+				: System.Text.RegularExpressions.Regex.Replace(name, "[^0-9a-zA-Z:-]+", "");
 		}
 		#endregion
 
@@ -51,19 +58,7 @@ namespace net.vieapps.Components.Caching
 			return combined;
 		}
 
-		public static byte[] Combine(params byte[][] arrays)
-		{
-			var combined = new byte[arrays.Sum(a => a.Length)];
-			var offset = 0;
-			foreach (var array in arrays)
-			{
-				Buffer.BlockCopy(array, 0, combined, offset, array.Length);
-				offset += array.Length;
-			}
-			return combined;
-		}
-
-		public static List<byte[]> Split(byte[] data, int size = 0)
+		internal static List<byte[]> Split(byte[] data, int size = 0)
 		{
 			var blocks = new List<byte[]>();
 			if (data != null && data.Length > 0)
@@ -86,7 +81,7 @@ namespace net.vieapps.Components.Caching
 		#endregion
 
 		#region Serialize & Deserialize
-		internal static Tuple<int, int> GetFlags(byte[] data)
+		internal static Tuple<int, int> GetFlags(byte[] data, bool getLength = false)
 		{
 			if (data == null || data.Length < 4)
 				return null;
@@ -95,8 +90,8 @@ namespace net.vieapps.Components.Caching
 			Buffer.BlockCopy(data, 0, tmp, 0, 4);
 			var typeFlag = BitConverter.ToInt32(tmp, 0);
 
-			var length = 0;
-			if (data.Length > 7)
+			var length = data.Length - 4;
+			if (getLength && data.Length > 7)
 			{
 				Buffer.BlockCopy(data, 4, tmp, 0, 4);
 				length = BitConverter.ToInt32(tmp, 0);
@@ -105,201 +100,72 @@ namespace net.vieapps.Components.Caching
 			return new Tuple<int, int>(typeFlag, length);
 		}
 
-		internal static byte[] Serialize(object value, bool addFlags)
+		/// <summary>
+		/// Serializes an object into array of bytes
+		/// </summary>
+		/// <param name="value"></param>
+		/// <param name="addFlags"></param>
+		/// <returns></returns>
+		public static byte[] Serialize(object value, bool addFlags = true)
 		{
+			var typeFlag = 0;
 			var data = new byte[0];
-			var typeCode = value == null ? TypeCode.DBNull : Type.GetTypeCode(value.GetType());
-			var typeFlag = (int)typeCode | 0x0100;
-			switch (typeCode)
+
+			if (value != null && value is JToken)
 			{
-				case TypeCode.Empty:
-				case TypeCode.DBNull:
-					break;
-
-				case TypeCode.Boolean:
-					data = BitConverter.GetBytes((bool)value);
-					break;
-
-				case TypeCode.DateTime:
-					data = BitConverter.GetBytes(((DateTime)value).ToBinary());
-					break;
-
-				case TypeCode.Char:
-					data = BitConverter.GetBytes((char)value);
-					break;
-
-				case TypeCode.String:
-					data = Encoding.UTF8.GetBytes((string)value);
-					break;
-
-				case TypeCode.Byte:
-					data = BitConverter.GetBytes((byte)value);
-					break;
-
-				case TypeCode.SByte:
-					data = BitConverter.GetBytes((sbyte)value);
-					break;
-
-				case TypeCode.Int16:
-					data = BitConverter.GetBytes((short)value);
-					break;
-
-				case TypeCode.UInt16:
-					data = BitConverter.GetBytes((ushort)value);
-					break;
-
-				case TypeCode.Int32:
-					data = BitConverter.GetBytes((int)value);
-					break;
-
-				case TypeCode.UInt32:
-					data = BitConverter.GetBytes((uint)value);
-					break;
-
-				case TypeCode.Int64:
-					data = BitConverter.GetBytes((long)value);
-					break;
-
-				case TypeCode.UInt64:
-					data = BitConverter.GetBytes((ulong)value);
-					break;
-
-				case TypeCode.Single:
-					data = BitConverter.GetBytes((float)value);
-					break;
-
-				case TypeCode.Double:
-					data = BitConverter.GetBytes((double)value);
-					break;
-
-				case TypeCode.Decimal:
-					Decimal.GetBits((decimal)value).ToList().ForEach(i => data = Helper.Combine(data, BitConverter.GetBytes(i)));
-					break;
-
-				default:
-					if (value is byte[] || value is ArraySegment<byte>)
+				typeFlag = value is JArray ? Helper.FlagOfJsonArray : Helper.FlagOfJsonObject;
+				using (var stream = new MemoryStream())
+				{
+					using (var writer = new BsonDataWriter(stream))
 					{
-						typeFlag = Helper.FlagOfRawData;
-						data = value is byte[] ? value as byte[] : ((ArraySegment<byte>)value).Array;
+						(new JsonSerializer()).Serialize(writer, value);
+						data = stream.GetBuffer();
 					}
-					else
-					{
-						if (value.GetType().IsSerializable)
-							using (var stream = new MemoryStream())
-							{
-								(new BinaryFormatter()).Serialize(stream, value);
-								data = stream.GetBuffer();
-							}
-						else
-							throw new ArgumentException($"The type '{value.GetType()}' of '{nameof(value)}' must have Serializable attribute or implemented the ISerializable interface");
-					}
-					break;
+				}
+			}
+			else
+			{
+				var info = CacheUtils.Helper.Serialize(value);
+				typeFlag = info.Item1;
+				data = info.Item2;
 			}
 
 			return addFlags
-				? Helper.Combine(BitConverter.GetBytes(typeFlag), BitConverter.GetBytes(data.Length), data)
+				? CacheUtils.Helper.Combine(BitConverter.GetBytes(typeFlag), data)
 				: data;
-		}
-
-		public static byte[] Serialize(object value)
-		{
-			return Helper.Serialize(value, true);
 		}
 
 		internal static object Deserialize(byte[] data, int start, int count)
 		{
-			using (var stream = new MemoryStream(data, start, count))
-			{
-				return (new BinaryFormatter()).Deserialize(stream);
-			}
+			return CacheUtils.Helper.Deserialize(data, (int)TypeCode.Object | 0x0100, start, count);
 		}
 
+		/// <summary>
+		/// Deserializes an object from the array of bytes
+		/// </summary>
+		/// <param name="data"></param>
+		/// <returns></returns>
 		public static object Deserialize(byte[] data)
 		{
-			if (data == null || data.Length < 9)
+			if (data == null || data.Length < 4)
 				return null;
 
-			var info = Helper.GetFlags(data);
-			var typeFlag = info.Item1;
-			var dataLength = info.Item2;
-
-			var tmp = new byte[0];
-			if (typeFlag.Equals(Helper.FlagOfRawData))
-			{
-				tmp = new byte[dataLength];
-				Buffer.BlockCopy(data, 8, tmp, 0, dataLength);
-				return tmp;
-			}
-
-			var typeCode = (TypeCode)(typeFlag & 0xff);
-			if (!typeCode.Equals(TypeCode.Empty) && !typeCode.Equals(TypeCode.DBNull) && !typeCode.Equals(TypeCode.Object))
-			{
-				tmp = new byte[dataLength];
-				Buffer.BlockCopy(data, 8, tmp, 0, dataLength);
-			}
-
-			switch (typeCode)
-			{
-				case TypeCode.Empty:
-				case TypeCode.DBNull:
-					return null;
-
-				case TypeCode.Boolean:
-					return BitConverter.ToBoolean(tmp, 0);
-
-				case TypeCode.DateTime:
-					return DateTime.FromBinary(BitConverter.ToInt64(tmp, 0));
-
-				case TypeCode.Char:
-					return BitConverter.ToChar(tmp, 0);
-
-				case TypeCode.String:
-					return Encoding.UTF8.GetString(tmp, 0, tmp.Length);
-
-				case TypeCode.Byte:
-					return tmp[0];
-
-				case TypeCode.SByte:
-					return (sbyte)tmp[0];
-
-				case TypeCode.Int16:
-					return BitConverter.ToInt16(tmp, 0);
-
-				case TypeCode.UInt16:
-					return BitConverter.ToUInt16(tmp, 0);
-
-				case TypeCode.Int32:
-					return BitConverter.ToInt32(tmp, 0);
-
-				case TypeCode.UInt32:
-					return BitConverter.ToUInt32(tmp, 0);
-
-				case TypeCode.Int64:
-					return BitConverter.ToInt64(tmp, 0);
-
-				case TypeCode.UInt64:
-					return BitConverter.ToUInt64(tmp, 0);
-
-				case TypeCode.Single:
-					return BitConverter.ToSingle(tmp, 0);
-
-				case TypeCode.Double:
-					return BitConverter.ToDouble(tmp, 0);
-
-				case TypeCode.Decimal:
-					var bits = new int[4];
-					for (var index = 0; index < 16; index += 4)
-						bits[index / 4] = BitConverter.ToInt32(tmp, index);
-					return new Decimal(bits);
-
-				default:
-					return Helper.Deserialize(data, 8, dataLength);
-			}
+			var typeFlag = Helper.GetFlags(data).Item1;
+			if (typeFlag.Equals(Helper.FlagOfJsonObject) || typeFlag.Equals(Helper.FlagOfJsonArray))
+				using (var stream = new MemoryStream(data, 4, data.Length - 4))
+				{
+					using (var reader = new BsonDataReader(stream))
+					{
+						return (new JsonSerializer()).Deserialize(reader);
+					}
+				}
+			else
+				return CacheUtils.Helper.Deserialize(data, typeFlag, 4, data.Length - 4);
 		}
 
 		public static T Deserialize<T>(byte[] data)
 		{
-			var value = data != null && data.Length > 8 ? Helper.Deserialize(data) : null;
+			var value = data != null ? Helper.Deserialize(data) : null;
 			return value != null && value is T ? (T)value : default(T);
 		}
 		#endregion

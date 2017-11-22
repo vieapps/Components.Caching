@@ -9,6 +9,9 @@ using System.Diagnostics;
 
 using Enyim.Caching;
 using Enyim.Caching.Memcached;
+using Enyim.Caching.Configuration;
+
+using Microsoft.Extensions.Logging;
 #endregion
 
 namespace net.vieapps.Components.Caching
@@ -28,9 +31,7 @@ namespace net.vieapps.Components.Caching
 		public Memcached(string name, int expirationTime, bool storeKeys)
 		{
 			// region name
-			this._name = string.IsNullOrWhiteSpace(name)
-				? Helper.RegionName
-				: System.Text.RegularExpressions.Regex.Replace(name, "[^0-9a-zA-Z:-]+", "");
+			this._name = Helper.GetRegionName(name);
 
 			// expiration time
 			this._expirationTime = expirationTime > 0
@@ -47,19 +48,45 @@ namespace net.vieapps.Components.Caching
 
 			// register the region
 			Task.Run(async () => await Memcached.RegisterRegionAsync(this.Name).ConfigureAwait(false)).ConfigureAwait(false);
-
-			// get the client
-			if (Memcached._Client == null)
-			{
-				var configuration = ConfigurationManager.GetSection("memcached") as Enyim.Caching.Configuration.MemcachedClientConfigurationSectionHandler;
-				if (configuration == null)
-					throw new ConfigurationErrorsException("The section named 'memcached' is not found, please check your configuration file (app.config/web.config)");
-				Memcached._Client = new MemcachedClient(configuration);
-			}
 		}
 
-		#region Attributes
-		static MemcachedClient _Client = null;
+		#region Get client (singleton)
+		internal static MemcachedClient GetClient(CacheConfiguration configuration, ILoggerFactory loggerFactory = null)
+		{
+			if (configuration == null)
+				throw new ArgumentNullException(nameof(configuration));
+
+			var logger = loggerFactory?.CreateLogger<Cache>();
+			if (logger != null && logger.IsEnabled(LogLevel.Debug))
+				logger.LogInformation("Create new an instance of memcached with integrated configuration (appsettings.json)");
+
+			return new MemcachedClient(loggerFactory, configuration.GetMemcachedConfiguration(loggerFactory));
+		}
+
+		internal static MemcachedClient GetClient(ILoggerFactory loggerFactory = null)
+		{
+			var memcachedSection = ConfigurationManager.GetSection("memcached") as MemcachedClientConfigurationSectionHandler;
+			if (memcachedSection != null)
+			{
+				var logger = loggerFactory?.CreateLogger<Cache>();
+				if (logger != null && logger.IsEnabled(LogLevel.Debug))
+					logger.LogInformation("Create new an instance of memcached with stand-alone configuration (app.config/web.config) at the section named 'memcached'");
+
+				return new MemcachedClient(memcachedSection, loggerFactory);
+			}
+			else if (ConfigurationManager.GetSection("cache") is CacheConfigurationSectionHandler cacheSection)
+			{
+				var logger = loggerFactory?.CreateLogger<Cache>();
+				if (logger != null && logger.IsEnabled(LogLevel.Debug))
+					logger.LogInformation("Create new an instance of memcached with stand-alone configuration (app.config/web.config) at the section named 'cache'");
+
+				return new MemcachedClient(loggerFactory, (new CacheConfiguration(cacheSection)).GetMemcachedConfiguration(loggerFactory));
+			}
+			else
+				throw new ConfigurationErrorsException("The configuration file (app.config/web.config) must have a section named 'memcached' or 'cache'!");
+		}
+
+		static MemcachedClient _Client;
 
 		/// <summary>
 		/// Gets the instance of memcached client
@@ -68,10 +95,16 @@ namespace net.vieapps.Components.Caching
 		{
 			get
 			{
-				return Memcached._Client;
+				return Memcached._Client ?? (Memcached._Client = Memcached.GetClient());
+			}
+			internal set
+			{
+				Memcached._Client = value;
 			}
 		}
+		#endregion
 
+		#region Attributes
 		string _name;
 		int _expirationTime;
 		bool _storeKeys, _isUpdatingKeys = false;
@@ -330,7 +363,7 @@ namespace net.vieapps.Components.Caching
 		bool _SetFragments(string key, List<byte[]> fragments, int expirationTime = 0, StoreMode mode = StoreMode.Set)
 		{
 			var success = fragments != null && fragments.Count > 0
-				? this._Set(key, new ArraySegment<byte>(Helper.Combine(BitConverter.GetBytes(Helper.FlagOfFirstFragmentBlock), BitConverter.GetBytes(fragments.Sum(f => f.Length)), fragments[0])), expirationTime, false, mode)
+				? this._Set(key, new ArraySegment<byte>(CacheUtils.Helper.Combine(BitConverter.GetBytes(Helper.FlagOfFirstFragmentBlock), BitConverter.GetBytes(fragments.Sum(f => f.Length)), fragments[0])), expirationTime, false, mode)
 				: false;
 
 			if (success)
@@ -352,7 +385,7 @@ namespace net.vieapps.Components.Caching
 		async Task<bool> _SetFragmentsAsync(string key, List<byte[]> fragments, int expirationTime = 0, StoreMode mode = StoreMode.Set)
 		{
 			var success = fragments != null && fragments.Count > 0
-				? await this._SetAsync(key, new ArraySegment<byte>(Helper.Combine(BitConverter.GetBytes(Helper.FlagOfFirstFragmentBlock), BitConverter.GetBytes(fragments.Sum(f => f.Length)), fragments[0])), expirationTime, false, mode)
+				? await this._SetAsync(key, new ArraySegment<byte>(CacheUtils.Helper.Combine(BitConverter.GetBytes(Helper.FlagOfFirstFragmentBlock), BitConverter.GetBytes(fragments.Sum(f => f.Length)), fragments[0])), expirationTime, false, mode)
 				: false;
 
 			if (success)
@@ -806,7 +839,7 @@ namespace net.vieapps.Components.Caching
 		internal static async Task<bool> SetKeysAsync(string key, HashSet<string> keys)
 		{
 			var fragments = Helper.Split(Helper.Serialize(keys, false));
-			var success = await Memcached.Client.StoreAsync(StoreMode.Set, key, new ArraySegment<byte>(Helper.Combine(BitConverter.GetBytes(fragments.Count), fragments[0])));
+			var success = await Memcached.Client.StoreAsync(StoreMode.Set, key, new ArraySegment<byte>(CacheUtils.Helper.Combine(BitConverter.GetBytes(fragments.Count), fragments[0])));
 			if (success && fragments.Count > 1)
 			{
 				var tasks = new List<Task>();

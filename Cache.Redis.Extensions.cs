@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 
 using StackExchange.Redis;
+using CacheUtils;
 #endregion
 
 namespace net.vieapps.Components.Caching
