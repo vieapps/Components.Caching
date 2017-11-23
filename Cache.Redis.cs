@@ -29,7 +29,7 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		/// <param name="name">The string that presents name of isolated region of the cache</param>
 		/// <param name="expirationTime">The number that presents times (in minutes) for caching an item</param>
-		/// <param name="storeKeys">true to active store keys of the region (to clear or using with other purpose further)</param>
+		/// <param name="storeKeys">true to active store keys of the region (to clear or using with other purposes)</param>
 		public Redis(string name, int expirationTime, bool storeKeys)
 		{
 			// region name
@@ -113,6 +113,38 @@ namespace net.vieapps.Components.Caching
 			}
 			else
 				throw new ConfigurationErrorsException("The configuration file (app.config/web.config) must have a section named 'redis' or 'cache'!");
+		}
+
+		/// <summary>
+		/// Prepares the instance of redis client
+		/// </summary>
+		/// <param name="loggerFactory"></param>
+		/// <param name="configuration"></param>
+		public static void PrepareClient(RedisClientConfiguration configuration, ILoggerFactory loggerFactory = null)
+		{
+			if (Redis._Client == null)
+				Redis._Client = Redis.GetClient(configuration, loggerFactory);
+		}
+
+		/// <summary>
+		/// Prepares the instance of redis client
+		/// </summary>
+		/// <param name="loggerFactory"></param>
+		/// <param name="configuration"></param>
+		public static void PrepareClient(CacheConfiguration configuration, ILoggerFactory loggerFactory = null)
+		{
+			if (Redis._Client == null)
+				Redis._Client = Redis.GetClient(configuration, loggerFactory);
+		}
+
+		/// <summary>
+		/// Prepares the instance of redis client
+		/// </summary>
+		/// <param name="loggerFactory"></param>
+		public static void PrepareClient(ILoggerFactory loggerFactory = null)
+		{
+			if (Redis._Client == null)
+				Redis._Client = Redis.GetClient(loggerFactory);
 		}
 
 		static IDatabase _Client;

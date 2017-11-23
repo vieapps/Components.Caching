@@ -765,9 +765,7 @@ namespace net.vieapps.Components.Caching
 			var expiresIn = value != null ? this.Get<uint?>(key.GetIDistributedCacheExpirationKey()) : null;
 			if (value != null && expiresIn != null && expiresIn.Value > 0)
 			{
-				var expiresAt = expiresIn > 0
-					? DateTime.Now.AddSeconds(expiresIn.Value)
-					: DateTime.MaxValue;
+				var expiresAt = DateTime.Now.AddSeconds(expiresIn.Value);
 				if (this.Replace(key, value, expiresAt))
 					this.Replace(key.GetIDistributedCacheExpirationKey(), expiresIn.Value, expiresAt);
 			}
@@ -781,9 +779,7 @@ namespace net.vieapps.Components.Caching
 			var expiresIn = value != null ? await this.GetAsync<uint?>(key.GetIDistributedCacheExpirationKey()) : null;
 			if (value != null && expiresIn != null && expiresIn.Value > 0)
 			{
-				var expiresAt = expiresIn > 0
-					? DateTime.Now.AddSeconds(expiresIn.Value)
-					: DateTime.MaxValue;
+				var expiresAt = DateTime.Now.AddSeconds(expiresIn.Value);
 				if (await this.ReplaceAsync(key, value, expiresAt))
 					await this.ReplaceAsync(key.GetIDistributedCacheExpirationKey(), expiresIn.Value, expiresAt);
 			}

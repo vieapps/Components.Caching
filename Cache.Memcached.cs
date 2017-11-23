@@ -27,7 +27,7 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		/// <param name="name">The string that presents name of isolated region of the cache</param>
 		/// <param name="expirationTime">The number that presents times (in minutes) for caching an item</param>
-		/// <param name="storeKeys">true to active store keys of the region (to clear or using with other purpose further)</param>
+		/// <param name="storeKeys">true to active store keys of the region (to clear or using with other purposes)</param>
 		public Memcached(string name, int expirationTime, bool storeKeys)
 		{
 			// region name
@@ -84,6 +84,38 @@ namespace net.vieapps.Components.Caching
 			}
 			else
 				throw new ConfigurationErrorsException("The configuration file (app.config/web.config) must have a section named 'memcached' or 'cache'!");
+		}
+
+		/// <summary>
+		/// Prepares the instance of memcached client
+		/// </summary>
+		/// <param name="loggerFactory"></param>
+		/// <param name="configuration"></param>
+		public static void PrepareClient(IMemcachedClientConfiguration configuration, ILoggerFactory loggerFactory = null)
+		{
+			if (Memcached._Client == null)
+				Memcached._Client = new MemcachedClient(loggerFactory, configuration);
+		}
+
+		/// <summary>
+		/// Prepares the instance of memcached client
+		/// </summary>
+		/// <param name="loggerFactory"></param>
+		/// <param name="configuration"></param>
+		public static void PrepareClient(CacheConfiguration configuration, ILoggerFactory loggerFactory = null)
+		{
+			if (Memcached._Client == null)
+				Memcached._Client = Memcached.GetClient(configuration, loggerFactory);
+		}
+
+		/// <summary>
+		/// Prepares the instance of memcached client
+		/// </summary>
+		/// <param name="loggerFactory"></param>
+		public static void PrepareClient(ILoggerFactory loggerFactory = null)
+		{
+			if (Memcached._Client == null)
+				Memcached._Client = Memcached.GetClient(loggerFactory);
 		}
 
 		static MemcachedClient _Client;
@@ -348,7 +380,8 @@ namespace net.vieapps.Components.Caching
 		{
 			await Task.WhenAll(items != null
 				? items.Where(kvp => !string.IsNullOrWhiteSpace(kvp.Key)).Select(kvp => this._SetAsync((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + kvp.Key, kvp.Value, expirationTime, false, mode))
-				: new List<Task<bool>>());
+				: new List<Task<bool>>()
+			);
 			if (this._storeKeys && this._addedKeys.Count > 0)
 				this._UpdateKeys(123);
 		}
