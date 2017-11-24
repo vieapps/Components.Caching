@@ -42,19 +42,39 @@ namespace net.vieapps.Components.Caching
 				? Helper.RegionName
 				: System.Text.RegularExpressions.Regex.Replace(name, "[^0-9a-zA-Z:-]+", "");
 		}
+
+		internal static string GetCacheKey(string region, string key)
+		{
+			return region + "@" + key.Replace(" ", "-");
+		}
+
+		internal static string GetFragmentKey(string key, int index)
+		{
+			var fragmentKey = "0" + index.ToString();
+			return key.Replace(" ", "-") + "$[Fragment<" + fragmentKey.Substring(fragmentKey.Length - 2) + ">]";
+		}
+
+		internal static List<string> GetFragmentKeys(string key, int max)
+		{
+			var keys = new List<string>() { key };
+			for (var index = 1; index < max; index++)
+				keys.Add(Helper.GetFragmentKey(key, index));
+			return keys;
+		}
 		#endregion
 
 		#region Split & Combine
 		internal static byte[] Combine(byte[] first, IEnumerable<byte[]> arrays)
 		{
-			var combined = new byte[first.Length + arrays.Sum(a => a.Length)];
+			var combined = new byte[first.Length + arrays.Sum(a => a?.Length ?? 0)];
 			var offset = first.Length;
 			Buffer.BlockCopy(first, 0, combined, 0, offset);
 			foreach (var array in arrays)
-			{
-				Buffer.BlockCopy(array, 0, combined, offset, array.Length);
-				offset += array.Length;
-			}
+				if (array != null)
+				{
+					Buffer.BlockCopy(array, 0, combined, offset, array.Length);
+					offset += array.Length;
+				}
 			return combined;
 		}
 
@@ -80,7 +100,7 @@ namespace net.vieapps.Components.Caching
 		}
 		#endregion
 
-		#region Serialize & Deserialize
+		#region Fragments
 		internal static Tuple<int, int> GetFlags(byte[] data, bool getLength = false)
 		{
 			if (data == null || data.Length < 4)
@@ -121,7 +141,9 @@ namespace net.vieapps.Components.Caching
 			}
 			return new Tuple<int, int>(blocks, length);
 		}
+		#endregion
 
+		#region Serialize & Deserialize
 		/// <summary>
 		/// Serializes an object into array of bytes
 		/// </summary>

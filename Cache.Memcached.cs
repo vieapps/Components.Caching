@@ -58,7 +58,7 @@ namespace net.vieapps.Components.Caching
 
 			var logger = loggerFactory?.CreateLogger<Cache>();
 			if (logger != null && logger.IsEnabled(LogLevel.Debug))
-				logger.LogInformation("Create new an instance of memcached with integrated configuration (appsettings.json)");
+				logger.LogInformation("An instance of Memcached was created successful");
 
 			return new MemcachedClient(loggerFactory, configuration.GetMemcachedConfiguration(loggerFactory));
 		}
@@ -70,7 +70,7 @@ namespace net.vieapps.Components.Caching
 			{
 				var logger = loggerFactory?.CreateLogger<Cache>();
 				if (logger != null && logger.IsEnabled(LogLevel.Debug))
-					logger.LogInformation("Create new an instance of memcached with stand-alone configuration (app.config/web.config) at the section named 'memcached'");
+					logger.LogInformation("An instance of Memcached was created successful with stand-alone configuration (app.config/web.config) at the section named 'memcached'");
 
 				return new MemcachedClient(memcachedSection, loggerFactory);
 			}
@@ -78,12 +78,15 @@ namespace net.vieapps.Components.Caching
 			{
 				var logger = loggerFactory?.CreateLogger<Cache>();
 				if (logger != null && logger.IsEnabled(LogLevel.Debug))
-					logger.LogInformation("Create new an instance of memcached with stand-alone configuration (app.config/web.config) at the section named 'cache'");
+					logger.LogInformation("An instance of Memcached was created successful with stand-alone configuration (app.config/web.config) at the section named 'cache'");
 
 				return new MemcachedClient(loggerFactory, (new CacheConfiguration(cacheSection)).GetMemcachedConfiguration(loggerFactory));
 			}
 			else
+			{
+				loggerFactory?.CreateLogger<Cache>()?.LogError("No configuration is found");
 				throw new ConfigurationErrorsException("The configuration file (app.config/web.config) must have a section named 'memcached' or 'cache'!");
+			}
 		}
 
 		/// <summary>
@@ -570,56 +573,32 @@ namespace net.vieapps.Components.Caching
 		#region Get (Fragment)
 		Tuple<int, int> _GetFragments(string key)
 		{
-			var data = this._Get(key, false) as byte[];
-			return data != null
-				? Helper.GetFragments(data)
-				: null;
+			return Helper.GetFragments(this._Get(key, false) as byte[]);
 		}
 
 		async Task<Tuple<int, int>> _GetFragmentsAsync(string key)
 		{
-			var data = await this._GetAsync(key, false) as byte[];
-			return data != null
-				? Helper.GetFragments(data)
-				: null;
+			return Helper.GetFragments(await this._GetAsync(key, false) as byte[]);
 		}
 
 		List<byte[]> _GetAsFragments(string key, List<int> indexes)
 		{
-			if (string.IsNullOrWhiteSpace(key) || indexes == null || indexes.Count < 1)
-				return new List<byte[]>();
-
-			var fragments = Enumerable.Repeat(new byte[0], indexes.Count).ToList();
-			Func<int, Task> func = async (index) =>
-			{
-				var fragmentIndex = indexes[index];
-				fragments[index] = fragmentIndex < 0 ? null : await this._GetAsync(fragmentIndex > 0 ? this._GetFragmentKey(key, fragmentIndex) : key, false) as byte[];
-			};
-			var tasks = new List<Task>();
-			for (var index = 0; index < indexes.Count; index++)
-				tasks.Add(func(index));
-			Task.WaitAll(tasks.ToArray(), 13000);
-
-			return fragments;
+			var fragments = string.IsNullOrWhiteSpace(key) || indexes == null || indexes.Count < 1
+				? null
+				: this._Get(indexes.Select(index => index > 0 ? this._GetFragmentKey(key, index) : key));
+			return fragments != null
+				? fragments.OrderBy(kvp => kvp.Key).Select(kvp => kvp.Value as byte[]).ToList()
+				: new List<byte[]>();
 		}
 
 		async Task<List<byte[]>> _GetAsFragmentsAsync(string key, List<int> indexes)
 		{
-			if (string.IsNullOrWhiteSpace(key) || indexes == null || indexes.Count < 1)
-				return new List<byte[]>();
-
-			var fragments = Enumerable.Repeat(new byte[0], indexes.Count).ToList();
-			Func<int, Task> func = async (index) =>
-			{
-				var fragmentIndex = indexes[index];
-				fragments[index] = fragmentIndex < 0 ? null : await this._GetAsync(fragmentIndex > 0 ? this._GetFragmentKey(key, fragmentIndex) : key, false) as byte[];
-			};
-			var tasks = new List<Task>();
-			for (var index = 0; index < indexes.Count; index++)
-				tasks.Add(func(index));
-			await Task.WhenAll(tasks);
-
-			return fragments;
+			var fragments = string.IsNullOrWhiteSpace(key) || indexes == null || indexes.Count < 1
+				? null
+				: await this._GetAsync(indexes.Select(index => index > 0 ? this._GetFragmentKey(key, index) : key));
+			return fragments != null
+				? fragments.OrderBy(kvp => kvp.Key).Select(kvp => kvp.Value as byte[]).ToList()
+				: new List<byte[]>();
 		}
 
 		List<byte[]> _GetAsFragments(string key, params int[] indexes)
@@ -827,27 +806,24 @@ namespace net.vieapps.Components.Caching
 		#region [Helper]
 		string _GetKey(string key)
 		{
-			return this.Name + "@" + key.Replace(" ", "-");
+			return Helper.GetCacheKey(this.Name, key);
 		}
 
 		string _GetFragmentKey(string key, int index)
 		{
-			return key.Replace(" ", "-") + "$[Fragment<" + index.ToString() + ">]";
+			return Helper.GetFragmentKey(key, index);
 		}
 
 		List<string> _GetFragmentKeys(string key, int max)
 		{
-			var keys = new List<string>() { key };
-			for (var index = 1; index < max; index++)
-				keys.Add(this._GetFragmentKey(key, index));
-			return keys;
+			return Helper.GetFragmentKeys(key, max);
 		}
 
 		string _RegionKey
 		{
 			get
 			{
-				return this._GetKey("<Region-Keys>");
+				return this._GetKey("<Keys-Of-Region>");
 			}
 		}
 		#endregion

@@ -64,12 +64,16 @@ namespace net.vieapps.Components.Caching
 		#region Get instance (singleton)
 		static Cache _Instance = null;
 
-		internal static Cache GetInstance(IServiceProvider svcProvider)
+		/// <summary>
+		/// Gets the instance of caching component
+		/// </summary>
+		/// <param name="configuration"></param>
+		/// <param name="loggerFactory"></param>
+		/// <returns></returns>
+		public static Cache GetInstance(CacheConfiguration configuration, ILoggerFactory loggerFactory = null)
 		{
 			if (Cache._Instance == null)
 			{
-				var loggerFactory = svcProvider.GetService<ILoggerFactory>();
-				var configuration = svcProvider.GetService<CacheConfiguration>();
 				if (configuration == null)
 					throw new ConfigurationErrorsException($"No configuration is found [{typeof(CacheConfiguration)}]");
 
@@ -80,10 +84,47 @@ namespace net.vieapps.Components.Caching
 
 				if (configuration.Servers.Where(s => s.Type.ToLower().Equals("memcached")).Count() > 0)
 					Memcached.Client = Memcached.GetClient(configuration, loggerFactory);
+			}
+			return Cache._Instance;
+		}
+
+		/// <summary>
+		/// Gets the instance of caching component
+		/// </summary>
+		/// <param name="configurationSection"></param>
+		/// <param name="loggerFactory"></param>
+		/// <returns></returns>
+		public static Cache GetInstance(CacheConfigurationSectionHandler configurationSection, ILoggerFactory loggerFactory = null)
+		{
+			if (Cache._Instance == null)
+			{
+				if (configurationSection == null)
+					throw new ConfigurationErrorsException($"No configuration is found [{typeof(CacheConfigurationSectionHandler)}]");
+
+				var configuration = new CacheConfiguration(configurationSection);
+				Cache.GetInstance(configuration, loggerFactory);
 
 				var logger = loggerFactory?.CreateLogger<Cache>();
 				if (logger != null && logger.IsEnabled(LogLevel.Debug))
-					logger.LogInformation($"An instance of VIEApps Cache  was created successful with integrated configuration - {configuration.Provider}: {configuration.RegionName} ({configuration.ExpirationTime} minutes)");
+					logger.LogInformation($"An instance of VIEApps Cache was created successful with stand-alone configuration (app.config/web.config) - {configuration.Provider}: {configuration.RegionName} ({configuration.ExpirationTime} minutes)");
+			}
+			return Cache._Instance;
+		}
+
+		internal static Cache GetInstance(IServiceProvider svcProvider)
+		{
+			if (Cache._Instance == null)
+			{
+				var loggerFactory = svcProvider.GetService<ILoggerFactory>();
+				var configuration = svcProvider.GetService<CacheConfiguration>();
+				if (configuration == null)
+					throw new ConfigurationErrorsException($"No configuration is found [{typeof(CacheConfiguration)}]");
+
+				Cache.GetInstance(configuration, loggerFactory);
+
+				var logger = loggerFactory?.CreateLogger<Cache>();
+				if (logger != null && logger.IsEnabled(LogLevel.Debug))
+					logger.LogInformation($"An instance of VIEApps Cache was created successful with integrated configuration - {configuration.Provider}: {configuration.RegionName} ({configuration.ExpirationTime} minutes)");
 			}
 			return Cache._Instance;
 		}

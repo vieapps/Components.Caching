@@ -10,7 +10,6 @@ using net.vieapps.Components.Caching;
 
 namespace Microsoft.Extensions.DependencyInjection
 {
-
 	public static partial class ServiceCollectionExtensions
 	{
 		/// <summary>
@@ -50,11 +49,11 @@ namespace Microsoft.AspNetCore.Builder
 		{
 			try
 			{
-				appBuilder.ApplicationServices.GetService<ILogger<Cache>>().LogInformation(new EventId(), null, $"VIEApps Cache is {(appBuilder.ApplicationServices.GetService<Cache>() != null ? "" : "not-")}started");
+				appBuilder.ApplicationServices.GetService<ILogger<Cache>>().LogInformation($"VIEApps Cache is {(appBuilder.ApplicationServices.GetService<Cache>() != null ? "" : "not-")}started");
 			}
 			catch (Exception ex)
 			{
-				appBuilder.ApplicationServices.GetService<ILogger<Cache>>().LogError(new EventId(), ex, "VIEApps Cache is failed to start");
+				appBuilder.ApplicationServices.GetService<ILogger<Cache>>().LogError(ex, "VIEApps Cache is failed to start");
 			}
 			return appBuilder;
 		}
