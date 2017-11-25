@@ -20,6 +20,9 @@ using Microsoft.Extensions.Logging;
 
 namespace net.vieapps.Components.Caching
 {
+	/// <summary>
+	/// Caching configuration
+	/// </summary>
 	public class CacheConfiguration
 	{
 		public string Provider { get; set; } = "Redis";
@@ -28,7 +31,7 @@ namespace net.vieapps.Components.Caching
 
 		public int ExpirationTime { get; set; } = 30;
 
-		public IList<Server> Servers { get; set; } = new List<Server>();
+		public IList<CacheServer> Servers { get; set; } = new List<CacheServer>();
 
 		public string Options { get; set; } = "";
 
@@ -82,7 +85,7 @@ namespace net.vieapps.Components.Caching
 					var type = server.Attributes["type"]?.Value ?? "Redis";
 					var address = server.Attributes["address"]?.Value ?? "localhost";
 					var port = Convert.ToInt32(server.Attributes["port"]?.Value ?? (type.ToLower().Equals("redis") ? "6379" : "11211"));
-					this.Servers.Add(new Server()
+					this.Servers.Add(new CacheServer()
 					{
 						Address = address,
 						Port = port,
@@ -198,6 +201,9 @@ namespace net.vieapps.Components.Caching
 
 	// -----------------------------------------------------------
 
+	/// <summary>
+	/// Caching options
+	/// </summary>
 	public class CacheOptions : IOptions<CacheOptions>
 	{
 		public string Provider { get; set; } = "Redis";
@@ -206,7 +212,7 @@ namespace net.vieapps.Components.Caching
 
 		public int ExpirationTime { get; set; } = 30;
 
-		public List<Server> Servers { get; set; } = new List<Server>();
+		public List<CacheServer> Servers { get; set; } = new List<CacheServer>();
 
 		public string Options { get; set; } = "";
 
@@ -227,7 +233,10 @@ namespace net.vieapps.Components.Caching
 
 	// -----------------------------------------------------------
 
-	public class Server
+	/// <summary>
+	/// Information of a distributed cache server
+	/// </summary>
+	public class CacheServer
 	{
 		public string Address { get; set; }
 
@@ -238,6 +247,9 @@ namespace net.vieapps.Components.Caching
 
 	// -----------------------------------------------------------
 
+	/// <summary>
+	/// Redis cache configuration
+	/// </summary>
 	public class RedisClientConfiguration
 	{
 		public List<IPEndPoint> Servers { get; internal set; } = new List<IPEndPoint>();
@@ -247,9 +259,12 @@ namespace net.vieapps.Components.Caching
 
 	// -----------------------------------------------------------
 
+	/// <summary>
+	/// Redis cache options
+	/// </summary>
 	public class RedisClientOptions : IOptions<RedisClientOptions>
 	{
-		public List<Server> Servers { get; set; } = new List<Server>();
+		public List<IPEndPoint> Servers { get; set; } = new List<IPEndPoint>();
 
 		public string Options { get; set; } = "";
 
@@ -258,6 +273,9 @@ namespace net.vieapps.Components.Caching
 
 	// -----------------------------------------------------------
 
+	/// <summary>
+	/// Configuration section handler of the caching component
+	/// </summary>
 	public class CacheConfigurationSectionHandler : IConfigurationSectionHandler
 	{
 		public object Create(object parent, object configContext, XmlNode section)
@@ -271,5 +289,8 @@ namespace net.vieapps.Components.Caching
 		public XmlNode Section { get { return this._section; } }
 	}
 
+	/// <summary>
+	/// Configuration section handler of the Redis caching component
+	/// </summary>
 	public class RedisClientConfigurationSectionHandler : CacheConfigurationSectionHandler { }
 }

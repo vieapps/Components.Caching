@@ -20,7 +20,7 @@ namespace net.vieapps.Components.Caching
 	/// Manipulates cached objects in isolated regions with memcached
 	/// </summary>
 	[DebuggerDisplay("Memcached: {Name} ({ExpirationTime} minutes)")]
-	public sealed class Memcached : ICacheProvider
+	public sealed class Memcached : ICache
 	{
 		/// <summary>
 		/// Create new instance of memcached
@@ -217,11 +217,12 @@ namespace net.vieapps.Components.Caching
 
 		void _UpdateKeys(int delay = 13, bool checkUpdatedKeys = true, Action callback = null)
 		{
-			Task.Run(async () =>
-			{
-				await Task.Delay(delay);
-				await this._UpdateKeysAsync(checkUpdatedKeys, callback).ConfigureAwait(false);
-			}).ConfigureAwait(false);
+			if (this._storeKeys)
+				Task.Run(async () =>
+				{
+					await Task.Delay(delay);
+					await this._UpdateKeysAsync(checkUpdatedKeys, callback).ConfigureAwait(false);
+				}).ConfigureAwait(false);
 		}
 
 		void _UpdateKeys(string key, bool doPush)
@@ -727,18 +728,14 @@ namespace net.vieapps.Components.Caching
 		#region Remove (Multiple)
 		void _Remove(IEnumerable<string> keys, string keyPrefix = null)
 		{
-			if (keys != null)
-				keys.Where(key => !string.IsNullOrWhiteSpace(key)).ToList().ForEach(key => this._Remove((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + key, false));
+			keys?.Where(key => !string.IsNullOrWhiteSpace(key)).ToList().ForEach(key => this._Remove((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + key, false));
 			if (this._storeKeys && this._removedKeys.Count > 0)
 				this._UpdateKeys(123);
 		}
 
 		async Task _RemoveAsync(IEnumerable<string> keys, string keyPrefix = null)
 		{
-			await Task.WhenAll(keys == null
-				? keys.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => this._RemoveAsync((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + key, false))
-				: new List<Task<bool>>()
-			);
+			await Task.WhenAll(keys?.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => this._RemoveAsync((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + key, false)) ?? new List<Task<bool>>());
 			if (this._storeKeys && this._removedKeys.Count > 0)
 				this._UpdateKeys(123);
 		}

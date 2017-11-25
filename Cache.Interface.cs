@@ -7,9 +7,9 @@ using System.Threading.Tasks;
 namespace net.vieapps.Components.Caching
 {
 	/// <summary>
-	/// Presents a provider of distributed cache for manipulating objects with isolated regions
+	/// Presents a caching provider for manipulating objects in isolated regions with distributed cache servers (Redis &amp; Memcached)
 	/// </summary>
-	public interface ICacheProvider
+	public interface ICache
 	{
 
 		#region Properties

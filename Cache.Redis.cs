@@ -22,7 +22,7 @@ namespace net.vieapps.Components.Caching
 	/// Manipulates cached objects in isolated regions with redis
 	/// </summary>
 	[DebuggerDisplay("Redis: {Name} ({ExpirationTime} minutes)")]
-	public sealed class Redis : ICacheProvider
+	public sealed class Redis : ICache
 	{
 		/// <summary>
 		/// Create new instance of redis
@@ -816,15 +816,12 @@ namespace net.vieapps.Components.Caching
 		#region Remove (Multiple)
 		void _Remove(IEnumerable<string> keys, string keyPrefix = null)
 		{
-			if (keys != null)
-				keys.Where(key => !string.IsNullOrWhiteSpace(key)).ToList().ForEach(key => this._Remove((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + key));
+			keys?.Where(key => !string.IsNullOrWhiteSpace(key)).ToList().ForEach(key => this._Remove((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + key));
 		}
 
 		Task _RemoveAsync(IEnumerable<string> keys, string keyPrefix = null)
 		{
-			return keys != null
-				? Task.WhenAll(keys.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => this._RemoveAsync((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + key)))
-				: Task.CompletedTask;
+			return Task.WhenAll(keys?.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => this._RemoveAsync((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + key)) ?? new List<Task<bool>>());
 		}
 		#endregion
 

@@ -17,48 +17,48 @@ using CacheUtils;
 namespace net.vieapps.Components.Caching
 {
 	/// <summary>
-	/// Manipulates distributed cache in isolated regions - support memcached &amp; redis
+	/// Manipulates objects in isolated regions with distributed cache servers (support Redis &amp; Memcached)
 	/// </summary>
 	[DebuggerDisplay("{Name} ({ExpirationTime} minutes)")]
-	public sealed class Cache : IDistributedCache
+	public sealed class Cache : IDistributedCache, ICache
 	{
-		ICacheProvider _cache;
+		ICache _cache;
 
 		/// <summary>
-		/// Create new instance of distributed cache with isolated region
+		/// Create a new instance of distributed cache with isolated region
 		/// </summary>
 		/// <param name="name">The string that presents name of isolated region</param>
 		/// <param name="expirationTime">Time for caching an item (in minutes)</param>
-		/// <param name="storeKeys">true to active store keys of the region (to clear or using with other purpose further)</param>
+		/// <param name="storeKeys">true to active store all keys of the region (to clear or use with other purposes further)</param>
 		public Cache(string name = null, int expirationTime = 0, bool storeKeys = false) : this(name, expirationTime, storeKeys, null) { }
 
 		/// <summary>
-		/// Create new instance of distributed cache with isolated region
+		/// Create a new instance of distributed cache with isolated region
 		/// </summary>
 		/// <param name="name">The string that presents name of isolated region</param>
-		/// <param name="provider">The string that presents the caching provider ('memcached' or 'redis') - the default provider is 'redis')</param>
+		/// <param name="provider">The string that presents the caching provider ('Redis' or 'Memcached') - the default provider is 'Redis')</param>
 		public Cache(string name, string provider) : this(name, 0, false, provider) { }
 
 		/// <summary>
-		/// Create new instance of distributed cache with isolated region
+		/// Create a new instance of distributed cache with isolated region
 		/// </summary>
 		/// <param name="name">The string that presents name of isolated region</param>
 		/// <param name="expirationTime">Time for caching an item (in minutes)</param>
-		/// <param name="provider">The string that presents the caching provider ('memcached' or 'redis') - the default provider is 'memcached')</param>
+		/// <param name="provider">The string that presents the caching provider ('Redis' or 'Memcached') - the default provider is 'Redis')</param>
 		public Cache(string name, int expirationTime, string provider) : this(name, expirationTime, false, provider) { }
 
 		/// <summary>
-		/// Create new instance of distributed cache with isolated region
+		/// Create a new instance of distributed cache with isolated region
 		/// </summary>
 		/// <param name="name">The string that presents name of isolated region</param>
 		/// <param name="expirationTime">Time for caching an item (in minutes)</param>
-		/// <param name="storeKeys">true to active store keys of the region (to clear or using with other purpose further)</param>
-		/// <param name="provider">The string that presents the caching provider ('memcached' or 'redis') - the default provider is 'redis')</param>
+		/// <param name="storeKeys">true to active store all keys of the region (to clear or use with other purposes further)</param>
+		/// <param name="provider">The string that presents the caching provider ('Redis' or 'Memcached') - the default provider is 'Redis')</param>
 		public Cache(string name, int expirationTime, bool storeKeys, string provider)
 		{
 			this._cache = !string.IsNullOrWhiteSpace(provider) && provider.Trim().ToLower().Equals("memcached")
-				? new Memcached(name, expirationTime, storeKeys) as ICacheProvider
-				: new Redis(name, expirationTime, storeKeys) as ICacheProvider;
+				? new Memcached(name, expirationTime, storeKeys) as ICache
+				: new Redis(name, expirationTime, storeKeys) as ICache;
 		}
 
 		#region Get instance (singleton)
@@ -759,7 +759,7 @@ namespace net.vieapps.Components.Caching
 		}
 		#endregion
 
-		#region IDistributedCache 
+		#region Implements of IDistributedCache
 		void IDistributedCache.Set(string key, byte[] value, DistributedCacheEntryOptions options)
 		{
 			if (string.IsNullOrWhiteSpace(key))
@@ -786,16 +786,16 @@ namespace net.vieapps.Components.Caching
 
 		byte[] IDistributedCache.Get(string key)
 		{
-			if (string.IsNullOrWhiteSpace(key))
-				throw new ArgumentNullException(nameof(key));
-			return this.Get<byte[]>(key);
+			return string.IsNullOrWhiteSpace(key)
+				? throw new ArgumentNullException(nameof(key))
+				: this.Get<byte[]>(key);
 		}
 
 		Task<byte[]> IDistributedCache.GetAsync(string key, CancellationToken token = default(CancellationToken))
 		{
-			if (string.IsNullOrWhiteSpace(key))
-				throw new ArgumentNullException(nameof(key));
-			return this.GetAsync<byte[]>(key);
+			return string.IsNullOrWhiteSpace(key)
+				? throw new ArgumentNullException(nameof(key))
+				: this.GetAsync<byte[]>(key);
 		}
 
 		void IDistributedCache.Refresh(string key)
