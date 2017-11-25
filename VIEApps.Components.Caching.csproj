@@ -16,7 +16,6 @@
 		<Version>10.1.4.1712</Version>
 		<Title>VIEApps NGX Caching</Title>
 		<Description>The .NET Standard 2.0 wrapper library for working with distributed cache (memcached &amp; redis)</Description>
-		<Summary>The .NET Standard 2.0 wrapper library for working with distributed cache (memcached &amp; redis)</Summary>
 		<Authors>VIEApps.net</Authors>
 		<Copyright>© 2017 VIEApps.net</Copyright>
 		<PackageReleaseNotes></PackageReleaseNotes>
@@ -41,6 +40,7 @@
 		<None Remove=".DS_Store" />
 		<None Remove=".gitattributes" />
 		<None Remove=".gitignore" />
+		<None Remove="LICENSE" />
 		<None Remove="README.md" />
 	</ItemGroup>
 
