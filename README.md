@@ -9,6 +9,7 @@ A .NET Standard 2.0 wrapper library for working with distributed cache
 - Memcached: [VIEApps.Enyim.Caching](https://github.com/vieapps/Enyim.Caching)
 - Redis: [StackExchange.Redis](https://github.com/StackExchange/StackExchange.Redis)
 ## Configuration
+### Configure with seperated sections
 Add the configuration settings into your app.config/web.config file
 ```xml
 <?xml version="1.0" encoding="utf-8"?>
@@ -19,79 +20,72 @@ Add the configuration settings into your app.config/web.config file
 	</configSections>
 	<memcached>
 		<servers>
-			<add address="127.0.0.1" port="11211" />
 			<add address="192.168.1.2" port="11211" />
+			<add address="192.168.1.3" port="11211" />
 		</servers>
 		<socketPool minPoolSize="10" maxPoolSize="250" deadTimeout="00:01:00" connectionTimeout="00:00:05" receiveTimeout="00:00:01" />
 	</memcached>
 	<redis>
 		<servers>
-			<add address="127.0.0.1" port="6379" />
-			<add address="192.168.1.2" port="6379" />
+			<add address="192.168.1.4" port="6379" />
+			<add address="192.168.1.5" port="6379" />
 		</servers>
-		<options allowAdmin="false" version="4.0" connectTimeout="4000" syncTimeout="2000" />
+		<options allowAdmin="false" version="3.0" connectTimeout="4000" syncTimeout="2000" />
 	</redis>
 </configuration>
 ```
-## Example usage
+### Configure with only one section
+Add the configuration settings into your app.config/web.config file
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+	<configSections>
+		<section name="cache" type="net.vieapps.Components.Caching.CacheConfigurationSectionHandler, VIEApps.Components.Caching" />
+	</configSections>
+	<cache>
+		<servers>
+			<add address="192.168.1.2" port="11211" type="Memcached" />
+			<add address="192.168.1.3" port="11211" type="Memcached" />
+			<add address="192.168.1.4" port="6379" type="Redis" />
+			<add address="192.168.1.5" port="6379" type="Redis" />
+		</servers>
+		<socketPool minPoolSize="10" maxPoolSize="250" deadTimeout="00:01:00" connectionTimeout="00:00:05" receiveTimeout="00:00:01" />
+		<options allowAdmin="false" version="4.0" connectTimeout="4000" syncTimeout="2000" />
+	</cache>
+</configuration>
+```
+## Example of usage
 ```cs
 public class CreativeService
 {	
 	using net.vieapps.Components.Caching;
 
-	private Cache _memcached;
-	private Cache _redis;
+	Cache _cache;
+	Cache _memcached;
+	Cache _redis;
 
 	public CreativeService()
 	{
+		this._cache = new Cache("Region-Name"); // with default caching provider is 'Redis'
 		this._memcached = new Cache("Region-Name", "memcached");
 		this._redis = new Cache("Region-Name", "redis");
 	}
 
-	public async Task<IList<CreativeDTO>> GetMemcachedCreatives(string unitName)
+	public async Task<IList<CreativeDTO>> GetCreativesAsync(string unitName)
+	{
+		return await this._cache.GetAsync<IList<CreativeDTO>>($"creatives_{unitName}");
+	}
+
+	public async Task<IList<CreativeDTO>> GetMemcachedCreativesAsync(string unitName)
 	{
 		return await this._memcached.GetAsync<IList<CreativeDTO>>($"creatives_{unitName}");
 	}
 
-	public async Task<IList<CreativeDTO>> GetRedisCreatives(string unitName)
+	public async Task<IList<CreativeDTO>> GetRedisCreativesAsync(string unitName)
 	{
 		return await this._redis.GetAsync<IList<CreativeDTO>>($"creatives_{unitName}");
 	}
 }
-```
-## Constructors
-```cs
-/// <summary>
-/// Create new an instance of  distributed cache with isolated region
-/// </summary>
-/// <param name="name">The string that presents name of isolated region</param>
-/// <param name="expirationTime">Time for caching an item (in minutes)</param>
-/// <param name="storeKeys">true to active store keys of the region (to clear or using with other purpose further)</param>
-public Cache(string name = null, int expirationTime = 0, bool storeKeys = false);
-
-/// <summary>
-/// Create new an instance of  distributed cache with isolated region
-/// </summary>
-/// <param name="name">The string that presents name of isolated region</param>
-/// <param name="provider">The string that presents the caching provider ('memcached' or 'redis') - the default provider is 'memcached')</param>
-public Cache(string name, string provider);
-
-/// <summary>
-/// Create new an instance of  distributed cache with isolated region
-/// </summary>
-/// <param name="name">The string that presents name of isolated region</param>
-/// <param name="expirationTime">Time for caching an item (in minutes)</param>
-/// <param name="provider">The string that presents the caching provider ('memcached' or 'redis') - the default provider is 'memcached')</param>
-public Cache(string name, int expirationTime, string provider);
-
-/// <summary>
-/// Create new an instance of  distributed cache with isolated region
-/// </summary>
-/// <param name="name">The string that presents name of isolated region</param>
-/// <param name="expirationTime">Time for caching an item (in minutes)</param>
-/// <param name="storeKeys">true to active store keys of the region (to clear or using with other purpose further)</param>
-/// <param name="provider">The string that presents the caching provider ('memcached' or 'redis') - the default provider is 'memcached')</param>
-public Cache(string name, int expirationTime, bool storeKeys, string provider);
 ```
 ## Listing of all methods
 ```cs
