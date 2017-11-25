@@ -2,15 +2,15 @@
 A .NET Standard 2.0 wrapper library for working with distributed cache
 - Ready with .NET Core 2.0 and .NET Framework 4.6.1 (and higher)
 - Supported: Memcached & Redis
-## Nuget
+## NuGet
 - Package ID: VIEApps.Components.Caching
 - Details: https://www.nuget.org/packages/VIEApps.Components.Caching
 ## Dependencies
 - Memcached: [VIEApps.Enyim.Caching](https://github.com/vieapps/Enyim.Caching)
 - Redis: [StackExchange.Redis](https://github.com/StackExchange/StackExchange.Redis)
 ## Configuration
-### Configure with seperated sections
 Add the configuration settings into your app.config/web.config file
+### Configure with two seperated sections
 ```xml
 <?xml version="1.0" encoding="utf-8"?>
 <configuration>
@@ -35,7 +35,6 @@ Add the configuration settings into your app.config/web.config file
 </configuration>
 ```
 ### Configure with only one section
-Add the configuration settings into your app.config/web.config file
 ```xml
 <?xml version="1.0" encoding="utf-8"?>
 <configuration>
@@ -142,5 +141,5 @@ Task ClearAsync();
 HashSet<string> GetKeys();
 Task<HashSet<string>> GetKeysAsync();
 ```
-## Session State Provider
+## Session State Providers
 - See [VIEApps.Components.Caching.AspNet](https://github.com/vieapps/Components.Caching.AspNet)
