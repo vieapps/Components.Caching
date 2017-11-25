@@ -8,7 +8,7 @@ A .NET Standard 2.0 wrapper library for working with distributed cache
 ## Dependencies
 - Memcached: [VIEApps.Enyim.Caching](https://github.com/vieapps/Enyim.Caching)
 - Redis: [StackExchange.Redis](https://github.com/StackExchange/StackExchange.Redis)
-## Configuration
+## Configuration (stand-alone/classical apps)
 Add the configuration settings into your app.config/web.config file
 ### Configure with two seperated sections
 ```xml
@@ -49,11 +49,11 @@ Add the configuration settings into your app.config/web.config file
 			<add address="192.168.1.5" port="6379" type="Redis" />
 		</servers>
 		<socketPool minPoolSize="10" maxPoolSize="250" deadTimeout="00:01:00" connectionTimeout="00:00:05" receiveTimeout="00:00:01" />
-		<options allowAdmin="false" version="4.0" connectTimeout="4000" syncTimeout="2000" />
+		<options allowAdmin="false" version="3.0" connectTimeout="4000" syncTimeout="2000" />
 	</cache>
 </configuration>
 ```
-## Example of usage
+## Example of usage (stand-alone/classical apps)
 ```cs
 public class CreativeService
 {	
@@ -86,6 +86,10 @@ public class CreativeService
 	}
 }
 ```
+## Configuration (ASP.NET Core 2.0 apps)
+TBD
+## Example of usage (ASP.NET Core 2.0 apps)
+TBD
 ## Listing of all methods
 ```cs
 bool Set(string key, object value, int expirationTime = 0);
