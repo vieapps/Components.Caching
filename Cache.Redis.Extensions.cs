@@ -194,7 +194,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns></returns>
 		public static async Task<bool> AddAsync(this IDatabase redis, string key, object value, TimeSpan validFor)
 		{
-			return string.IsNullOrWhiteSpace(key) || await redis.ExistsAsync(key)
+			return string.IsNullOrWhiteSpace(key) || await redis.ExistsAsync(key).ConfigureAwait(false)
 				? false
 				: await redis.SetAsync(key, value, validFor);
 		}
@@ -276,9 +276,9 @@ namespace net.vieapps.Components.Caching
 		/// <returns></returns>
 		public static async Task<bool> ReplaceAsync(this IDatabase redis, string key, object value, TimeSpan validFor)
 		{
-			return string.IsNullOrWhiteSpace(key) || !await redis.ExistsAsync(key)
+			return string.IsNullOrWhiteSpace(key) || !await redis.ExistsAsync(key).ConfigureAwait(false)
 				? false
-				: await redis.SetAsync(key, value, validFor);
+				: await redis.SetAsync(key, value, validFor).ConfigureAwait(false);
 		}
 
 		/// <summary>
@@ -331,7 +331,7 @@ namespace net.vieapps.Components.Caching
 		internal static async Task<object> GetAsync(this IDatabase redis, string key, bool doDeserialize)
 		{
 			var value = !string.IsNullOrWhiteSpace(key)
-				? (byte[])await redis.StringGetAsync(key)
+				? (byte[])await redis.StringGetAsync(key).ConfigureAwait(false)
 				: null;
 			return value != null && doDeserialize
 				? Helper.Deserialize(value)
@@ -376,7 +376,7 @@ namespace net.vieapps.Components.Caching
 		public static async Task<T> GetAsync<T>(this IDatabase redis, string key)
 		{
 			var value = !string.IsNullOrWhiteSpace(key)
-				? (byte[])await redis.StringGetAsync(key)
+				? (byte[])await redis.StringGetAsync(key).ConfigureAwait(false)
 				: null;
 			return value != null
 				? Helper.Deserialize<T>(value)
@@ -404,7 +404,7 @@ namespace net.vieapps.Components.Caching
 		internal static async Task<IDictionary<string, object>> GetAsync(this IDatabase redis, IEnumerable<string> keys, bool doDeserialize)
 		{
 			var objects = new Dictionary<string, object>();
-			await Task.WhenAll(keys?.Where(key => !string.IsNullOrWhiteSpace(key)).Select(async (key) => objects[key] = await redis.GetAsync(key, doDeserialize)) ?? new List<Task<object>>());
+			await Task.WhenAll(keys?.Where(key => !string.IsNullOrWhiteSpace(key)).Select(async (key) => objects[key] = await redis.GetAsync(key, doDeserialize).ConfigureAwait(false)) ?? new List<Task<object>>());
 			return objects;
 		}
 
@@ -443,7 +443,7 @@ namespace net.vieapps.Components.Caching
 		public static async Task<IDictionary<string, T>> GetAsync<T>(this IDatabase redis, IEnumerable<string> keys)
 		{
 			var objects = new Dictionary<string, T>();
-			await Task.WhenAll(keys?.Where(key => !string.IsNullOrWhiteSpace(key)).Select(async (key) => objects[key] = await redis.GetAsync<T>(key)) ?? new List<Task<T>>());
+			await Task.WhenAll(keys?.Where(key => !string.IsNullOrWhiteSpace(key)).Select(async (key) => objects[key] = await redis.GetAsync<T>(key).ConfigureAwait(false)) ?? new List<Task<T>>());
 			return objects;
 		}
 
@@ -532,14 +532,14 @@ namespace net.vieapps.Components.Caching
 			if (!string.IsNullOrWhiteSpace(key) && values != null && values.Length > 0)
 				try
 				{
-					return (await redis.SetAddAsync(key, values.Where(v => !string.IsNullOrWhiteSpace(v)).Select(v => (RedisValue)v).ToArray())) > 0;
+					return (await redis.SetAddAsync(key, values.Where(v => !string.IsNullOrWhiteSpace(v)).Select(v => (RedisValue)v).ToArray()).ConfigureAwait(false)) > 0;
 				}
 				catch (RedisServerException ex)
 				{
 					if (ex.Message.Contains("WRONGTYPE"))
 					{
 						await redis.KeyDeleteAsync(key);
-						return (await redis.SetAddAsync(key, values.Where(v => !string.IsNullOrWhiteSpace(v)).Select(v => (RedisValue)v).ToArray())) > 0;
+						return (await redis.SetAddAsync(key, values.Where(v => !string.IsNullOrWhiteSpace(v)).Select(v => (RedisValue)v).ToArray()).ConfigureAwait(false)) > 0;
 					}
 					throw;
 				}
@@ -596,7 +596,7 @@ namespace net.vieapps.Components.Caching
 		{
 			try
 			{
-				var keys = await redis.SetMembersAsync(key);
+				var keys = await redis.SetMembersAsync(key).ConfigureAwait(false);
 				return new HashSet<string>(keys?.Where(k => !k.IsNull).Select(k => k.ToString()) ?? new string[] { });
 			}
 			catch

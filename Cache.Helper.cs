@@ -2,24 +2,17 @@
 using System;
 using System.IO;
 using System.Text;
-using System.Xml;
 using System.Linq;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Dynamic;
 using System.Diagnostics;
 using System.Configuration;
-using System.Runtime.Serialization.Formatters.Binary;
 
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json.Bson;
-
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Caching.Distributed;
-using Microsoft.Extensions.DependencyInjection;
-
-using net.vieapps.Components.Caching;
 #endregion
 
 namespace net.vieapps.Components.Caching
@@ -31,7 +24,8 @@ namespace net.vieapps.Components.Caching
 		public const int ExpirationTime = 30;
 		public const int FlagOfJsonObject = 0xfb52;
 		public const int FlagOfJsonArray = 0xfc52;
-		public const int FlagOfFirstFragmentBlock = 0xfd52;
+		public const int FlagOfExpandoObject = 0xfd52;
+		public const int FlagOfFirstFragmentBlock = 0xfe52;
 		internal static readonly int FragmentSize = (1024 * 1024) - 128;
 		internal static readonly string RegionsKey = "VIEApps-NGX-Regions";
 		internal static readonly string RegionName = "VIEApps-NGX-Cache";
@@ -155,9 +149,11 @@ namespace net.vieapps.Components.Caching
 			var typeFlag = 0;
 			var data = new byte[0];
 
-			if (value != null && value is JToken)
+			if (value != null && (value is JToken || value is ExpandoObject))
 			{
-				typeFlag = value is JArray ? Helper.FlagOfJsonArray : Helper.FlagOfJsonObject;
+				typeFlag = value is JToken
+					? value is JArray ? Helper.FlagOfJsonArray : Helper.FlagOfJsonObject
+					: Helper.FlagOfExpandoObject;
 				using (var stream = new MemoryStream())
 				{
 					using (var writer = new BsonDataWriter(stream))
@@ -195,14 +191,16 @@ namespace net.vieapps.Components.Caching
 				return null;
 
 			var typeFlag = Helper.GetFlags(data).Item1;
-			if (typeFlag.Equals(Helper.FlagOfJsonObject) || typeFlag.Equals(Helper.FlagOfJsonArray))
+			if (typeFlag.Equals(Helper.FlagOfJsonObject) || typeFlag.Equals(Helper.FlagOfJsonArray) || typeFlag.Equals(Helper.FlagOfExpandoObject))
 				using (var stream = new MemoryStream(data, 4, data.Length - 4))
 				{
 					using (var reader = new BsonDataReader(stream))
 					{
 						if (typeFlag.Equals(Helper.FlagOfJsonArray))
 							reader.ReadRootValueAsArray = true;
-						return (new JsonSerializer()).Deserialize(reader);
+						return typeFlag.Equals(Helper.FlagOfExpandoObject)
+							? (new JsonSerializer()).Deserialize<ExpandoObject>(reader)
+							: (new JsonSerializer()).Deserialize(reader);
 					}
 				}
 			else
@@ -260,9 +258,9 @@ namespace net.vieapps.Components.Caching
 			// write logs into file
 			try
 			{
-				using (var stream =  new FileStream(filePath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite, 4096, true))
+				using (var stream = new FileStream(filePath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite, 4096, true))
 				{
-					using (var writer =  new StreamWriter(stream, System.Text.Encoding.UTF8))
+					using (var writer = new StreamWriter(stream, System.Text.Encoding.UTF8))
 					{
 						await writer.WriteLineAsync(content + "\r\n");
 					}

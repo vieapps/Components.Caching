@@ -275,7 +275,7 @@ namespace net.vieapps.Components.Caching
 			if (!string.IsNullOrWhiteSpace(key) && value != null)
 				try
 				{
-					success = await Redis.Client.SetAsync(this._GetKey(key), value, validFor);
+					success = await Redis.Client.SetAsync(this._GetKey(key), value, validFor).ConfigureAwait(false);
 				}
 				catch (ArgumentException)
 				{
@@ -360,7 +360,7 @@ namespace net.vieapps.Components.Caching
 		{
 			var validFor = TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime);
 			var success = fragments != null && fragments.Count > 0
-				? await Redis.Client.SetAsync(this._GetKey(key), Helper.GetFirstBlock(fragments), validFor)
+				? await Redis.Client.SetAsync(this._GetKey(key), Helper.GetFirstBlock(fragments), validFor).ConfigureAwait(false)
 				: false;
 
 			if (success && fragments.Count > 1)
@@ -368,7 +368,7 @@ namespace net.vieapps.Components.Caching
 				var items = new Dictionary<string, byte[]>();
 				for (var index = 1; index < fragments.Count; index++)
 					items[this._GetKey(this._GetFragmentKey(key, index))] = fragments[index];
-				await Redis.Client.SetAsync(items, validFor);
+				await Redis.Client.SetAsync(items, validFor).ConfigureAwait(false);
 			}
 
 			return success;
@@ -429,7 +429,7 @@ namespace net.vieapps.Components.Caching
 			if (!string.IsNullOrWhiteSpace(key) && value != null)
 				try
 				{
-					success = await Redis.Client.AddAsync(this._GetKey(key), value, validFor);
+					success = await Redis.Client.AddAsync(this._GetKey(key), value, validFor).ConfigureAwait(false);
 				}
 				catch (ArgumentException)
 				{
@@ -497,7 +497,7 @@ namespace net.vieapps.Components.Caching
 			if (!string.IsNullOrWhiteSpace(key) && value != null)
 				try
 				{
-					success = await Redis.Client.ReplaceAsync(this._GetKey(key), value, validFor);
+					success = await Redis.Client.ReplaceAsync(this._GetKey(key), value, validFor).ConfigureAwait(false);
 				}
 				catch (ArgumentException)
 				{
@@ -576,7 +576,7 @@ namespace net.vieapps.Components.Caching
 			object value = null;
 			try
 			{
-				value = await Redis.Client.GetAsync(this._GetKey(key), false);
+				value = await Redis.Client.GetAsync(this._GetKey(key), false).ConfigureAwait(false);
 			}
 			catch (Exception ex)
 			{
@@ -588,7 +588,7 @@ namespace net.vieapps.Components.Caching
 				if (autoGetFragments && Helper.GetFlags(value as byte[]).Item1.Equals(Helper.FlagOfFirstFragmentBlock))
 					try
 					{
-						value = await this._GetFromFragmentsAsync(key, value as byte[]);
+						value = await this._GetFromFragmentsAsync(key, value as byte[]).ConfigureAwait(false);
 					}
 					catch (Exception ex)
 					{
@@ -662,7 +662,7 @@ namespace net.vieapps.Components.Caching
 			IDictionary<string, object> items = null;
 			try
 			{
-				items = await Redis.Client.GetAsync(keys.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => this._GetKey(key)));
+				items = await Redis.Client.GetAsync(keys.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => this._GetKey(key))).ConfigureAwait(false);
 			}
 			catch (Exception ex)
 			{
@@ -683,7 +683,7 @@ namespace net.vieapps.Components.Caching
 			IDictionary<string, T> items = null;
 			try
 			{
-				items = await Redis.Client.GetAsync<T>(keys.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => this._GetKey(key)));
+				items = await Redis.Client.GetAsync<T>(keys.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => this._GetKey(key))).ConfigureAwait(false);
 			}
 			catch (Exception ex)
 			{
@@ -722,7 +722,7 @@ namespace net.vieapps.Components.Caching
 		{
 			var fragments = string.IsNullOrWhiteSpace(key) || indexes == null || indexes.Count < 1
 				? null
-				: await Redis.Client.GetAsync(indexes.Select(index => this._GetKey(index > 0 ? this._GetFragmentKey(key, index) : key)), false);
+				: await Redis.Client.GetAsync(indexes.Select(index => this._GetKey(index > 0 ? this._GetFragmentKey(key, index) : key)), false).ConfigureAwait(false);
 			return fragments != null
 				? fragments.OrderBy(kvp => kvp.Key).Select(kvp => kvp.Value as byte[]).ToList()
 				: new List<byte[]>();
@@ -762,7 +762,7 @@ namespace net.vieapps.Components.Caching
 			try
 			{
 				var info = Helper.GetFragments(firstBlock);
-				var data = Helper.Combine(firstBlock, await this._GetAsFragmentsAsync(key, Enumerable.Range(1, info.Item1 - 1).ToList()));
+				var data = Helper.Combine(firstBlock, await this._GetAsFragmentsAsync(key, Enumerable.Range(1, info.Item1 - 1).ToList()).ConfigureAwait(false));
 				return Helper.Deserialize(data, 8, data.Length - 8);
 			}
 			catch (Exception ex)
@@ -799,7 +799,7 @@ namespace net.vieapps.Components.Caching
 			if (!string.IsNullOrWhiteSpace(key))
 				try
 				{
-					success = await Redis.Client.RemoveAsync(this._GetKey(key));
+					success = await Redis.Client.RemoveAsync(this._GetKey(key)).ConfigureAwait(false);
 				}
 				catch (Exception ex)
 				{
@@ -846,11 +846,11 @@ namespace net.vieapps.Components.Caching
 
 		async Task _ClearAsync()
 		{
-			var keys = await this._GetKeysAsync();
+			var keys = await this._GetKeysAsync().ConfigureAwait(false);
 			await Task.WhenAll(
 				this._RemoveAsync(keys),
 				Redis.Client.RemoveAsync(this._RegionKey)
-			);
+			).ConfigureAwait(false);
 		}
 		#endregion
 
@@ -902,7 +902,7 @@ namespace net.vieapps.Components.Caching
 		{
 			try
 			{
-				await Redis.Client.UpdateSetMembersAsync(Helper.RegionsKey, name);
+				await Redis.Client.UpdateSetMembersAsync(Helper.RegionsKey, name).ConfigureAwait(false);
 			}
 			catch { }
 		}
@@ -1326,7 +1326,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns>The retrieved cache item, or a null reference if the key is not found</returns>
 		public async Task<T> GetAsync<T>(string key)
 		{
-			var @object = await this.GetAsync(key);
+			var @object = await this.GetAsync(key).ConfigureAwait(false);
 			return @object != null && @object is T
 				? (T)@object
 				: default(T);
