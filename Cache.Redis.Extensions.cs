@@ -196,7 +196,7 @@ namespace net.vieapps.Components.Caching
 		{
 			return string.IsNullOrWhiteSpace(key) || await redis.ExistsAsync(key).ConfigureAwait(false)
 				? false
-				: await redis.SetAsync(key, value, validFor);
+				: await redis.SetAsync(key, value, validFor).ConfigureAwait(false);
 		}
 
 		/// <summary>
@@ -571,7 +571,7 @@ namespace net.vieapps.Components.Caching
 		{
 			try
 			{
-				return await redis.SetRemoveAsync(key, value);
+				return await redis.SetRemoveAsync(key, value).ConfigureAwait(false);
 			}
 			catch
 			{
