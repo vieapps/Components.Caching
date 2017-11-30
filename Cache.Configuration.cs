@@ -130,8 +130,8 @@ namespace net.vieapps.Components.Caching
 				if (authentication.Attributes["type"]?.Value != null)
 					try
 					{
-						var authenticationType = Type.GetType(authentication.Attributes["type"].Value);
-						if (authenticationType != null)
+						var type = Type.GetType(authentication.Attributes["type"].Value);
+						if (type != null)
 						{
 							this.Authentication.Type = authentication.Attributes["type"].Value;
 							if (authentication.Attributes["zone"]?.Value != null)

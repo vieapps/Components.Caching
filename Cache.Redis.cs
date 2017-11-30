@@ -61,61 +61,70 @@ namespace net.vieapps.Components.Caching
 				if (!string.IsNullOrWhiteSpace(configuration.Options))
 					connectionString += (connectionString != "" ? "," : "") + configuration.Options;
 
-				Redis._Connection = string.IsNullOrWhiteSpace(connectionString) ? null : ConnectionMultiplexer.Connect(connectionString);
+				if (Redis._Connection == null)
+					Redis._Connection = string.IsNullOrWhiteSpace(connectionString) ? null : ConnectionMultiplexer.Connect(connectionString);
 			}
 			return Redis._Connection?.GetDatabase();
 		}
 
 		internal static IDatabase GetClient(CacheConfiguration configuration, ILoggerFactory loggerFactory = null)
 		{
-			if (configuration == null)
-				throw new ArgumentNullException(nameof(configuration));
+			if (Redis._Client == null)
+			{
+				if (configuration == null)
+					throw new ArgumentNullException(nameof(configuration));
 
-			var logger = loggerFactory?.CreateLogger<Cache>();
-			if (logger != null && logger.IsEnabled(LogLevel.Debug))
-				logger.LogInformation("An instance of Redis was created successful");
+				Redis._Client = Redis.GetClient(configuration.GetRedisConfiguration(loggerFactory), loggerFactory);
 
-			return Redis.GetClient(configuration.GetRedisConfiguration(loggerFactory), loggerFactory);
+				var logger = loggerFactory?.CreateLogger<Cache>();
+				if (logger != null && logger.IsEnabled(LogLevel.Debug))
+					logger.LogInformation("An instance of Redis was created successful");
+			}
+			return Redis._Client;
 		}
 
 		internal static IDatabase GetClient(ILoggerFactory loggerFactory = null)
 		{
-			var redisSection = ConfigurationManager.GetSection("redis") as RedisClientConfigurationSectionHandler;
-			if (redisSection != null)
+			if (Redis._Client == null)
 			{
-				var configuration = new RedisClientConfiguration();
-				if (redisSection.Section.SelectNodes("servers/add") is XmlNodeList servers)
-					foreach (XmlNode server in servers)
-					{
-						var address = server.Attributes["address"]?.Value ?? "localhost";
-						var port = Convert.ToInt32(server.Attributes["port"]?.Value ?? "6379");
-						configuration.Servers.Add(Enyim.Caching.Configuration.ConfigurationHelper.ResolveToEndPoint(address, port) as IPEndPoint);
-					}
+				var redisSection = ConfigurationManager.GetSection("redis") as RedisClientConfigurationSectionHandler;
+				if (redisSection != null)
+				{
+					var configuration = new RedisClientConfiguration();
+					if (redisSection.Section.SelectNodes("servers/add") is XmlNodeList servers)
+						foreach (XmlNode server in servers)
+						{
+							var address = server.Attributes["address"]?.Value ?? "localhost";
+							var port = Convert.ToInt32(server.Attributes["port"]?.Value ?? "6379");
+							configuration.Servers.Add(Enyim.Caching.Configuration.ConfigurationHelper.ResolveToEndPoint(address, port) as IPEndPoint);
+						}
 
-				if (redisSection.Section.SelectSingleNode("options") is XmlNode options)
-					foreach (XmlAttribute option in options.Attributes)
-						if (!string.IsNullOrWhiteSpace(option.Value))
-							configuration.Options += (configuration.Options != "" ? "," : "") + option.Name + "=" + option.Value;
+					if (redisSection.Section.SelectSingleNode("options") is XmlNode options)
+						foreach (XmlAttribute option in options.Attributes)
+							if (!string.IsNullOrWhiteSpace(option.Value))
+								configuration.Options += (configuration.Options != "" ? "," : "") + option.Name + "=" + option.Value;
 
-				var logger = loggerFactory?.CreateLogger<Cache>();
-				if (logger != null && logger.IsEnabled(LogLevel.Debug))
-					logger.LogInformation("An instance of Redis was created successful with stand-alone configuration (app.config/web.config) at the section named 'redis'");
+					Redis._Client = Redis.GetClient(configuration, loggerFactory);
 
-				return Redis.GetClient(configuration, loggerFactory);
+					var logger = loggerFactory?.CreateLogger<Cache>();
+					if (logger != null && logger.IsEnabled(LogLevel.Debug))
+						logger.LogInformation("An instance of Redis was created successful with stand-alone configuration (app.config/web.config) at the section named 'redis'");
+				}
+				else if (ConfigurationManager.GetSection("cache") is CacheConfigurationSectionHandler cacheSection)
+				{
+					Redis._Client = Redis.GetClient((new CacheConfiguration(cacheSection)).GetRedisConfiguration(loggerFactory), loggerFactory);
+
+					var logger = loggerFactory?.CreateLogger<Cache>();
+					if (logger != null && logger.IsEnabled(LogLevel.Debug))
+						logger.LogInformation("An instance of Redis was created successful with stand-alone configuration (app.config/web.config) at the section named 'cache'");
+				}
+				else
+				{
+					loggerFactory?.CreateLogger<Cache>()?.LogError("No configuration is found");
+					throw new ConfigurationErrorsException("The configuration file (app.config/web.config) must have a section named 'redis' or 'cache'!");
+				}
 			}
-			else if (ConfigurationManager.GetSection("cache") is CacheConfigurationSectionHandler cacheSection)
-			{
-				var logger = loggerFactory?.CreateLogger<Cache>();
-				if (logger != null && logger.IsEnabled(LogLevel.Debug))
-					logger.LogInformation("An instance of Redis was created successful with stand-alone configuration (app.config/web.config) at the section named 'cache'");
-
-				return Redis.GetClient((new CacheConfiguration(cacheSection)).GetRedisConfiguration(loggerFactory), loggerFactory);
-			}
-			else
-			{
-				loggerFactory?.CreateLogger<Cache>()?.LogError("No configuration is found");
-				throw new ConfigurationErrorsException("The configuration file (app.config/web.config) must have a section named 'redis' or 'cache'!");
-			}
+			return Redis._Client;
 		}
 
 		/// <summary>
@@ -125,8 +134,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="configuration"></param>
 		public static void PrepareClient(RedisClientConfiguration configuration, ILoggerFactory loggerFactory = null)
 		{
-			if (Redis._Client == null)
-				Redis._Client = Redis.GetClient(configuration, loggerFactory);
+			Redis.GetClient(configuration, loggerFactory);
 		}
 
 		/// <summary>
@@ -136,8 +144,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="configuration"></param>
 		public static void PrepareClient(CacheConfiguration configuration, ILoggerFactory loggerFactory = null)
 		{
-			if (Redis._Client == null)
-				Redis._Client = Redis.GetClient(configuration, loggerFactory);
+			Redis.GetClient(configuration, loggerFactory);
 		}
 
 		/// <summary>
@@ -146,8 +153,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="loggerFactory"></param>
 		public static void PrepareClient(ILoggerFactory loggerFactory = null)
 		{
-			if (Redis._Client == null)
-				Redis._Client = Redis.GetClient(loggerFactory);
+			Redis.GetClient(loggerFactory);
 		}
 
 		static IDatabase _Client;
@@ -160,10 +166,6 @@ namespace net.vieapps.Components.Caching
 			get
 			{
 				return Redis._Client ?? (Redis._Client = Redis.GetClient());
-			}
-			internal set
-			{
-				Redis._Client = value;
 			}
 		}
 		#endregion
