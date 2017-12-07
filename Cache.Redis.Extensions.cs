@@ -538,7 +538,7 @@ namespace net.vieapps.Components.Caching
 				{
 					if (ex.Message.Contains("WRONGTYPE"))
 					{
-						await redis.KeyDeleteAsync(key);
+						await redis.KeyDeleteAsync(key).ConfigureAwait(false);
 						return await redis.SetAddAsync(key, values.Where(v => !string.IsNullOrWhiteSpace(v)).Select(v => (RedisValue)v).ToArray()).ConfigureAwait(false) > 0;
 					}
 					throw;
