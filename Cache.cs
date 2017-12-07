@@ -104,7 +104,7 @@ namespace net.vieapps.Components.Caching
 				var configuration = new CacheConfiguration(configurationSection);
 				Cache.GetInstance(configuration, loggerFactory);
 
-				var logger = loggerFactory?.CreateLogger<Cache>();
+				var logger = loggerFactory?.CreateLogger<ICache>();
 				if (logger != null && logger.IsEnabled(LogLevel.Debug))
 					logger.LogInformation($"An instance of VIEApps Cache was created successful with stand-alone configuration (app.config/web.config) - {configuration.Provider}: {configuration.RegionName} ({configuration.ExpirationTime} minutes)");
 			}
@@ -116,13 +116,13 @@ namespace net.vieapps.Components.Caching
 			if (Cache._Instance == null)
 			{
 				var loggerFactory = svcProvider.GetService<ILoggerFactory>();
-				var configuration = svcProvider.GetService<CacheConfiguration>();
+				var configuration = svcProvider.GetService<ICacheConfiguration>();
 				if (configuration == null)
-					throw new ConfigurationErrorsException($"No configuration is found [{typeof(CacheConfiguration)}]");
+					throw new ConfigurationErrorsException($"No configuration is found [{typeof(ICacheConfiguration)}]");
 
-				Cache.GetInstance(configuration, loggerFactory);
+				Cache.GetInstance(configuration as CacheConfiguration, loggerFactory);
 
-				var logger = loggerFactory?.CreateLogger<Cache>();
+				var logger = loggerFactory?.CreateLogger<ICache>();
 				if (logger != null && logger.IsEnabled(LogLevel.Debug))
 					logger.LogInformation($"An instance of VIEApps Cache was created successful with integrated configuration - {configuration.Provider}: {configuration.RegionName} ({configuration.ExpirationTime} minutes)");
 			}
@@ -780,8 +780,8 @@ namespace net.vieapps.Components.Caching
 			var validFor = expires is TimeSpan
 				? (TimeSpan)expires
 				: CacheUtils.Helper.UnixEpoch.AddSeconds((long)expires).ToTimeSpan();
-			if (await this.SetAsync(key, value, validFor) && expires is TimeSpan && validFor != TimeSpan.Zero)
-				await this.SetAsync(key.GetIDistributedCacheExpirationKey(), expires, validFor);
+			if (await this.SetAsync(key, value, validFor).ConfigureAwait(false) && expires is TimeSpan && validFor != TimeSpan.Zero)
+				await this.SetAsync(key.GetIDistributedCacheExpirationKey(), expires, validFor).ConfigureAwait(false);
 		}
 
 		byte[] IDistributedCache.Get(string key)
@@ -813,11 +813,11 @@ namespace net.vieapps.Components.Caching
 		{
 			if (string.IsNullOrWhiteSpace(key))
 				throw new ArgumentNullException(nameof(key));
-			var value = await this.GetAsync<byte[]>(key);
-			var expires = value != null ? this.Get(key.GetIDistributedCacheExpirationKey()) : null;
+			var value = await this.GetAsync<byte[]>(key).ConfigureAwait(false);
+			var expires = value != null ? await this.GetAsync(key.GetIDistributedCacheExpirationKey()).ConfigureAwait(false) : null;
 			if (value != null && expires != null && expires is TimeSpan)
-				if (await this.ReplaceAsync(key, value, (TimeSpan)expires))
-					await this.ReplaceAsync(key.GetIDistributedCacheExpirationKey(), expires, (TimeSpan)expires);
+				if (await this.ReplaceAsync(key, value, (TimeSpan)expires).ConfigureAwait(false))
+					await this.ReplaceAsync(key.GetIDistributedCacheExpirationKey(), expires, (TimeSpan)expires).ConfigureAwait(false);
 		}
 
 		void IDistributedCache.Remove(string key)

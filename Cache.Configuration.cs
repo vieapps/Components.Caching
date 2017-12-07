@@ -23,7 +23,25 @@ namespace net.vieapps.Components.Caching
 	/// <summary>
 	/// Caching configuration
 	/// </summary>
-	public class CacheConfiguration
+	public interface ICacheConfiguration
+	{
+		string Provider { get; }
+		string RegionName { get; }
+		int ExpirationTime { get; }
+		IList<CacheServer> Servers { get; }
+		string Options { get; }
+		MemcachedProtocol Protocol { get; }
+		ISocketPoolConfiguration SocketPool { get; }
+		IAuthenticationConfiguration Authentication { get; }
+		string KeyTransformer { get; }
+		string Transcoder { get; }
+		string NodeLocator { get; }
+	}
+
+	/// <summary>
+	/// Caching configuration
+	/// </summary>
+	public class CacheConfiguration : ICacheConfiguration
 	{
 		public string Provider { get; set; } = "Redis";
 

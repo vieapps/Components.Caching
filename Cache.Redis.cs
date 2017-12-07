@@ -19,13 +19,13 @@ using CacheUtils;
 namespace net.vieapps.Components.Caching
 {
 	/// <summary>
-	/// Manipulates cached objects in isolated regions with redis
+	/// Manipulates cached objects in isolated regions with Redis
 	/// </summary>
 	[DebuggerDisplay("Redis: {Name} ({ExpirationTime} minutes)")]
 	public sealed class Redis : ICache
 	{
 		/// <summary>
-		/// Create new instance of redis
+		/// Create new instance of Redis
 		/// </summary>
 		/// <param name="name">The string that presents name of isolated region of the cache</param>
 		/// <param name="expirationTime">The number that presents times (in minutes) for caching an item</param>
@@ -289,7 +289,7 @@ namespace net.vieapps.Components.Caching
 				}
 
 			if (success)
-				await this._UpdateKeyAsync(key);
+				await this._UpdateKeyAsync(key).ConfigureAwait(false);
 
 			return success;
 		}
@@ -443,7 +443,7 @@ namespace net.vieapps.Components.Caching
 				}
 
 			if (success)
-				await this._UpdateKeyAsync(key);
+				await this._UpdateKeyAsync(key).ConfigureAwait(false);
 
 			return success;
 		}
@@ -511,7 +511,7 @@ namespace net.vieapps.Components.Caching
 				}
 
 			if (success)
-				await this._UpdateKeyAsync(key);
+				await this._UpdateKeyAsync(key).ConfigureAwait(false);
 
 			return success;
 		}
@@ -809,7 +809,7 @@ namespace net.vieapps.Components.Caching
 				}
 
 			if (success)
-				await this._RemoveKeyAsync(key);
+				await this._RemoveKeyAsync(key).ConfigureAwait(false);
 
 			return success;
 		}

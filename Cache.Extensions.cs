@@ -26,8 +26,8 @@ namespace Microsoft.Extensions.DependencyInjection
 
 			services.AddOptions();
 			services.Configure(setupAction);
-			services.Add(ServiceDescriptor.Singleton<CacheConfiguration, CacheConfiguration>());
-			services.Add(ServiceDescriptor.Singleton<Cache, Cache>(s => Cache.GetInstance(s)));
+			services.Add(ServiceDescriptor.Singleton<ICacheConfiguration, CacheConfiguration>());
+			services.Add(ServiceDescriptor.Singleton<ICache, Cache>(s => Cache.GetInstance(s)));
 			if (addInstanceOfIDistributedCache)
 				services.Add(ServiceDescriptor.Singleton<IDistributedCache, Cache>(s => Cache.GetInstance(s)));
 
@@ -41,7 +41,7 @@ namespace Microsoft.AspNetCore.Builder
 	public static partial class ApplicationBuilderExtensions
 	{
 		/// <summary>
-		/// Calls to use the service of <see cref="net.vieapps.Components.Caching.Cache">VIEApps Cache</see>
+		/// Calls to use the service of <see cref="net.vieapps.Components.Caching.ICache">VIEApps Cache</see>
 		/// </summary>
 		/// <param name="appBuilder"></param>
 		/// <returns></returns>
@@ -49,11 +49,11 @@ namespace Microsoft.AspNetCore.Builder
 		{
 			try
 			{
-				appBuilder.ApplicationServices.GetService<ILogger<Cache>>().LogInformation($"VIEApps Cache is {(appBuilder.ApplicationServices.GetService<Cache>() != null ? "" : "not-")}started");
+				appBuilder.ApplicationServices.GetService<ILogger<ICache>>().LogInformation($"VIEApps Cache is {(appBuilder.ApplicationServices.GetService<ICache>() != null ? "" : "not-")}started");
 			}
 			catch (Exception ex)
 			{
-				appBuilder.ApplicationServices.GetService<ILogger<Cache>>().LogError(ex, "VIEApps Cache is failed to start");
+				appBuilder.ApplicationServices.GetService<ILogger<ICache>>().LogError(ex, "VIEApps Cache is failed to start");
 			}
 			return appBuilder;
 		}

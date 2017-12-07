@@ -404,7 +404,7 @@ namespace net.vieapps.Components.Caching
 		internal static async Task<IDictionary<string, object>> GetAsync(this IDatabase redis, IEnumerable<string> keys, bool doDeserialize)
 		{
 			var objects = new Dictionary<string, object>();
-			await Task.WhenAll(keys?.Where(key => !string.IsNullOrWhiteSpace(key)).Select(async (key) => objects[key] = await redis.GetAsync(key, doDeserialize).ConfigureAwait(false)) ?? new List<Task<object>>());
+			await Task.WhenAll(keys?.Where(key => !string.IsNullOrWhiteSpace(key)).Select(async (key) => objects[key] = await redis.GetAsync(key, doDeserialize).ConfigureAwait(false)) ?? new List<Task<object>>()).ConfigureAwait(false);
 			return objects;
 		}
 
@@ -443,7 +443,7 @@ namespace net.vieapps.Components.Caching
 		public static async Task<IDictionary<string, T>> GetAsync<T>(this IDatabase redis, IEnumerable<string> keys)
 		{
 			var objects = new Dictionary<string, T>();
-			await Task.WhenAll(keys?.Where(key => !string.IsNullOrWhiteSpace(key)).Select(async (key) => objects[key] = await redis.GetAsync<T>(key).ConfigureAwait(false)) ?? new List<Task<T>>());
+			await Task.WhenAll(keys?.Where(key => !string.IsNullOrWhiteSpace(key)).Select(async (key) => objects[key] = await redis.GetAsync<T>(key).ConfigureAwait(false)) ?? new List<Task<T>>()).ConfigureAwait(false);
 			return objects;
 		}
 

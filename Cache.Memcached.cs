@@ -17,13 +17,13 @@ using Microsoft.Extensions.Logging;
 namespace net.vieapps.Components.Caching
 {
 	/// <summary>
-	/// Manipulates cached objects in isolated regions with memcached
+	/// Manipulates cached objects in isolated regions with Memcached
 	/// </summary>
 	[DebuggerDisplay("Memcached: {Name} ({ExpirationTime} minutes)")]
 	public sealed class Memcached : ICache
 	{
 		/// <summary>
-		/// Create new instance of memcached
+		/// Create new instance of Memcached
 		/// </summary>
 		/// <param name="name">The string that presents name of isolated region of the cache</param>
 		/// <param name="expirationTime">The number that presents times (in minutes) for caching an item</param>
