@@ -60,7 +60,7 @@ namespace net.vieapps.Components.Caching
 
 				Memcached._Client = new MemcachedClient(loggerFactory, configuration.GetMemcachedConfiguration(loggerFactory));
 
-				var logger = loggerFactory?.CreateLogger<Cache>();
+				var logger = loggerFactory?.CreateLogger<ICache>();
 				if (logger != null && logger.IsEnabled(LogLevel.Debug))
 					logger.LogInformation("An instance of Memcached was created successful");
 			}
@@ -76,7 +76,7 @@ namespace net.vieapps.Components.Caching
 				{
 					Memcached._Client = new MemcachedClient(memcachedSection, loggerFactory);
 
-					var logger = loggerFactory?.CreateLogger<Cache>();
+					var logger = loggerFactory?.CreateLogger<ICache>();
 					if (logger != null && logger.IsEnabled(LogLevel.Debug))
 						logger.LogInformation("An instance of Memcached was created successful with stand-alone configuration (app.config/web.config) at the section named 'memcached'");
 				}
@@ -84,13 +84,13 @@ namespace net.vieapps.Components.Caching
 				{
 					Memcached._Client = new MemcachedClient(loggerFactory, (new CacheConfiguration(cacheSection)).GetMemcachedConfiguration(loggerFactory));
 
-					var logger = loggerFactory?.CreateLogger<Cache>();
+					var logger = loggerFactory?.CreateLogger<ICache>();
 					if (logger != null && logger.IsEnabled(LogLevel.Debug))
 						logger.LogInformation("An instance of Memcached was created successful with stand-alone configuration (app.config/web.config) at the section named 'cache'");
 				}
 				else
 				{
-					loggerFactory?.CreateLogger<Cache>()?.LogError("No configuration is found");
+					loggerFactory?.CreateLogger<ICache>()?.LogError("No configuration is found");
 					throw new ConfigurationErrorsException("The configuration file (app.config/web.config) must have a section named 'memcached' or 'cache'!");
 				}
 			}
@@ -853,9 +853,9 @@ namespace net.vieapps.Components.Caching
 			var fragments = Enumerable.Repeat(new byte[0], BitConverter.ToInt32(tmp, 0)).ToList();
 			if (fragments.Count > 1)
 			{
-				Func<int, Task> func = async (index) =>
+				Func<int, Task> func = (index) =>
 				{
-					fragments[index] = await Memcached.Client.GetAsync<byte[]>(key + ":" + index).ConfigureAwait(false);
+					return Task.Run(() => fragments[index] = Memcached.Client.Get<byte[]>(key + ":" + index));
 				};
 				var tasks = new List<Task>();
 				for (var index = 1; index < fragments.Count; index++)

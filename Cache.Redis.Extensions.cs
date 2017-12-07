@@ -532,14 +532,14 @@ namespace net.vieapps.Components.Caching
 			if (!string.IsNullOrWhiteSpace(key) && values != null && values.Length > 0)
 				try
 				{
-					return (await redis.SetAddAsync(key, values.Where(v => !string.IsNullOrWhiteSpace(v)).Select(v => (RedisValue)v).ToArray()).ConfigureAwait(false)) > 0;
+					return await redis.SetAddAsync(key, values.Where(v => !string.IsNullOrWhiteSpace(v)).Select(v => (RedisValue)v).ToArray()).ConfigureAwait(false) > 0;
 				}
 				catch (RedisServerException ex)
 				{
 					if (ex.Message.Contains("WRONGTYPE"))
 					{
 						await redis.KeyDeleteAsync(key);
-						return (await redis.SetAddAsync(key, values.Where(v => !string.IsNullOrWhiteSpace(v)).Select(v => (RedisValue)v).ToArray()).ConfigureAwait(false)) > 0;
+						return await redis.SetAddAsync(key, values.Where(v => !string.IsNullOrWhiteSpace(v)).Select(v => (RedisValue)v).ToArray()).ConfigureAwait(false) > 0;
 					}
 					throw;
 				}

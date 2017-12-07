@@ -60,15 +60,14 @@ namespace net.vieapps.Components.Caching
 		#region Split & Combine
 		internal static byte[] Combine(byte[] first, IEnumerable<byte[]> arrays)
 		{
-			var combined = new byte[first.Length + arrays.Sum(a => a?.Length ?? 0)];
+			var combined = new byte[first.Length + arrays.Where(a => a != null).Sum(a => a.Length)];
 			var offset = first.Length;
 			Buffer.BlockCopy(first, 0, combined, 0, offset);
-			foreach (var array in arrays)
-				if (array != null)
-				{
-					Buffer.BlockCopy(array, 0, combined, offset, array.Length);
-					offset += array.Length;
-				}
+			arrays.Where(a => a != null).ToList().ForEach(a =>
+			{
+				Buffer.BlockCopy(a, 0, combined, offset, a.Length);
+				offset += a.Length;
+			});
 			return combined;
 		}
 
@@ -158,7 +157,7 @@ namespace net.vieapps.Components.Caching
 				{
 					using (var writer = new BsonDataWriter(stream))
 					{
-						(new JsonSerializer()).Serialize(writer, value);
+						new JsonSerializer().Serialize(writer, value);
 						data = stream.GetBuffer();
 					}
 				}
@@ -199,8 +198,8 @@ namespace net.vieapps.Components.Caching
 						if (typeFlag.Equals(Helper.FlagOfJsonArray))
 							reader.ReadRootValueAsArray = true;
 						return typeFlag.Equals(Helper.FlagOfExpandoObject)
-							? (new JsonSerializer()).Deserialize<ExpandoObject>(reader)
-							: (new JsonSerializer()).Deserialize(reader);
+							? new JsonSerializer().Deserialize<ExpandoObject>(reader)
+							: new JsonSerializer().Deserialize(reader);
 					}
 				}
 			else
@@ -222,7 +221,7 @@ namespace net.vieapps.Components.Caching
 
 		static string LogsPath = null;
 
-		internal static async Task WriteLogs(string filePath, string region, List<string> logs, Exception ex)
+		internal static async Task WriteLogsAsync(string filePath, string region, List<string> logs, Exception ex)
 		{
 			// prepare
 			var info = Helper.GetLogPrefix(DateTime.Now.ToString("HH:mm:ss.fff"), "\t") + "\t" + region + "\t";
@@ -262,7 +261,7 @@ namespace net.vieapps.Components.Caching
 				{
 					using (var writer = new StreamWriter(stream, System.Text.Encoding.UTF8))
 					{
-						await writer.WriteLineAsync(content + "\r\n");
+						await writer.WriteLineAsync(content + "\r\n").ConfigureAwait(false);
 					}
 				}
 			}
@@ -288,20 +287,16 @@ namespace net.vieapps.Components.Caching
 				}
 				catch { }
 
-			// stop if a valid path is not found
-			if (string.IsNullOrWhiteSpace(Helper.LogsPath))
-				return;
-
-			// build file path and write logs via other thread
-			var filePath = Helper.LogsPath + DateTime.Now.ToString("yyyy-MM-dd") + ".cache.txt";
-			Task.Run(async () =>
-			{
-				try
+			// write logs
+			if (!string.IsNullOrWhiteSpace(Helper.LogsPath))
+				Task.Run(async () =>
 				{
-					await Helper.WriteLogs(filePath, region, logs, ex).ConfigureAwait(false);
-				}
-				catch { }
-			}).ConfigureAwait(false);
+					try
+					{
+						await Helper.WriteLogsAsync(Helper.LogsPath + DateTime.Now.ToString("yyyy-MM-dd") + ".cache.txt", region, logs, ex).ConfigureAwait(false);
+					}
+					catch { }
+				}).ConfigureAwait(false);
 		}
 
 		internal static void WriteLogs(string region, string log, Exception ex)

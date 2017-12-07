@@ -804,9 +804,8 @@ namespace net.vieapps.Components.Caching
 				throw new ArgumentNullException(nameof(key));
 			var value = this.Get<byte[]>(key);
 			var expires = value != null ? this.Get(key.GetIDistributedCacheExpirationKey()) : null;
-			if (value != null && expires != null && expires is TimeSpan)
-				if (this.Replace(key, value, (TimeSpan)expires))
-					this.Replace(key.GetIDistributedCacheExpirationKey(), expires, (TimeSpan)expires);
+			if (value != null && expires != null && expires is TimeSpan && this.Replace(key, value, (TimeSpan)expires))
+				this.Replace(key.GetIDistributedCacheExpirationKey(), expires, (TimeSpan)expires);
 		}
 
 		async Task IDistributedCache.RefreshAsync(string key, CancellationToken token = default(CancellationToken))
@@ -815,9 +814,8 @@ namespace net.vieapps.Components.Caching
 				throw new ArgumentNullException(nameof(key));
 			var value = await this.GetAsync<byte[]>(key).ConfigureAwait(false);
 			var expires = value != null ? await this.GetAsync(key.GetIDistributedCacheExpirationKey()).ConfigureAwait(false) : null;
-			if (value != null && expires != null && expires is TimeSpan)
-				if (await this.ReplaceAsync(key, value, (TimeSpan)expires).ConfigureAwait(false))
-					await this.ReplaceAsync(key.GetIDistributedCacheExpirationKey(), expires, (TimeSpan)expires).ConfigureAwait(false);
+			if (value != null && expires != null && expires is TimeSpan && await this.ReplaceAsync(key, value, (TimeSpan)expires).ConfigureAwait(false))
+				await this.ReplaceAsync(key.GetIDistributedCacheExpirationKey(), expires, (TimeSpan)expires).ConfigureAwait(false);
 		}
 
 		void IDistributedCache.Remove(string key)

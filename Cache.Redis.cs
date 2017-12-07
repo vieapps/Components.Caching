@@ -76,7 +76,7 @@ namespace net.vieapps.Components.Caching
 
 				Redis._Client = Redis.GetClient(configuration.GetRedisConfiguration(loggerFactory), loggerFactory);
 
-				var logger = loggerFactory?.CreateLogger<Cache>();
+				var logger = loggerFactory?.CreateLogger<ICache>();
 				if (logger != null && logger.IsEnabled(LogLevel.Debug))
 					logger.LogInformation("An instance of Redis was created successful");
 			}
@@ -106,7 +106,7 @@ namespace net.vieapps.Components.Caching
 
 					Redis._Client = Redis.GetClient(configuration, loggerFactory);
 
-					var logger = loggerFactory?.CreateLogger<Cache>();
+					var logger = loggerFactory?.CreateLogger<ICache>();
 					if (logger != null && logger.IsEnabled(LogLevel.Debug))
 						logger.LogInformation("An instance of Redis was created successful with stand-alone configuration (app.config/web.config) at the section named 'redis'");
 				}
@@ -114,13 +114,13 @@ namespace net.vieapps.Components.Caching
 				{
 					Redis._Client = Redis.GetClient((new CacheConfiguration(cacheSection)).GetRedisConfiguration(loggerFactory), loggerFactory);
 
-					var logger = loggerFactory?.CreateLogger<Cache>();
+					var logger = loggerFactory?.CreateLogger<ICache>();
 					if (logger != null && logger.IsEnabled(LogLevel.Debug))
 						logger.LogInformation("An instance of Redis was created successful with stand-alone configuration (app.config/web.config) at the section named 'cache'");
 				}
 				else
 				{
-					loggerFactory?.CreateLogger<Cache>()?.LogError("No configuration is found");
+					loggerFactory?.CreateLogger<ICache>()?.LogError("No configuration is found");
 					throw new ConfigurationErrorsException("The configuration file (app.config/web.config) must have a section named 'redis' or 'cache'!");
 				}
 			}
