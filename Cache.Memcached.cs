@@ -56,7 +56,7 @@ namespace net.vieapps.Components.Caching
 			if (Memcached._Client == null)
 			{
 				if (configuration == null)
-					throw new ArgumentNullException(nameof(configuration));
+					throw new ArgumentNullException(nameof(configuration), "No configuration is found for creating new an instance of Memcached");
 
 				Memcached._Client = new MemcachedClient(loggerFactory, configuration.GetMemcachedConfiguration(loggerFactory));
 
@@ -90,7 +90,7 @@ namespace net.vieapps.Components.Caching
 				}
 				else
 				{
-					loggerFactory?.CreateLogger<ICache>()?.LogError("No configuration is found");
+					loggerFactory?.CreateLogger<ICache>()?.LogError("No configuration of Memcached is found");
 					throw new ConfigurationErrorsException("The configuration file (app.config/web.config) must have a section named 'memcached' or 'cache'!");
 				}
 			}

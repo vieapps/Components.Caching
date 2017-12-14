@@ -62,7 +62,14 @@ namespace net.vieapps.Components.Caching
 					connectionString += (connectionString != "" ? "," : "") + configuration.Options;
 
 				if (Redis._Connection == null)
-					Redis._Connection = string.IsNullOrWhiteSpace(connectionString) ? null : ConnectionMultiplexer.Connect(connectionString);
+					try
+					{
+						Redis._Connection = string.IsNullOrWhiteSpace(connectionString) ? null : ConnectionMultiplexer.Connect(connectionString);
+					}
+					catch (Exception ex)
+					{
+						throw new ConfigurationErrorsException("Error occurred while creating the connection of Redis", ex);
+					}
 			}
 			return Redis._Connection?.GetDatabase();
 		}
@@ -72,7 +79,7 @@ namespace net.vieapps.Components.Caching
 			if (Redis._Client == null)
 			{
 				if (configuration == null)
-					throw new ArgumentNullException(nameof(configuration));
+					throw new ArgumentNullException(nameof(configuration), "No configuration is found for creating new an instance of Redis");
 
 				Redis._Client = Redis.GetClient(configuration.GetRedisConfiguration(loggerFactory), loggerFactory);
 
@@ -120,7 +127,7 @@ namespace net.vieapps.Components.Caching
 				}
 				else
 				{
-					loggerFactory?.CreateLogger<ICache>()?.LogError("No configuration is found");
+					loggerFactory?.CreateLogger<ICache>()?.LogError("No configuration of Redis is found");
 					throw new ConfigurationErrorsException("The configuration file (app.config/web.config) must have a section named 'redis' or 'cache'!");
 				}
 			}
