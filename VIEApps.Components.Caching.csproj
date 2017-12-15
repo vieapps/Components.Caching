@@ -13,12 +13,12 @@
 		<Company>VIEApps.net</Company>
 		<GeneratePackageOnBuild>false</GeneratePackageOnBuild>
 		<PackageId>VIEApps.Components.Caching</PackageId>
-		<Version>10.1.5.1801-rc5</Version>
+		<Version>10.1.5.1801</Version>
 		<SignAssembly>false</SignAssembly>
 		<DelaySign>false</DelaySign>
 		<AssemblyOriginatorKeyFile>../VIEApps.Components.snk</AssemblyOriginatorKeyFile>
 		<Title>VIEApps NGX Caching</Title>
-		<Description>The .NET Standard 2.0 wrapper library for working with distributed cache (memcached &amp; redis)</Description>
+		<Description>The .NET Standard 2.0 wrapper library for working with distributed cache (Memcached &amp; Redis)</Description>
 		<Authors>VIEApps.net</Authors>
 		<Copyright>© 2018 VIEApps.net</Copyright>
 		<PackageTags>cache;distributedcache;memcached;redis;vieapps;vieapps.components</PackageTags>
@@ -50,7 +50,7 @@
 		<PackageReference Include="Newtonsoft.Json" Version="10.0.3" />
 		<PackageReference Include="Newtonsoft.Json.Bson" Version="1.0.1" />
 		<PackageReference Include="StackExchange.Redis" Version="1.2.6" />
-		<PackageReference Include="VIEApps.Enyim.Caching" Version="1.4.0.1801-rc5" />
+		<PackageReference Include="VIEApps.Enyim.Caching" Version="1.4.0.1801-rc8" />
 	</ItemGroup>
 
 </Project>

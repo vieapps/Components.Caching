@@ -56,11 +56,11 @@ namespace net.vieapps.Components.Caching
 			if (Memcached._Client == null)
 			{
 				if (configuration == null)
-					throw new ArgumentNullException(nameof(configuration), "No configuration is found for creating new an instance of Memcached");
+					throw new ArgumentNullException(nameof(configuration), "No configuration is found");
 
 				Memcached._Client = new MemcachedClient(loggerFactory, configuration.GetMemcachedConfiguration(loggerFactory));
 
-				var logger = loggerFactory?.CreateLogger<ICache>();
+				var logger = loggerFactory?.CreateLogger<Memcached>();
 				if (logger != null && logger.IsEnabled(LogLevel.Debug))
 					logger.LogInformation("An instance of Memcached was created successful");
 			}
@@ -71,12 +71,11 @@ namespace net.vieapps.Components.Caching
 		{
 			if (Memcached._Client == null)
 			{
-				var memcachedSection = ConfigurationManager.GetSection("memcached") as MemcachedClientConfigurationSectionHandler;
-				if (memcachedSection != null)
+				if (ConfigurationManager.GetSection("memcached") is MemcachedClientConfigurationSectionHandler memcachedSection)
 				{
 					Memcached._Client = new MemcachedClient(memcachedSection, loggerFactory);
 
-					var logger = loggerFactory?.CreateLogger<ICache>();
+					var logger = loggerFactory?.CreateLogger<Memcached>();
 					if (logger != null && logger.IsEnabled(LogLevel.Debug))
 						logger.LogInformation("An instance of Memcached was created successful with stand-alone configuration (app.config/web.config) at the section named 'memcached'");
 				}
@@ -84,14 +83,14 @@ namespace net.vieapps.Components.Caching
 				{
 					Memcached._Client = new MemcachedClient(loggerFactory, (new CacheConfiguration(cacheSection)).GetMemcachedConfiguration(loggerFactory));
 
-					var logger = loggerFactory?.CreateLogger<ICache>();
+					var logger = loggerFactory?.CreateLogger<Memcached>();
 					if (logger != null && logger.IsEnabled(LogLevel.Debug))
 						logger.LogInformation("An instance of Memcached was created successful with stand-alone configuration (app.config/web.config) at the section named 'cache'");
 				}
 				else
 				{
-					loggerFactory?.CreateLogger<ICache>()?.LogError("No configuration of Memcached is found");
-					throw new ConfigurationErrorsException("The configuration file (app.config/web.config) must have a section named 'memcached' or 'cache'!");
+					loggerFactory?.CreateLogger<Memcached>()?.LogError("No configuration is found");
+					throw new ConfigurationErrorsException("No configuration is found. The configuration file (app.config/web.config) must have a section named 'memcached' or 'cache'.");
 				}
 			}
 			return Memcached._Client;
@@ -130,7 +129,7 @@ namespace net.vieapps.Components.Caching
 		static MemcachedClient _Client;
 
 		/// <summary>
-		/// Gets the instance of memcached client
+		/// Gets the instance of the Memcached client
 		/// </summary>
 		public static MemcachedClient Client
 		{
@@ -144,13 +143,13 @@ namespace net.vieapps.Components.Caching
 		#region Attributes
 		string _name;
 		int _expirationTime;
-		bool _storeKeys, _isUpdatingKeys = false;
+		bool _storeKeys = false, _isUpdatingKeys = false;
 		HashSet<string> _addedKeys, _removedKeys;
 		ReaderWriterLockSlim _locker = new ReaderWriterLockSlim(LockRecursionPolicy.SupportsRecursion);
 		#endregion
 
 		#region Keys
-		async Task _UpdateKeysAsync(bool checkUpdatedKeys = true, Action callback = null)
+		async Task _UpdateKeysAsync(int delay = 13, bool checkUpdatedKeys = true, Action callback = null)
 		{
 			// no key need to update, then stop
 			if (checkUpdatedKeys && this._addedKeys.Count < 1 && this._removedKeys.Count < 1)
@@ -162,6 +161,7 @@ namespace net.vieapps.Components.Caching
 
 			// set flag
 			this._isUpdatingKeys = true;
+			await Task.Delay(delay).ConfigureAwait(false);
 
 			// prepare
 			var syncKeys = await Memcached.FetchKeysAsync(this._RegionKey).ConfigureAwait(false);
@@ -220,20 +220,12 @@ namespace net.vieapps.Components.Caching
 		void _UpdateKeys(int delay = 13, bool checkUpdatedKeys = true, Action callback = null)
 		{
 			if (this._storeKeys)
-				Task.Run(async () =>
-				{
-					await Task.Delay(delay).ConfigureAwait(false);
-					await this._UpdateKeysAsync(checkUpdatedKeys, callback).ConfigureAwait(false);
-				}).ConfigureAwait(false);
+				Task.Run(async () => await this._UpdateKeysAsync(delay, checkUpdatedKeys, callback).ConfigureAwait(false)).ConfigureAwait(false);
 		}
 
 		void _UpdateKeys(string key, bool doPush)
 		{
-			// update added keys
-			if (!this._storeKeys)
-				return;
-
-			if (!this._addedKeys.Contains(key))
+			if (this._storeKeys && !this._addedKeys.Contains(key))
 				try
 				{
 					this._locker.EnterWriteLock();
@@ -249,7 +241,7 @@ namespace net.vieapps.Components.Caching
 						this._locker.ExitWriteLock();
 				}
 
-			if (doPush && this._addedKeys.Count > 0)
+			if (this._storeKeys && doPush && this._addedKeys.Count > 0)
 				this._UpdateKeys(113);
 		}
 
@@ -282,7 +274,7 @@ namespace net.vieapps.Components.Caching
 					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
 				}
 
-			if (success)
+			if (success && this._storeKeys)
 				this._UpdateKeys(key, doPush);
 
 			return success;
@@ -310,7 +302,7 @@ namespace net.vieapps.Components.Caching
 					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
 				}
 
-			if (success)
+			if (success && this._storeKeys)
 				this._UpdateKeys(key, doPush);
 
 			return success;
@@ -333,7 +325,7 @@ namespace net.vieapps.Components.Caching
 					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
 				}
 
-			if (success)
+			if (success && this._storeKeys)
 				this._UpdateKeys(key, doPush);
 
 			return success;
@@ -361,7 +353,7 @@ namespace net.vieapps.Components.Caching
 					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
 				}
 
-			if (success)
+			if (success && this._storeKeys)
 				this._UpdateKeys(key, doPush);
 
 			return success;
@@ -663,7 +655,7 @@ namespace net.vieapps.Components.Caching
 					Helper.WriteLogs(this.Name, $"Error occurred while removing an object from cache storage [{key}]", ex);
 				}
 
-			if (success)
+			if (success && this._storeKeys)
 			{
 				if (!this._removedKeys.Contains(key))
 					try
@@ -701,7 +693,7 @@ namespace net.vieapps.Components.Caching
 					Helper.WriteLogs(this.Name, $"Error occurred while removing an object from cache storage [{key}]", ex);
 				}
 
-			if (success)
+			if (success && this._storeKeys)
 			{
 				if (!this._removedKeys.Contains(key))
 					try

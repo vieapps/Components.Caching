@@ -196,7 +196,7 @@ namespace net.vieapps.Components.Caching
 				configuration.Authentication.Parameters[kvp.Key] = kvp.Value;
 
 			if (!string.IsNullOrWhiteSpace(this.KeyTransformer))
-				configuration.KeyTransformer = FastActivator.Create(Type.GetType(this.KeyTransformer)) as IMemcachedKeyTransformer;
+				configuration.KeyTransformer = FastActivator.Create(Type.GetType(this.KeyTransformer)) as IKeyTransformer;
 
 			if (!string.IsNullOrWhiteSpace(this.Transcoder))
 				configuration.Transcoder = FastActivator.Create(Type.GetType(this.Transcoder)) as ITranscoder;

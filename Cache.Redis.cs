@@ -68,7 +68,8 @@ namespace net.vieapps.Components.Caching
 					}
 					catch (Exception ex)
 					{
-						throw new ConfigurationErrorsException("Error occurred while creating the connection of Redis", ex);
+						loggerFactory?.CreateLogger<Redis>()?.LogError(ex, $"Error occurred while creating the connection of Redis [{connectionString}]");
+						throw new ConfigurationErrorsException($"Error occurred while creating the connection of Redis [{connectionString}]", ex);
 					}
 			}
 			return Redis._Connection?.GetDatabase();
@@ -79,11 +80,11 @@ namespace net.vieapps.Components.Caching
 			if (Redis._Client == null)
 			{
 				if (configuration == null)
-					throw new ArgumentNullException(nameof(configuration), "No configuration is found for creating new an instance of Redis");
+					throw new ArgumentNullException(nameof(configuration), "No configuration is found");
 
 				Redis._Client = Redis.GetClient(configuration.GetRedisConfiguration(loggerFactory), loggerFactory);
 
-				var logger = loggerFactory?.CreateLogger<ICache>();
+				var logger = loggerFactory?.CreateLogger<Redis>();
 				if (logger != null && logger.IsEnabled(LogLevel.Debug))
 					logger.LogInformation("An instance of Redis was created successful");
 			}
@@ -113,7 +114,7 @@ namespace net.vieapps.Components.Caching
 
 					Redis._Client = Redis.GetClient(configuration, loggerFactory);
 
-					var logger = loggerFactory?.CreateLogger<ICache>();
+					var logger = loggerFactory?.CreateLogger<Redis>();
 					if (logger != null && logger.IsEnabled(LogLevel.Debug))
 						logger.LogInformation("An instance of Redis was created successful with stand-alone configuration (app.config/web.config) at the section named 'redis'");
 				}
@@ -121,14 +122,14 @@ namespace net.vieapps.Components.Caching
 				{
 					Redis._Client = Redis.GetClient((new CacheConfiguration(cacheSection)).GetRedisConfiguration(loggerFactory), loggerFactory);
 
-					var logger = loggerFactory?.CreateLogger<ICache>();
+					var logger = loggerFactory?.CreateLogger<Redis>();
 					if (logger != null && logger.IsEnabled(LogLevel.Debug))
 						logger.LogInformation("An instance of Redis was created successful with stand-alone configuration (app.config/web.config) at the section named 'cache'");
 				}
 				else
 				{
-					loggerFactory?.CreateLogger<ICache>()?.LogError("No configuration of Redis is found");
-					throw new ConfigurationErrorsException("The configuration file (app.config/web.config) must have a section named 'redis' or 'cache'!");
+					loggerFactory?.CreateLogger<Redis>()?.LogError("No configuration is found");
+					throw new ConfigurationErrorsException("No configuration is found. The configuration file (app.config/web.config) must have a section named 'redis' or 'cache'.");
 				}
 			}
 			return Redis._Client;
@@ -166,7 +167,7 @@ namespace net.vieapps.Components.Caching
 		static IDatabase _Client;
 
 		/// <summary>
-		/// Gets the instance of redis client
+		/// Gets the instance of the Redis client
 		/// </summary>
 		public static IDatabase Client
 		{
@@ -262,7 +263,7 @@ namespace net.vieapps.Components.Caching
 					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
 				}
 
-			if (success)
+			if (success && this._storeKeys)
 				this._UpdateKey(key);
 
 			return success;
@@ -295,7 +296,7 @@ namespace net.vieapps.Components.Caching
 					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
 				}
 
-			if (success)
+			if (success && this._storeKeys)
 				await this._UpdateKeyAsync(key).ConfigureAwait(false);
 
 			return success;
@@ -320,7 +321,8 @@ namespace net.vieapps.Components.Caching
 					: new Dictionary<string, T>(),
 				TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime)
 			);
-			this._UpdateKeys(items, keyPrefix);
+			if (this._storeKeys)
+				this._UpdateKeys(items, keyPrefix);
 		}
 
 		void _Set(IDictionary<string, object> items, string keyPrefix = null, int expirationTime = 0)
@@ -336,7 +338,7 @@ namespace net.vieapps.Components.Caching
 					: new Dictionary<string, T>(),
 					TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime)
 				),
-				this._UpdateKeysAsync(items, keyPrefix)
+				this._storeKeys ? this._UpdateKeysAsync(items, keyPrefix) : Task.CompletedTask
 			);
 		}
 
@@ -416,7 +418,7 @@ namespace net.vieapps.Components.Caching
 					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
 				}
 
-			if (success)
+			if (success && this._storeKeys)
 				this._UpdateKey(key);
 
 			return success;
@@ -449,7 +451,7 @@ namespace net.vieapps.Components.Caching
 					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
 				}
 
-			if (success)
+			if (success && this._storeKeys)
 				await this._UpdateKeyAsync(key).ConfigureAwait(false);
 
 			return success;
@@ -484,7 +486,7 @@ namespace net.vieapps.Components.Caching
 					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
 				}
 
-			if (success)
+			if (success && this._storeKeys)
 				this._UpdateKey(key);
 
 			return success;
@@ -517,7 +519,7 @@ namespace net.vieapps.Components.Caching
 					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
 				}
 
-			if (success)
+			if (success && this._storeKeys)
 				await this._UpdateKeyAsync(key).ConfigureAwait(false);
 
 			return success;
@@ -796,7 +798,7 @@ namespace net.vieapps.Components.Caching
 					Helper.WriteLogs(this.Name, $"Error occurred while removing an object from cache storage [{key}]", ex);
 				}
 
-			if (success)
+			if (success && this._storeKeys)
 				this._RemoveKey(key);
 
 			return success;
@@ -815,7 +817,7 @@ namespace net.vieapps.Components.Caching
 					Helper.WriteLogs(this.Name, $"Error occurred while removing an object from cache storage [{key}]", ex);
 				}
 
-			if (success)
+			if (success && this._storeKeys)
 				await this._RemoveKeyAsync(key).ConfigureAwait(false);
 
 			return success;

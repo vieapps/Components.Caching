@@ -106,7 +106,7 @@ namespace net.vieapps.Components.Caching
 
 				var logger = loggerFactory?.CreateLogger<ICache>();
 				if (logger != null && logger.IsEnabled(LogLevel.Debug))
-					logger.LogInformation($"An instance of VIEApps Cache was created successful with stand-alone configuration (app.config/web.config) - {configuration.Provider}: {configuration.RegionName} ({configuration.ExpirationTime} minutes)");
+					logger.LogInformation($"An instance of VIEApps NGX Caching was created successful with stand-alone configuration (app.config/web.config) - {configuration.Provider}: {configuration.RegionName} ({configuration.ExpirationTime} minutes)");
 			}
 			return Cache._Instance;
 		}
@@ -115,16 +115,16 @@ namespace net.vieapps.Components.Caching
 		{
 			if (Cache._Instance == null)
 			{
-				var loggerFactory = svcProvider.GetService<ILoggerFactory>();
 				var configuration = svcProvider.GetService<ICacheConfiguration>();
 				if (configuration == null)
 					throw new ConfigurationErrorsException($"No configuration is found [{typeof(ICacheConfiguration)}]");
 
+				var loggerFactory = svcProvider.GetService<ILoggerFactory>();
 				Cache.GetInstance(configuration as CacheConfiguration, loggerFactory);
 
 				var logger = loggerFactory?.CreateLogger<ICache>();
 				if (logger != null && logger.IsEnabled(LogLevel.Debug))
-					logger.LogInformation($"An instance of VIEApps Cache was created successful with integrated configuration - {configuration.Provider}: {configuration.RegionName} ({configuration.ExpirationTime} minutes)");
+					logger.LogInformation($"An instance of VIEApps NGX Caching was created successful with integrated configuration - {configuration.Provider}: {configuration.RegionName} ({configuration.ExpirationTime} minutes)");
 			}
 			return Cache._Instance;
 		}
