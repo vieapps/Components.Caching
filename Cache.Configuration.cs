@@ -116,9 +116,8 @@ namespace net.vieapps.Components.Caching
 					if (!string.IsNullOrWhiteSpace(option.Value))
 						this.Options += (this.Options != "" ? "," : "") + option.Name + "=" + option.Value;
 
-			if (!Enum.TryParse<MemcachedProtocol>(configuration.Section.Attributes["protocol"]?.Value ?? "Binary", out MemcachedProtocol protocol))
-				protocol = MemcachedProtocol.Binary;
-			this.Protocol = protocol;
+			if (Enum.TryParse<MemcachedProtocol>(configuration.Section.Attributes["protocol"]?.Value ?? "Binary", out MemcachedProtocol protocol))
+				this.Protocol = protocol;
 
 			if (configuration.Section.SelectSingleNode("socketPool") is XmlNode socketpool)
 			{
@@ -148,17 +147,13 @@ namespace net.vieapps.Components.Caching
 				if (authentication.Attributes["type"]?.Value != null)
 					try
 					{
-						var type = Type.GetType(authentication.Attributes["type"].Value);
-						if (type != null)
-						{
-							this.Authentication.Type = authentication.Attributes["type"].Value;
-							if (authentication.Attributes["zone"]?.Value != null)
-								this.Authentication.Parameters.Add("zone", authentication.Attributes["zone"].Value);
-							if (authentication.Attributes["userName"]?.Value != null)
-								this.Authentication.Parameters.Add("userName", authentication.Attributes["userName"].Value);
-							if (authentication.Attributes["password"]?.Value != null)
-								this.Authentication.Parameters.Add("password", authentication.Attributes["password"].Value);
-						}
+						this.Authentication.Type = authentication.Attributes["type"].Value;
+						if (authentication.Attributes["zone"]?.Value != null)
+							this.Authentication.Parameters.Add("zone", authentication.Attributes["zone"].Value);
+						if (authentication.Attributes["userName"]?.Value != null)
+							this.Authentication.Parameters.Add("userName", authentication.Attributes["userName"].Value);
+						if (authentication.Attributes["password"]?.Value != null)
+							this.Authentication.Parameters.Add("password", authentication.Attributes["password"].Value);
 					}
 					catch { }
 
