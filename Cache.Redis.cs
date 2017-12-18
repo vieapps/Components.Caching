@@ -95,8 +95,7 @@ namespace net.vieapps.Components.Caching
 		{
 			if (Redis._Client == null)
 			{
-				var redisSection = ConfigurationManager.GetSection("redis") as RedisClientConfigurationSectionHandler;
-				if (redisSection != null)
+				if (ConfigurationManager.GetSection("redis") is RedisClientConfigurationSectionHandler redisSection)
 				{
 					var configuration = new RedisClientConfiguration();
 					if (redisSection.Section.SelectNodes("servers/add") is XmlNodeList servers)
