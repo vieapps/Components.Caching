@@ -242,7 +242,7 @@ namespace net.vieapps.Components.Caching
 				}
 
 			if (this._storeKeys && doPush && this._addedKeys.Count > 0)
-				this._UpdateKeys(113);
+				this._UpdateKeys(123);
 		}
 
 		HashSet<string> _GetKeys()
@@ -732,18 +732,6 @@ namespace net.vieapps.Components.Caching
 			await Task.WhenAll(keys?.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => this._RemoveAsync((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + key, false)) ?? new List<Task<bool>>()).ConfigureAwait(false);
 			if (this._storeKeys && this._removedKeys.Count > 0)
 				this._UpdateKeys(123);
-		}
-		#endregion
-
-		#region Remove (Fragment)
-		void _RemoveFragments(string key, int max = 100)
-		{
-			this._Remove(this._GetFragmentKeys(key, max));
-		}
-
-		Task _RemoveFragmentsAsync(string key, int max = 100)
-		{
-			return this._RemoveAsync(this._GetFragmentKeys(key, max));
 		}
 		#endregion
 
@@ -1536,7 +1524,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="key">The string that presents key of fragmented items need to be removed</param>
 		public void RemoveFragments(string key)
 		{
-			this._RemoveFragments(key);
+			this._Remove(this._GetFragmentKeys(key, 100));
 		}
 
 		/// <summary>
@@ -1545,7 +1533,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="key">The string that presents key of fragmented items need to be removed</param>
 		public Task RemoveFragmentsAsync(string key)
 		{
-			return this._RemoveFragmentsAsync(key);
+			return this._RemoveAsync(this._GetFragmentKeys(key, 100));
 		}
 		#endregion
 
