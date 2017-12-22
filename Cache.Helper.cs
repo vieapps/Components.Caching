@@ -281,15 +281,15 @@ namespace net.vieapps.Components.Caching
 				try
 				{
 					Helper.LogsPath = ConfigurationManager.AppSettings["vieapps:LogsPath"];
-					if (!Helper.LogsPath.EndsWith(@"\"))
-						Helper.LogsPath += @"\";
+					if (!Helper.LogsPath.EndsWith(Path.DirectorySeparatorChar.ToString()))
+						Helper.LogsPath += Path.DirectorySeparatorChar.ToString();
 				}
 				catch { }
 
 			if (string.IsNullOrWhiteSpace(Helper.LogsPath))
 				try
 				{
-					Helper.LogsPath = Directory.GetCurrentDirectory() + @"\Logs\";
+					Helper.LogsPath = Directory.GetCurrentDirectory() + Path.DirectorySeparatorChar.ToString() + "Logs" + Path.DirectorySeparatorChar.ToString();
 				}
 				catch { }
 
