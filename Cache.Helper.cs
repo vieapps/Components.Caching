@@ -220,9 +220,9 @@ namespace net.vieapps.Components.Caching
 		#endregion
 
 		#region Working with logs
-		internal static string GetLogPrefix(string label, string seperator = ":")
+		internal static string GetLogPrefix(string label, string separator = ":")
 		{
-			return $"{label}{seperator}[{Process.GetCurrentProcess().Id} : {AppDomain.CurrentDomain.Id} : {Thread.CurrentThread.ManagedThreadId}]";
+			return $"{label}{separator}[{Process.GetCurrentProcess().Id} : {AppDomain.CurrentDomain.Id} : {Thread.CurrentThread.ManagedThreadId}]";
 		}
 
 		static string LogsPath = null;
@@ -233,28 +233,26 @@ namespace net.vieapps.Components.Caching
 			var info = Helper.GetLogPrefix(DateTime.Now.ToString("HH:mm:ss.fff"), "\t") + "\t" + region + "\t";
 
 			var content = "";
-			if (logs != null)
-				logs.ForEach(log =>
-				{
-					if (!string.IsNullOrWhiteSpace(log))
-						content += info + log + "\r\n";
-				});
+			logs?.ForEach(log =>
+			{
+				if (!string.IsNullOrWhiteSpace(log))
+					content += info + log + "\r\n";
+			});
 
 			if (ex != null)
 			{
-				content += info + "- " + (ex.Message != null ? ex.Message : "No error message") + $" [{ex.GetType()}]" + "\r\n"
-					+ info + "- " + (ex.StackTrace != null ? ex.StackTrace : "No stack trace");
+				content += info + "- " + (ex.Message ?? "No error message") + $" [{ex.GetType()}]" + "\r\n"
+					+ info + "- " + (ex.StackTrace ?? "No stack trace");
 
-				ex = ex.InnerException;
-				var counter = 1;
-				while (ex != null)
+				var inner = ex.InnerException;
+				var counter = 0;
+				while (inner != null)
 				{
-					content += info + "- Inner (" + counter.ToString() + "): ----------------------------------" + "\r\n"
-						+ info + "- " + (ex.Message != null ? ex.Message : "No error message") + $" [{ex.GetType()}]" + "\r\n"
-						+ info + "- " + (ex.StackTrace != null ? ex.StackTrace : "No stack trace");
-
 					counter++;
-					ex = ex.InnerException;
+					content += info + "- Inner (" + counter.ToString() + "): ----------------------------------" + "\r\n"
+						+ info + "- " + (inner.Message ?? "No error message") + $" [{inner.GetType()}]" + "\r\n"
+						+ info + "- " + (inner.StackTrace ?? "No stack trace");
+					inner = inner.InnerException;
 				}
 
 				content += "\r\n";
@@ -263,7 +261,7 @@ namespace net.vieapps.Components.Caching
 			// write logs into file
 			try
 			{
-				using (var stream = new FileStream(filePath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite, 4096, true))
+				using (var stream = new FileStream(filePath, FileMode.Append, FileAccess.Write, FileShare.Read, 4096, true))
 				{
 					using (var writer = new StreamWriter(stream, System.Text.Encoding.UTF8))
 					{
