@@ -278,7 +278,7 @@ namespace net.vieapps.Components.Caching
 			if (string.IsNullOrWhiteSpace(Helper.LogsPath))
 				try
 				{
-					Helper.LogsPath = ConfigurationManager.AppSettings["vieapps:LogsPath"];
+					Helper.LogsPath = ConfigurationManager.AppSettings["vieapps:Path:Logs"];
 					if (!Helper.LogsPath.EndsWith(Path.DirectorySeparatorChar.ToString()))
 						Helper.LogsPath += Path.DirectorySeparatorChar.ToString();
 				}
@@ -287,7 +287,7 @@ namespace net.vieapps.Components.Caching
 			if (string.IsNullOrWhiteSpace(Helper.LogsPath))
 				try
 				{
-					Helper.LogsPath = Directory.GetCurrentDirectory() + Path.DirectorySeparatorChar.ToString() + "Logs" + Path.DirectorySeparatorChar.ToString();
+					Helper.LogsPath = Path.Combine(Directory.GetCurrentDirectory(), "Logs") + Path.DirectorySeparatorChar.ToString();
 				}
 				catch { }
 
@@ -297,7 +297,7 @@ namespace net.vieapps.Components.Caching
 				{
 					try
 					{
-						await Helper.WriteLogsAsync(Helper.LogsPath + DateTime.Now.ToString("yyyy-MM-dd") + ".cache.txt", region, logs, ex).ConfigureAwait(false);
+						await Helper.WriteLogsAsync(Helper.LogsPath + DateTime.Now.ToString("yyyy-MM-dd") + ".caching.txt", region, logs, ex).ConfigureAwait(false);
 					}
 					catch { }
 				}).ConfigureAwait(false);
