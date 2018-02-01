@@ -386,7 +386,18 @@ namespace net.vieapps.Components.Caching
 		internal static IDictionary<string, object> Get(this IDatabase redis, IEnumerable<string> keys, bool doDeserialize)
 		{
 			var objects = new Dictionary<string, object>();
-			keys?.Where(key => !string.IsNullOrWhiteSpace(key)).ToList().ForEach(key => objects[key] = redis.Get(key, doDeserialize));
+			if (keys != null)
+			{
+				var redisKeys = keys.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => (RedisKey)key).ToArray();
+				var redisValues = redis.StringGet(redisKeys);
+
+				for (var index = 0; index < redisKeys.Length; index++)
+					objects[redisKeys[index]] = redisValues[index].IsNull
+						? null
+						: doDeserialize
+							? Helper.Deserialize((byte[])redisValues[index])
+							: (byte[])redisValues[index];
+			}
 			return objects;
 		}
 
@@ -404,7 +415,18 @@ namespace net.vieapps.Components.Caching
 		internal static async Task<IDictionary<string, object>> GetAsync(this IDatabase redis, IEnumerable<string> keys, bool doDeserialize)
 		{
 			var objects = new Dictionary<string, object>();
-			await Task.WhenAll(keys?.Where(key => !string.IsNullOrWhiteSpace(key)).Select(async (key) => objects[key] = await redis.GetAsync(key, doDeserialize).ConfigureAwait(false)) ?? new List<Task<object>>()).ConfigureAwait(false);
+			if (keys != null)
+			{
+				var redisKeys = keys.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => (RedisKey)key).ToArray();
+				var redisValues = await redis.StringGetAsync(redisKeys).ConfigureAwait(false);
+
+				for (var index = 0; index < redisKeys.Length; index++)
+					objects[redisKeys[index]] = redisValues[index].IsNull
+						? null
+						: doDeserialize
+							? Helper.Deserialize((byte[])redisValues[index])
+							: (byte[])redisValues[index];
+			}
 			return objects;
 		}
 
@@ -429,7 +451,16 @@ namespace net.vieapps.Components.Caching
 		public static IDictionary<string, T> Get<T>(this IDatabase redis, IEnumerable<string> keys)
 		{
 			var objects = new Dictionary<string, T>();
-			keys?.Where(key => !string.IsNullOrWhiteSpace(key)).ToList().ForEach(key => objects[key] = redis.Get<T>(key));
+			if (keys != null)
+			{
+				var redisKeys = keys.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => (RedisKey)key).ToArray();
+				var redisValues = redis.StringGet(redisKeys);
+
+				for (var index = 0; index < redisKeys.Length; index++)
+					objects[redisKeys[index]] = redisValues[index].IsNull
+						? default(T)
+						: Helper.Deserialize<T>((byte[])redisValues[index]);
+			}
 			return objects;
 		}
 
@@ -443,7 +474,16 @@ namespace net.vieapps.Components.Caching
 		public static async Task<IDictionary<string, T>> GetAsync<T>(this IDatabase redis, IEnumerable<string> keys)
 		{
 			var objects = new Dictionary<string, T>();
-			await Task.WhenAll(keys?.Where(key => !string.IsNullOrWhiteSpace(key)).Select(async (key) => objects[key] = await redis.GetAsync<T>(key).ConfigureAwait(false)) ?? new List<Task<T>>()).ConfigureAwait(false);
+			if (keys != null)
+			{
+				var redisKeys = keys.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => (RedisKey)key).ToArray();
+				var redisValues = await redis.StringGetAsync(redisKeys).ConfigureAwait(false);
+
+				for (var index = 0; index < redisKeys.Length; index++)
+					objects[redisKeys[index]] = redisValues[index].IsNull
+						? default(T)
+						: Helper.Deserialize<T>((byte[])redisValues[index]);
+			}
 			return objects;
 		}
 
