@@ -6,14 +6,14 @@
 		<RootNamespace>net.vieapps.Components.Caching</RootNamespace>
 		<AssemblyName>VIEApps.Components.Caching</AssemblyName>
 		<AssemblyTitle>VIEApps NGX Caching</AssemblyTitle>
-		<AssemblyVersion>10.1.8.1802</AssemblyVersion>
-		<FileVersion>10.1.8.1802</FileVersion>
-		<InformationalVersion>v10.1.netstandard-2+rev:2018.02.07-mget</InformationalVersion>
+		<AssemblyVersion>10.1.12.1802</AssemblyVersion>
+		<FileVersion>10.1.12.1802</FileVersion>
+		<InformationalVersion>v10.1.netstandard-2+rev:2018.02.22</InformationalVersion>
 		<Product>VIEApps NGX</Product>
 		<Company>VIEApps.net</Company>
 		<GeneratePackageOnBuild>false</GeneratePackageOnBuild>
 		<PackageId>VIEApps.Components.Caching</PackageId>
-		<Version>10.1.8.1802</Version>
+		<Version>10.1.12.1802</Version>
 		<SignAssembly>false</SignAssembly>
 		<DelaySign>false</DelaySign>
 		<AssemblyOriginatorKeyFile>../VIEApps.Components.snk</AssemblyOriginatorKeyFile>
@@ -22,6 +22,7 @@
 		<Authors>VIEApps.net</Authors>
 		<Copyright>© 2018 VIEApps.net</Copyright>
 		<PackageTags>cache;distributedcache;memcached;redis;vieapps;vieapps.components</PackageTags>
+		<PackageReleaseNotes>Upgrade to latest components</PackageReleaseNotes>
 		<PackageProjectUrl>https://github.com/vieapps/Components.Caching</PackageProjectUrl>
 		<RepositoryUrl>https://github.com/vieapps/Components.Caching</RepositoryUrl>
 	</PropertyGroup>
@@ -47,10 +48,10 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Newtonsoft.Json" Version="10.0.3" />
+		<PackageReference Include="Newtonsoft.Json" Version="11.0.1" />
 		<PackageReference Include="Newtonsoft.Json.Bson" Version="1.0.1" />
 		<PackageReference Include="StackExchange.Redis" Version="1.2.6" />
-		<PackageReference Include="VIEApps.Enyim.Caching" Version="1.4.2.1802" />
+		<PackageReference Include="VIEApps.Enyim.Caching" Version="1.4.3.1802" />
 	</ItemGroup>
 
 </Project>

@@ -794,7 +794,7 @@ namespace net.vieapps.Components.Caching
 		Task<byte[]> IDistributedCache.GetAsync(string key, CancellationToken token = default(CancellationToken))
 		{
 			return string.IsNullOrWhiteSpace(key)
-				? throw new ArgumentNullException(nameof(key))
+				? Task.FromException<byte[]>(new ArgumentNullException(nameof(key)))
 				: this.GetAsync<byte[]>(key);
 		}
 
@@ -827,9 +827,9 @@ namespace net.vieapps.Components.Caching
 
 		Task IDistributedCache.RemoveAsync(string key, CancellationToken token = default(CancellationToken))
 		{
-			if (string.IsNullOrWhiteSpace(key))
-				throw new ArgumentNullException(nameof(key));
-			return this.RemoveAsync(new List<string>() { key, key.GetIDistributedCacheExpirationKey() });
+			return string.IsNullOrWhiteSpace(key)
+				? Task.FromException(new ArgumentNullException(nameof(key)))
+				: this.RemoveAsync(new List<string>() { key, key.GetIDistributedCacheExpirationKey() });
 		}
 		#endregion
 
