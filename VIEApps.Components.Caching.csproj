@@ -6,14 +6,14 @@
 		<RootNamespace>net.vieapps.Components.Caching</RootNamespace>
 		<AssemblyName>VIEApps.Components.Caching</AssemblyName>
 		<AssemblyTitle>VIEApps NGX Caching</AssemblyTitle>
-		<AssemblyVersion>10.1.12.1802</AssemblyVersion>
-		<FileVersion>10.1.12.1802</FileVersion>
-		<InformationalVersion>v10.1.netstandard-2+rev:2018.02.22</InformationalVersion>
+		<AssemblyVersion>10.1.14.1804</AssemblyVersion>
+		<FileVersion>10.1.14.1804</FileVersion>
+		<InformationalVersion>v10.1.netstandard-2+rev:2018.04.01</InformationalVersion>
 		<Product>VIEApps NGX</Product>
 		<Company>VIEApps.net</Company>
 		<GeneratePackageOnBuild>false</GeneratePackageOnBuild>
 		<PackageId>VIEApps.Components.Caching</PackageId>
-		<Version>10.1.12.1802</Version>
+		<Version>10.1.14.1804</Version>
 		<SignAssembly>false</SignAssembly>
 		<DelaySign>false</DelaySign>
 		<AssemblyOriginatorKeyFile>../VIEApps.Components.snk</AssemblyOriginatorKeyFile>
@@ -48,7 +48,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Newtonsoft.Json" Version="11.0.1" />
+		<PackageReference Include="Newtonsoft.Json" Version="11.0.2" />
 		<PackageReference Include="Newtonsoft.Json.Bson" Version="1.0.1" />
 		<PackageReference Include="StackExchange.Redis" Version="1.2.6" />
 		<PackageReference Include="VIEApps.Enyim.Caching" Version="1.4.3.1802" />
