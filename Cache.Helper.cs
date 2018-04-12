@@ -220,92 +220,39 @@ namespace net.vieapps.Components.Caching
 		#endregion
 
 		#region Working with logs
-		internal static string GetLogPrefix(string label, string separator = ":")
+		internal static ILogger Logger = Enyim.Caching.Logger.CreateLogger<Cache>();
+
+		/// <summary>
+		/// Assigns the logger
+		/// </summary>
+		/// <param name="logger"></param>
+		public static void AssignLogger(ILogger logger)
 		{
-			return $"{label}{separator}[{Process.GetCurrentProcess().Id} : {AppDomain.CurrentDomain.Id} : {Thread.CurrentThread.ManagedThreadId}]";
-		}
-
-		static string LogsPath = null;
-
-		internal static async Task WriteLogsAsync(string filePath, string region, List<string> logs, Exception ex)
-		{
-			// prepare
-			var info = Helper.GetLogPrefix(DateTime.Now.ToString("HH:mm:ss.fff"), "\t") + "\t" + region + "\t";
-
-			var content = "";
-			logs?.ForEach(log =>
-			{
-				if (!string.IsNullOrWhiteSpace(log))
-					content += info + log + "\r\n";
-			});
-
-			if (ex != null)
-			{
-				content += info + "- " + (ex.Message ?? "No error message") + $" [{ex.GetType()}]" + "\r\n"
-					+ info + "- " + (ex.StackTrace ?? "No stack trace");
-
-				var inner = ex.InnerException;
-				var counter = 0;
-				while (inner != null)
-				{
-					counter++;
-					content += info + "- Inner (" + counter.ToString() + "): ----------------------------------" + "\r\n"
-						+ info + "- " + (inner.Message ?? "No error message") + $" [{inner.GetType()}]" + "\r\n"
-						+ info + "- " + (inner.StackTrace ?? "No stack trace");
-					inner = inner.InnerException;
-				}
-
-				content += "\r\n";
-			}
-
-			// write logs into file
-			try
-			{
-				using (var stream = new FileStream(filePath, FileMode.Append, FileAccess.Write, FileShare.Read, 4096, true))
-				{
-					using (var writer = new StreamWriter(stream, System.Text.Encoding.UTF8))
-					{
-						await writer.WriteLineAsync(content + "\r\n").ConfigureAwait(false);
-					}
-				}
-			}
-			catch { }
+			if (logger != null)
+				Helper.Logger = logger;
 		}
 
 		internal static void WriteLogs(string region, List<string> logs, Exception ex)
 		{
-			// prepare path of all log files
-			if (string.IsNullOrWhiteSpace(Helper.LogsPath))
-				try
-				{
-					Helper.LogsPath = ConfigurationManager.AppSettings["vieapps:Path:Logs"];
-					if (!Helper.LogsPath.EndsWith(Path.DirectorySeparatorChar.ToString()))
-						Helper.LogsPath += Path.DirectorySeparatorChar.ToString();
-				}
-				catch { }
-
-			if (string.IsNullOrWhiteSpace(Helper.LogsPath))
-				try
-				{
-					Helper.LogsPath = Path.Combine(Directory.GetCurrentDirectory(), "Logs") + Path.DirectorySeparatorChar.ToString();
-				}
-				catch { }
-
-			// write logs
-			if (!string.IsNullOrWhiteSpace(Helper.LogsPath))
-				Task.Run(async () =>
-				{
-					try
-					{
-						await Helper.WriteLogsAsync(Helper.LogsPath + DateTime.Now.ToString("yyyy-MM-dd") + ".caching.txt", region, logs, ex).ConfigureAwait(false);
-					}
-					catch { }
-				}).ConfigureAwait(false);
+			if (ex != null)
+			{
+				foreach (var log in logs)
+					Logger.LogDebug($"<{region}>: {log}");
+				Logger.LogError(ex, ex.Message);
+			}
+			else if (Logger.IsEnabled(LogLevel.Debug))
+			{
+				foreach (var log in logs)
+					Logger.LogInformation(ex, $"<{region}>: {log}");
+			}
 		}
 
 		internal static void WriteLogs(string region, string log, Exception ex)
 		{
-			Helper.WriteLogs(region, string.IsNullOrWhiteSpace(log) ? null : new List<string>() { log }, ex);
+			if (ex != null)
+				Logger.LogError(ex, $"<{region}>: {log}");
+			else if (Logger.IsEnabled(LogLevel.Debug))
+				Logger.LogInformation(ex, $"<{region}>: {log}");
 		}
 		#endregion
 
