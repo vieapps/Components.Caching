@@ -26,15 +26,25 @@ namespace net.vieapps.Components.Caching
 	public interface ICacheConfiguration
 	{
 		string Provider { get; }
+
 		string RegionName { get; }
+
 		int ExpirationTime { get; }
+
 		IList<CacheServer> Servers { get; }
+
 		string Options { get; }
+
 		MemcachedProtocol Protocol { get; }
+
 		ISocketPoolConfiguration SocketPool { get; }
+
 		IAuthenticationConfiguration Authentication { get; }
+
 		string KeyTransformer { get; }
+
 		string Transcoder { get; }
+
 		string NodeLocator { get; }
 	}
 
