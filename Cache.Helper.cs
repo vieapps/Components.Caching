@@ -219,6 +219,30 @@ namespace net.vieapps.Components.Caching
 		}
 		#endregion
 
+		#region Support cancellation token
+		internal static async Task WithCancellationToken(this Task task, CancellationToken cancellationToken)
+		{
+			var tcs = new TaskCompletionSource<bool>();
+			using (cancellationToken.Register(state => ((TaskCompletionSource<bool>)state).TrySetResult(true), tcs, false))
+			{
+				if (task != await Task.WhenAny(task, tcs.Task).ConfigureAwait(false))
+					throw new OperationCanceledException(cancellationToken);
+			}
+			await task.ConfigureAwait(false);
+		}
+
+		internal static async Task<T> WithCancellationToken<T>(this Task<T> task, CancellationToken cancellationToken)
+		{
+			var tcs = new TaskCompletionSource<bool>();
+			using (cancellationToken.Register(state => ((TaskCompletionSource<bool>)state).TrySetResult(true), tcs, false))
+			{
+				if (task != await Task.WhenAny(task, tcs.Task).ConfigureAwait(false))
+					throw new OperationCanceledException(cancellationToken);
+			}
+			return await task.ConfigureAwait(false);
+		}
+		#endregion
+
 		#region Working with logs
 		internal static ILogger Logger = Enyim.Caching.Logger.CreateLogger<Cache>();
 

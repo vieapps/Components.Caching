@@ -4,6 +4,7 @@ using System.Linq;
 using System.Xml;
 using System.Net;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Configuration;
 using System.Diagnostics;
@@ -24,6 +25,8 @@ namespace net.vieapps.Components.Caching
 	[DebuggerDisplay("Redis: {Name} ({ExpirationTime} minutes)")]
 	public sealed class Redis : ICache
 	{
+		bool _storeKeys;
+
 		/// <summary>
 		/// Create new instance of Redis
 		/// </summary>
@@ -33,10 +36,10 @@ namespace net.vieapps.Components.Caching
 		public Redis(string name, int expirationTime, bool storeKeys)
 		{
 			// region name
-			this._name = Helper.GetRegionName(name);
+			this.Name = Helper.GetRegionName(name);
 
 			// expiration time
-			this._expirationTime = expirationTime > 0
+			this.ExpirationTime = expirationTime > 0
 				? expirationTime
 				: Helper.ExpirationTime;
 
@@ -177,12 +180,6 @@ namespace net.vieapps.Components.Caching
 		}
 		#endregion
 
-		#region Attributes
-		string _name;
-		int _expirationTime;
-		bool _storeKeys;
-		#endregion
-
 		#region Keys
 		void _UpdateKey(string key)
 		{
@@ -190,10 +187,10 @@ namespace net.vieapps.Components.Caching
 				Redis.Client.UpdateSetMembers(this._RegionKey, this._GetKey(key));
 		}
 
-		Task _UpdateKeyAsync(string key)
+		Task _UpdateKeyAsync(string key, CancellationToken cancellationToken = default(CancellationToken))
 		{
 			return this._storeKeys
-				? Redis.Client.UpdateSetMembersAsync(this._RegionKey, this._GetKey(key))
+				? Redis.Client.UpdateSetMembersAsync(this._RegionKey, this._GetKey(key), cancellationToken)
 				: Task.CompletedTask;
 		}
 
@@ -208,15 +205,16 @@ namespace net.vieapps.Components.Caching
 				);
 		}
 
-		Task _UpdateKeysAsync<T>(IDictionary<string, T> items, string keyPrefix = null)
+		Task _UpdateKeysAsync<T>(IDictionary<string, T> items, string keyPrefix = null, CancellationToken cancellationToken = default(CancellationToken))
 		{
 			return this._storeKeys
 				? Redis.Client.UpdateSetMembersAsync(
 					this._RegionKey,
 					items != null
 						? items.Where(kvp => kvp.Key != null).Select(kvp => this._GetKey((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + kvp.Key)).ToArray()
-						: new string[] { }
-					)
+						: new string[] { },
+					cancellationToken
+				)
 				: Task.CompletedTask;
 		}
 
@@ -226,10 +224,10 @@ namespace net.vieapps.Components.Caching
 				Redis.Client.RemoveSetMembers(this._RegionKey, this._GetKey(key));
 		}
 
-		Task _RemoveKeyAsync(string key)
+		Task _RemoveKeyAsync(string key, CancellationToken cancellationToken = default(CancellationToken))
 		{
 			return this._storeKeys
-				? Redis.Client.RemoveSetMembersAsync(this._RegionKey, this._GetKey(key))
+				? Redis.Client.RemoveSetMembersAsync(this._RegionKey, this._GetKey(key), cancellationToken)
 				: Task.CompletedTask;
 		}
 
@@ -238,9 +236,9 @@ namespace net.vieapps.Components.Caching
 			return Redis.Client.GetSetMembers(this._RegionKey);
 		}
 
-		Task<HashSet<string>> _GetKeysAsync()
+		Task<HashSet<string>> _GetKeysAsync(CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return Redis.Client.GetSetMembersAsync(this._RegionKey);
+			return Redis.Client.GetSetMembersAsync(this._RegionKey, cancellationToken);
 		}
 		#endregion
 
@@ -278,13 +276,13 @@ namespace net.vieapps.Components.Caching
 			return this._Set(key, value, expiresAt.ToTimeSpan());
 		}
 
-		async Task<bool> _SetAsync(string key, object value, TimeSpan validFor)
+		async Task<bool> _SetAsync(string key, object value, TimeSpan validFor, CancellationToken cancellationToken = default(CancellationToken))
 		{
 			var success = false;
 			if (!string.IsNullOrWhiteSpace(key) && value != null)
 				try
 				{
-					success = await Redis.Client.SetAsync(this._GetKey(key), value, validFor).ConfigureAwait(false);
+					success = await Redis.Client.SetAsync(this._GetKey(key), value, validFor, cancellationToken).ConfigureAwait(false);
 				}
 				catch (ArgumentException)
 				{
@@ -296,19 +294,19 @@ namespace net.vieapps.Components.Caching
 				}
 
 			if (success && this._storeKeys)
-				await this._UpdateKeyAsync(key).ConfigureAwait(false);
+				await this._UpdateKeyAsync(key, cancellationToken).ConfigureAwait(false);
 
 			return success;
 		}
 
-		Task<bool> _SetAsync(string key, object value, int expirationTime = 0)
+		Task<bool> _SetAsync(string key, object value, int expirationTime = 0, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return this._SetAsync(key, value, TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime));
+			return this._SetAsync(key, value, TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime), cancellationToken);
 		}
 
-		Task<bool> _SetAsync(string key, object value, DateTime expiresAt)
+		Task<bool> _SetAsync(string key, object value, DateTime expiresAt, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return this._SetAsync(key, value, expiresAt.ToTimeSpan());
+			return this._SetAsync(key, value, expiresAt.ToTimeSpan(), cancellationToken);
 		}
 		#endregion
 
@@ -329,21 +327,22 @@ namespace net.vieapps.Components.Caching
 			this._Set<object>(items, keyPrefix, expirationTime);
 		}
 
-		Task _SetAsync<T>(IDictionary<string, T> items, string keyPrefix = null, int expirationTime = 0)
+		Task _SetAsync<T>(IDictionary<string, T> items, string keyPrefix = null, int expirationTime = 0, CancellationToken cancellationToken = default(CancellationToken))
 		{
 			return Task.WhenAll(
 				Redis.Client.SetAsync(items != null
 					? items.Where(kvp => kvp.Key != null).ToDictionary(kvp => this._GetKey((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + kvp.Key), kvp => kvp.Value)
 					: new Dictionary<string, T>(),
-					TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime)
+					TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime),
+					cancellationToken
 				),
-				this._storeKeys ? this._UpdateKeysAsync(items, keyPrefix) : Task.CompletedTask
+				this._storeKeys ? this._UpdateKeysAsync(items, keyPrefix, cancellationToken) : Task.CompletedTask
 			);
 		}
 
-		Task _SetAsync(IDictionary<string, object> items, string keyPrefix = null, int expirationTime = 0)
+		Task _SetAsync(IDictionary<string, object> items, string keyPrefix = null, int expirationTime = 0, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return this._SetAsync<object>(items, keyPrefix, expirationTime);
+			return this._SetAsync<object>(items, keyPrefix, expirationTime, cancellationToken);
 		}
 		#endregion
 
@@ -366,11 +365,11 @@ namespace net.vieapps.Components.Caching
 			return success;
 		}
 
-		async Task<bool> _SetFragmentsAsync(string key, List<byte[]> fragments, int expirationTime = 0)
+		async Task<bool> _SetFragmentsAsync(string key, List<byte[]> fragments, int expirationTime = 0, CancellationToken cancellationToken = default(CancellationToken))
 		{
 			var validFor = TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime);
 			var success = fragments != null && fragments.Count > 0
-				? await Redis.Client.SetAsync(this._GetKey(key), Helper.GetFirstBlock(fragments), validFor).ConfigureAwait(false)
+				? await Redis.Client.SetAsync(this._GetKey(key), Helper.GetFirstBlock(fragments), validFor, cancellationToken).ConfigureAwait(false)
 				: false;
 
 			if (success && fragments.Count > 1)
@@ -378,7 +377,7 @@ namespace net.vieapps.Components.Caching
 				var items = new Dictionary<string, byte[]>();
 				for (var index = 1; index < fragments.Count; index++)
 					items[this._GetKey(this._GetFragmentKey(key, index))] = fragments[index];
-				await Redis.Client.SetAsync(items, validFor).ConfigureAwait(false);
+				await Redis.Client.SetAsync(items, validFor, cancellationToken).ConfigureAwait(false);
 			}
 
 			return success;
@@ -391,11 +390,11 @@ namespace net.vieapps.Components.Caching
 				: this._SetFragments(key, Helper.Split(Helper.Serialize(value, false)), expirationTime);
 		}
 
-		Task<bool> _SetAsFragmentsAsync(string key, object value, int expirationTime = 0)
+		Task<bool> _SetAsFragmentsAsync(string key, object value, int expirationTime = 0, CancellationToken cancellationToken = default(CancellationToken))
 		{
 			return string.IsNullOrWhiteSpace(key) || value == null
 				? Task.FromResult(false)
-				: this._SetFragmentsAsync(key, Helper.Split(Helper.Serialize(value, false)), expirationTime);
+				: this._SetFragmentsAsync(key, Helper.Split(Helper.Serialize(value, false)), expirationTime, cancellationToken);
 		}
 		#endregion
 
@@ -433,13 +432,13 @@ namespace net.vieapps.Components.Caching
 			return this._Add(key, value, expiresAt.ToTimeSpan());
 		}
 
-		async Task<bool> _AddAsync(string key, object value, TimeSpan validFor)
+		async Task<bool> _AddAsync(string key, object value, TimeSpan validFor, CancellationToken cancellationToken = default(CancellationToken))
 		{
 			var success = false;
 			if (!string.IsNullOrWhiteSpace(key) && value != null)
 				try
 				{
-					success = await Redis.Client.AddAsync(this._GetKey(key), value, validFor).ConfigureAwait(false);
+					success = await Redis.Client.AddAsync(this._GetKey(key), value, validFor, cancellationToken).ConfigureAwait(false);
 				}
 				catch (ArgumentException)
 				{
@@ -451,19 +450,19 @@ namespace net.vieapps.Components.Caching
 				}
 
 			if (success && this._storeKeys)
-				await this._UpdateKeyAsync(key).ConfigureAwait(false);
+				await this._UpdateKeyAsync(key, cancellationToken).ConfigureAwait(false);
 
 			return success;
 		}
 
-		Task<bool> _AddAsync(string key, object value, int expirationTime = 0)
+		Task<bool> _AddAsync(string key, object value, int expirationTime = 0, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return this._AddAsync(key, value, TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime));
+			return this._AddAsync(key, value, TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime), cancellationToken);
 		}
 
-		Task<bool> _AddAsync(string key, object value, DateTime expiresAt)
+		Task<bool> _AddAsync(string key, object value, DateTime expiresAt, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return this._AddAsync(key, value, expiresAt.ToTimeSpan());
+			return this._AddAsync(key, value, expiresAt.ToTimeSpan(), cancellationToken);
 		}
 		#endregion
 
@@ -501,13 +500,13 @@ namespace net.vieapps.Components.Caching
 			return this._Replace(key, value, expiresAt.ToTimeSpan());
 		}
 
-		async Task<bool> _ReplaceAsync(string key, object value, TimeSpan validFor)
+		async Task<bool> _ReplaceAsync(string key, object value, TimeSpan validFor, CancellationToken cancellationToken = default(CancellationToken))
 		{
 			var success = false;
 			if (!string.IsNullOrWhiteSpace(key) && value != null)
 				try
 				{
-					success = await Redis.Client.ReplaceAsync(this._GetKey(key), value, validFor).ConfigureAwait(false);
+					success = await Redis.Client.ReplaceAsync(this._GetKey(key), value, validFor, cancellationToken).ConfigureAwait(false);
 				}
 				catch (ArgumentException)
 				{
@@ -519,19 +518,19 @@ namespace net.vieapps.Components.Caching
 				}
 
 			if (success && this._storeKeys)
-				await this._UpdateKeyAsync(key).ConfigureAwait(false);
+				await this._UpdateKeyAsync(key, cancellationToken).ConfigureAwait(false);
 
 			return success;
 		}
 
-		Task<bool> _ReplaceAsync(string key, object value, int expirationTime = 0)
+		Task<bool> _ReplaceAsync(string key, object value, int expirationTime = 0, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return this._ReplaceAsync(key, value, TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime));
+			return this._ReplaceAsync(key, value, TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime), cancellationToken);
 		}
 
-		Task<bool> _ReplaceAsync(string key, object value, DateTime expiresAt)
+		Task<bool> _ReplaceAsync(string key, object value, DateTime expiresAt, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return this._ReplaceAsync(key, value, expiresAt.ToTimeSpan());
+			return this._ReplaceAsync(key, value, expiresAt.ToTimeSpan(), cancellationToken);
 		}
 		#endregion
 
@@ -578,7 +577,7 @@ namespace net.vieapps.Components.Caching
 			return value;
 		}
 
-		async Task<object> _GetAsync(string key, bool autoGetFragments = true)
+		async Task<object> _GetAsync(string key, bool autoGetFragments = true, CancellationToken cancellationToken = default(CancellationToken))
 		{
 			if (string.IsNullOrWhiteSpace(key))
 				throw new ArgumentNullException(key);
@@ -586,7 +585,7 @@ namespace net.vieapps.Components.Caching
 			object value = null;
 			try
 			{
-				value = await Redis.Client.GetAsync(this._GetKey(key), false).ConfigureAwait(false);
+				value = await Redis.Client.GetAsync(this._GetKey(key), false, cancellationToken).ConfigureAwait(false);
 			}
 			catch (Exception ex)
 			{
@@ -598,7 +597,7 @@ namespace net.vieapps.Components.Caching
 				if (autoGetFragments && Helper.GetFlags(value as byte[]).Item1.Equals(Helper.FlagOfFirstFragmentBlock))
 					try
 					{
-						value = await this._GetFromFragmentsAsync(key, value as byte[]).ConfigureAwait(false);
+						value = await this._GetFromFragmentsAsync(key, value as byte[], cancellationToken).ConfigureAwait(false);
 					}
 					catch (Exception ex)
 					{
@@ -664,7 +663,7 @@ namespace net.vieapps.Components.Caching
 				: null;
 		}
 
-		async Task<IDictionary<string, object>> _GetAsync(IEnumerable<string> keys)
+		async Task<IDictionary<string, object>> _GetAsync(IEnumerable<string> keys, CancellationToken cancellationToken = default(CancellationToken))
 		{
 			if (keys == null)
 				return null;
@@ -672,7 +671,7 @@ namespace net.vieapps.Components.Caching
 			IDictionary<string, object> items = null;
 			try
 			{
-				items = await Redis.Client.GetAsync(keys.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => this._GetKey(key))).ConfigureAwait(false);
+				items = await Redis.Client.GetAsync(keys.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => this._GetKey(key)), cancellationToken).ConfigureAwait(false);
 			}
 			catch (Exception ex)
 			{
@@ -685,7 +684,7 @@ namespace net.vieapps.Components.Caching
 				: null;
 		}
 
-		async Task<IDictionary<string, T>> _GetAsync<T>(IEnumerable<string> keys)
+		async Task<IDictionary<string, T>> _GetAsync<T>(IEnumerable<string> keys, CancellationToken cancellationToken = default(CancellationToken))
 		{
 			if (keys == null)
 				return null;
@@ -693,7 +692,7 @@ namespace net.vieapps.Components.Caching
 			IDictionary<string, T> items = null;
 			try
 			{
-				items = await Redis.Client.GetAsync<T>(keys.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => this._GetKey(key))).ConfigureAwait(false);
+				items = await Redis.Client.GetAsync<T>(keys.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => this._GetKey(key)), cancellationToken).ConfigureAwait(false);
 			}
 			catch (Exception ex)
 			{
@@ -713,9 +712,9 @@ namespace net.vieapps.Components.Caching
 			return Helper.GetFragments(this._Get(key, false) as byte[]);
 		}
 
-		async Task<Tuple<int, int>> _GetFragmentsAsync(string key)
+		async Task<Tuple<int, int>> _GetFragmentsAsync(string key, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return Helper.GetFragments(await this._GetAsync(key, false) as byte[]);
+			return Helper.GetFragments(await this._GetAsync(key, false, cancellationToken).ConfigureAwait(false) as byte[]);
 		}
 
 		List<byte[]> _GetAsFragments(string key, List<int> indexes)
@@ -728,11 +727,11 @@ namespace net.vieapps.Components.Caching
 				: new List<byte[]>();
 		}
 
-		async Task<List<byte[]>> _GetAsFragmentsAsync(string key, List<int> indexes)
+		async Task<List<byte[]>> _GetAsFragmentsAsync(string key, List<int> indexes, CancellationToken cancellationToken = default(CancellationToken))
 		{
 			var fragments = string.IsNullOrWhiteSpace(key) || indexes == null || indexes.Count < 1
 				? null
-				: await Redis.Client.GetAsync(indexes.Select(index => this._GetKey(index > 0 ? this._GetFragmentKey(key, index) : key)), false).ConfigureAwait(false);
+				: await Redis.Client.GetAsync(indexes.Select(index => this._GetKey(index > 0 ? this._GetFragmentKey(key, index) : key)), false, cancellationToken).ConfigureAwait(false);
 			return fragments != null
 				? fragments.OrderBy(kvp => kvp.Key).Select(kvp => kvp.Value as byte[]).ToList()
 				: new List<byte[]>();
@@ -745,11 +744,11 @@ namespace net.vieapps.Components.Caching
 				: this._GetAsFragments(key, indexes.ToList());
 		}
 
-		Task<List<byte[]>> _GetAsFragmentsAsync(string key, params int[] indexes)
+		Task<List<byte[]>> _GetAsFragmentsAsync(string key, CancellationToken cancellationToken = default(CancellationToken), params int[] indexes)
 		{
 			return string.IsNullOrWhiteSpace(key) || indexes == null || indexes.Length < 1
 				? Task.FromResult<List<byte[]>>(null)
-				: this._GetAsFragmentsAsync(key, indexes.ToList());
+				: this._GetAsFragmentsAsync(key, indexes.ToList(), cancellationToken);
 		}
 
 		object _GetFromFragments(string key, byte[] firstBlock)
@@ -767,12 +766,12 @@ namespace net.vieapps.Components.Caching
 			}
 		}
 
-		async Task<object> _GetFromFragmentsAsync(string key, byte[] firstBlock)
+		async Task<object> _GetFromFragmentsAsync(string key, byte[] firstBlock, CancellationToken cancellationToken = default(CancellationToken))
 		{
 			try
 			{
 				var info = Helper.GetFragments(firstBlock);
-				var data = Helper.Combine(firstBlock, await this._GetAsFragmentsAsync(key, Enumerable.Range(1, info.Item1 - 1).ToList()).ConfigureAwait(false));
+				var data = Helper.Combine(firstBlock, await this._GetAsFragmentsAsync(key, Enumerable.Range(1, info.Item1 - 1).ToList(), cancellationToken).ConfigureAwait(false));
 				return Helper.Deserialize(data, 8, data.Length - 8);
 			}
 			catch (Exception ex)
@@ -803,13 +802,13 @@ namespace net.vieapps.Components.Caching
 			return success;
 		}
 
-		async Task<bool> _RemoveAsync(string key)
+		async Task<bool> _RemoveAsync(string key, CancellationToken cancellationToken = default(CancellationToken))
 		{
 			var success = false;
 			if (!string.IsNullOrWhiteSpace(key))
 				try
 				{
-					success = await Redis.Client.RemoveAsync(this._GetKey(key)).ConfigureAwait(false);
+					success = await Redis.Client.RemoveAsync(this._GetKey(key), cancellationToken).ConfigureAwait(false);
 				}
 				catch (Exception ex)
 				{
@@ -829,21 +828,21 @@ namespace net.vieapps.Components.Caching
 			keys?.Where(key => !string.IsNullOrWhiteSpace(key)).ToList().ForEach(key => this._Remove((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + key));
 		}
 
-		Task _RemoveAsync(IEnumerable<string> keys, string keyPrefix = null)
+		Task _RemoveAsync(IEnumerable<string> keys, string keyPrefix = null, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return Task.WhenAll(keys?.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => this._RemoveAsync((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + key)) ?? new List<Task<bool>>());
+			return Task.WhenAll(keys?.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => this._RemoveAsync((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + key, cancellationToken)) ?? new List<Task<bool>>());
 		}
 		#endregion
 
 		#region Remove (Fragment)
 		void _RemoveFragments(string key, int max = 100)
 		{
-			this._Remove(this._GetFragmentKeys(key, max));
+			this._Remove(this._GetFragmentKeys(key, max), null);
 		}
 
-		Task _RemoveFragmentsAsync(string key, int max = 100)
+		Task _RemoveFragmentsAsync(string key, int max = 100, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return this._RemoveAsync(this._GetFragmentKeys(key, max));
+			return this._RemoveAsync(this._GetFragmentKeys(key, max), null, cancellationToken);
 		}
 		#endregion
 
@@ -854,12 +853,12 @@ namespace net.vieapps.Components.Caching
 			Redis.Client.Remove(this._RegionKey);
 		}
 
-		async Task _ClearAsync()
+		async Task _ClearAsync(CancellationToken cancellationToken = default(CancellationToken))
 		{
-			var keys = await this._GetKeysAsync().ConfigureAwait(false);
+			var keys = await this._GetKeysAsync(cancellationToken).ConfigureAwait(false);
 			await Task.WhenAll(
-				this._RemoveAsync(keys),
-				Redis.Client.RemoveAsync(this._RegionKey)
+				this._RemoveAsync(keys, null, cancellationToken),
+				Redis.Client.RemoveAsync(this._RegionKey, cancellationToken)
 			).ConfigureAwait(false);
 		}
 		#endregion
@@ -903,16 +902,16 @@ namespace net.vieapps.Components.Caching
 		/// <summary>
 		/// Gets the collection of all registered regions (in distributed cache)
 		/// </summary>
-		public static Task<HashSet<string>> GetRegionsAsync()
+		public static Task<HashSet<string>> GetRegionsAsync(CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return Redis.Client.GetSetMembersAsync(Helper.RegionsKey);
+			return Redis.Client.GetSetMembersAsync(Helper.RegionsKey, cancellationToken);
 		}
 
-		static async Task RegisterRegionAsync(string name)
+		static async Task RegisterRegionAsync(string name, CancellationToken cancellationToken = default(CancellationToken))
 		{
 			try
 			{
-				await Redis.Client.UpdateSetMembersAsync(Helper.RegionsKey, name).ConfigureAwait(false);
+				await Redis.Client.UpdateSetMembersAsync(Helper.RegionsKey, name, cancellationToken).ConfigureAwait(false);
 			}
 			catch { }
 		}
@@ -924,24 +923,12 @@ namespace net.vieapps.Components.Caching
 		/// <summary>
 		/// Gets the name of the isolated region
 		/// </summary>
-		public string Name
-		{
-			get
-			{
-				return this._name;
-			}
-		}
+		public string Name { get; }
 
 		/// <summary>
 		/// Gets the expiration time (in minutes)
 		/// </summary>
-		public int ExpirationTime
-		{
-			get
-			{
-				return this._expirationTime;
-			}
-		}
+		public int ExpirationTime { get; }
 
 		/// <summary>
 		/// Gets the collection of keys
@@ -967,9 +954,9 @@ namespace net.vieapps.Components.Caching
 		/// <summary>
 		/// Gets the collection of keys that associates with the cached items
 		/// </summary>
-		public Task<HashSet<string>> GetKeysAsync()
+		public Task<HashSet<string>> GetKeysAsync(CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return this._GetKeysAsync();
+			return this._GetKeysAsync(cancellationToken);
 		}
 		#endregion
 
@@ -1017,9 +1004,9 @@ namespace net.vieapps.Components.Caching
 		/// <param name="value">The object that is to be cached</param>
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
-		public Task<bool> SetAsync(string key, object value, int expirationTime = 0)
+		public Task<bool> SetAsync(string key, object value, int expirationTime = 0, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return this._SetAsync(key, value, expirationTime);
+			return this._SetAsync(key, value, expirationTime, cancellationToken);
 		}
 
 		/// <summary>
@@ -1029,9 +1016,9 @@ namespace net.vieapps.Components.Caching
 		/// <param name="value">The object that is to be cached</param>
 		/// <param name="validFor">The time when the item is invalidated in the cache</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
-		public Task<bool> SetAsync(string key, object value, TimeSpan validFor)
+		public Task<bool> SetAsync(string key, object value, TimeSpan validFor, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return this._SetAsync(key, value, validFor);
+			return this._SetAsync(key, value, validFor, cancellationToken);
 		}
 
 		/// <summary>
@@ -1041,9 +1028,9 @@ namespace net.vieapps.Components.Caching
 		/// <param name="value">The object that is to be cached</param>
 		/// <param name="expiresAt">The time when the item is invalidated in the cache</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
-		public Task<bool> SetAsync(string key, object value, DateTime expiresAt)
+		public Task<bool> SetAsync(string key, object value, DateTime expiresAt, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return this._SetAsync(key, value, expiresAt);
+			return this._SetAsync(key, value, expiresAt, cancellationToken);
 		}
 		#endregion
 
@@ -1077,9 +1064,9 @@ namespace net.vieapps.Components.Caching
 		/// <param name="items">The collection of items to add</param>
 		/// <param name="keyPrefix">The string that presents prefix of all keys</param>
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
-		public Task SetAsync(IDictionary<string, object> items, string keyPrefix = null, int expirationTime = 0)
+		public Task SetAsync(IDictionary<string, object> items, string keyPrefix = null, int expirationTime = 0, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return this._SetAsync(items, keyPrefix, expirationTime);
+			return this._SetAsync(items, keyPrefix, expirationTime, cancellationToken);
 		}
 
 		/// <summary>
@@ -1089,9 +1076,9 @@ namespace net.vieapps.Components.Caching
 		/// <param name="items">The collection of items to add</param>
 		/// <param name="keyPrefix">The string that presents prefix of all keys</param>
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
-		public Task SetAsync<T>(IDictionary<string, T> items, string keyPrefix = null, int expirationTime = 0)
+		public Task SetAsync<T>(IDictionary<string, T> items, string keyPrefix = null, int expirationTime = 0, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return this._SetAsync<T>(items, keyPrefix, expirationTime);
+			return this._SetAsync<T>(items, keyPrefix, expirationTime, cancellationToken);
 		}
 		#endregion
 
@@ -1115,9 +1102,9 @@ namespace net.vieapps.Components.Caching
 		/// <param name="fragments">The collection that contains all fragments (object that serialized as binary - array bytes)</param>
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
-		public Task<bool> SetFragmentsAsync(string key, List<byte[]> fragments, int expirationTime = 0)
+		public Task<bool> SetFragmentsAsync(string key, List<byte[]> fragments, int expirationTime = 0, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return this._SetFragmentsAsync(key, fragments, expirationTime);
+			return this._SetFragmentsAsync(key, fragments, expirationTime, cancellationToken);
 		}
 
 		/// <summary>
@@ -1139,9 +1126,9 @@ namespace net.vieapps.Components.Caching
 		/// <param name="value">The object that is to be cached</param>
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
-		public Task<bool> SetAsFragmentsAsync(string key, object value, int expirationTime = 0)
+		public Task<bool> SetAsFragmentsAsync(string key, object value, int expirationTime = 0, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return this._SetAsFragmentsAsync(key, value, expirationTime);
+			return this._SetAsFragmentsAsync(key, value, expirationTime, cancellationToken);
 		}
 		#endregion
 
@@ -1189,9 +1176,9 @@ namespace net.vieapps.Components.Caching
 		/// <param name="value">The object that is to be cached</param>
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
-		public Task<bool> AddAsync(string key, object value, int expirationTime = 0)
+		public Task<bool> AddAsync(string key, object value, int expirationTime = 0, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return this._AddAsync(key, value, expirationTime);
+			return this._AddAsync(key, value, expirationTime, cancellationToken);
 		}
 
 		/// <summary>
@@ -1201,9 +1188,9 @@ namespace net.vieapps.Components.Caching
 		/// <param name="value">The object that is to be cached</param>
 		/// <param name="validFor">The time when the item is invalidated in the cache</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
-		public Task<bool> AddAsync(string key, object value, TimeSpan validFor)
+		public Task<bool> AddAsync(string key, object value, TimeSpan validFor, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return this._AddAsync(key, value, validFor);
+			return this._AddAsync(key, value, validFor, cancellationToken);
 		}
 
 		/// <summary>
@@ -1213,9 +1200,9 @@ namespace net.vieapps.Components.Caching
 		/// <param name="value">The object that is to be cached</param>
 		/// <param name="expiresAt">The time when the item is invalidated in the cache</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
-		public Task<bool> AddAsync(string key, object value, DateTime expiresAt)
+		public Task<bool> AddAsync(string key, object value, DateTime expiresAt, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return this._AddAsync(key, value, expiresAt);
+			return this._AddAsync(key, value, expiresAt, cancellationToken);
 		}
 		#endregion
 
@@ -1263,9 +1250,9 @@ namespace net.vieapps.Components.Caching
 		/// <param name="value">The object that is to be cached</param>
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
-		public Task<bool> ReplaceAsync(string key, object value, int expirationTime = 0)
+		public Task<bool> ReplaceAsync(string key, object value, int expirationTime = 0, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return this._ReplaceAsync(key, value, expirationTime);
+			return this._ReplaceAsync(key, value, expirationTime, cancellationToken);
 		}
 
 		/// <summary>
@@ -1275,9 +1262,9 @@ namespace net.vieapps.Components.Caching
 		/// <param name="value">The object that is to be cached</param>
 		/// <param name="validFor">The time when the item is invalidated in the cache</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
-		public Task<bool> ReplaceAsync(string key, object value, TimeSpan validFor)
+		public Task<bool> ReplaceAsync(string key, object value, TimeSpan validFor, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return this._ReplaceAsync(key, value, validFor);
+			return this._ReplaceAsync(key, value, validFor, cancellationToken);
 		}
 
 		/// <summary>
@@ -1287,9 +1274,9 @@ namespace net.vieapps.Components.Caching
 		/// <param name="value">The object that is to be cached</param>
 		/// <param name="expiresAt">The time when the item is invalidated in the cache</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
-		public Task<bool> ReplaceAsync(string key, object value, DateTime expiresAt)
+		public Task<bool> ReplaceAsync(string key, object value, DateTime expiresAt, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return this._ReplaceAsync(key, value, expiresAt);
+			return this._ReplaceAsync(key, value, expiresAt, cancellationToken);
 		}
 		#endregion
 
@@ -1301,7 +1288,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns>The retrieved cache item, or a null reference if the key is not found</returns>
 		public object Get(string key)
 		{
-			return this._Get(key);
+			return this._Get(key, true);
 		}
 
 		/// <summary>
@@ -1323,9 +1310,9 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		/// <param name="key">The string that presents key of cached item need to retreive</param>
 		/// <returns>The retrieved cache item, or a null reference if the key is not found</returns>
-		public Task<object> GetAsync(string key)
+		public Task<object> GetAsync(string key, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return this._GetAsync(key);
+			return this._GetAsync(key, true, cancellationToken);
 		}
 
 		/// <summary>
@@ -1334,9 +1321,9 @@ namespace net.vieapps.Components.Caching
 		/// <typeparam name="T">The type for casting the cached item</typeparam>
 		/// <param name="key">The string that presents key of cached item need to retreive</param>
 		/// <returns>The retrieved cache item, or a null reference if the key is not found</returns>
-		public async Task<T> GetAsync<T>(string key)
+		public async Task<T> GetAsync<T>(string key, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			var @object = await this.GetAsync(key).ConfigureAwait(false);
+			var @object = await this.GetAsync(key, cancellationToken).ConfigureAwait(false);
 			return @object != null && @object is T
 				? (T)@object
 				: default(T);
@@ -1359,9 +1346,9 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		/// <param name="keys">The collection of items' keys</param>
 		/// <returns>The collection of cache items</returns>
-		public Task<IDictionary<string, object>> GetAsync(IEnumerable<string> keys)
+		public Task<IDictionary<string, object>> GetAsync(IEnumerable<string> keys, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return this._GetAsync(keys);
+			return this._GetAsync(keys, cancellationToken);
 		}
 
 		/// <summary>
@@ -1379,9 +1366,9 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		/// <param name="keys">The collection of items' keys</param>
 		/// <returns>The collection of cache items</returns>
-		public Task<IDictionary<string, T>> GetAsync<T>(IEnumerable<string> keys)
+		public Task<IDictionary<string, T>> GetAsync<T>(IEnumerable<string> keys, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return this._GetAsync<T>(keys);
+			return this._GetAsync<T>(keys, cancellationToken);
 		}
 		#endregion
 
@@ -1401,9 +1388,9 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		/// <param name="key">The string that presents key of fragment information</param>
 		/// <returns>The information of fragments, first element is total number of fragments, second element is total length of data</returns>
-		public Task<Tuple<int, int>> GetFragmentsAsync(string key)
+		public Task<Tuple<int, int>> GetFragmentsAsync(string key, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return this._GetFragmentsAsync(key);
+			return this._GetFragmentsAsync(key, cancellationToken);
 		}
 
 		/// <summary>
@@ -1423,9 +1410,9 @@ namespace net.vieapps.Components.Caching
 		/// <param name="key">The string that presents key of all fragmented items</param>
 		/// <param name="indexes">The collection that presents indexes of all fragmented items need to get</param>
 		/// <returns>The collection of array of bytes that presents serialized information of fragmented items</returns>
-		public Task<List<byte[]>> GetAsFragmentsAsync(string key, List<int> indexes)
+		public Task<List<byte[]>> GetAsFragmentsAsync(string key, List<int> indexes, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return this._GetAsFragmentsAsync(key, indexes);
+			return this._GetAsFragmentsAsync(key, indexes, cancellationToken);
 		}
 
 		/// <summary>
@@ -1445,9 +1432,9 @@ namespace net.vieapps.Components.Caching
 		/// <param name="key">The string that presents key of all fragmented items</param>
 		/// <param name="indexes">The collection that presents indexes of all fragmented items need to get</param>
 		/// <returns>The collection of array of bytes that presents serialized information of fragmented items</returns>
-		public Task<List<byte[]>> GetAsFragmentsAsync(string key, params int[] indexes)
+		public Task<List<byte[]>> GetAsFragmentsAsync(string key, CancellationToken cancellationToken = default(CancellationToken), params int[] indexes)
 		{
-			return this._GetAsFragmentsAsync(key, indexes);
+			return this._GetAsFragmentsAsync(key, cancellationToken, indexes);
 		}
 		#endregion
 
@@ -1467,9 +1454,9 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		/// <param name="key">The string that presents key of cached item need to remove</param>
 		/// <returns>Returns a boolean value indicating if the item is removed or not</returns>
-		public Task<bool> RemoveAsync(string key)
+		public Task<bool> RemoveAsync(string key, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return this._RemoveAsync(key);
+			return this._RemoveAsync(key, cancellationToken);
 		}
 		#endregion
 
@@ -1489,9 +1476,9 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		/// <param name="keys">The collection that presents key of cached items need to remove</param>
 		/// <param name="keyPrefix">The string that presents prefix of all keys</param>
-		public Task RemoveAsync(IEnumerable<string> keys, string keyPrefix = null)
+		public Task RemoveAsync(IEnumerable<string> keys, string keyPrefix = null, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return this._RemoveAsync(keys, keyPrefix);
+			return this._RemoveAsync(keys, keyPrefix, cancellationToken);
 		}
 		#endregion
 
@@ -1502,16 +1489,16 @@ namespace net.vieapps.Components.Caching
 		/// <param name="key">The string that presents key of fragmented items need to be removed</param>
 		public void RemoveFragments(string key)
 		{
-			this._RemoveFragments(key);
+			this._RemoveFragments(key, 100);
 		}
 
 		/// <summary>
 		/// Removes a cached item (with first 100 fragments) from cache storage
 		/// </summary>
 		/// <param name="key">The string that presents key of fragmented items need to be removed</param>
-		public Task RemoveFragmentsAsync(string key)
+		public Task RemoveFragmentsAsync(string key, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return this._RemoveFragmentsAsync(key);
+			return this._RemoveFragmentsAsync(key, 100, cancellationToken);
 		}
 		#endregion
 
@@ -1531,9 +1518,9 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		/// <param name="key">The string that presents key of cached item need to check</param>
 		/// <returns>Returns a boolean value indicating if the object that associates with the key is cached or not</returns>
-		public Task<bool> ExistsAsync(string key)
+		public Task<bool> ExistsAsync(string key, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return Redis.Client.ExistsAsync(this._GetKey(key));
+			return Redis.Client.ExistsAsync(this._GetKey(key), cancellationToken);
 		}
 		#endregion
 
@@ -1549,9 +1536,9 @@ namespace net.vieapps.Components.Caching
 		/// <summary>
 		/// Clears the cache storage of this isolated region
 		/// </summary>
-		public Task ClearAsync()
+		public Task ClearAsync(CancellationToken cancellationToken = default(CancellationToken))
 		{
-			return this._ClearAsync();
+			return this._ClearAsync(cancellationToken);
 		}
 		#endregion
 

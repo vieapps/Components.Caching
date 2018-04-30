@@ -6,23 +6,23 @@
 		<RootNamespace>net.vieapps.Components.Caching</RootNamespace>
 		<AssemblyName>VIEApps.Components.Caching</AssemblyName>
 		<AssemblyTitle>VIEApps NGX Caching</AssemblyTitle>
-		<AssemblyVersion>10.1.14.1804</AssemblyVersion>
-		<FileVersion>10.1.14.1804</FileVersion>
-		<InformationalVersion>v10.1.netstandard-2+rev:2018.04.01</InformationalVersion>
+		<AssemblyVersion>10.1.19.1805</AssemblyVersion>
+		<FileVersion>10.1.19.1805</FileVersion>
+		<InformationalVersion>v10.1.netstandard-2+rev:2018.05.01</InformationalVersion>
 		<Product>VIEApps NGX</Product>
 		<Company>VIEApps.net</Company>
 		<GeneratePackageOnBuild>false</GeneratePackageOnBuild>
 		<PackageId>VIEApps.Components.Caching</PackageId>
-		<Version>10.1.14.1804</Version>
+		<Version>10.1.19.1805</Version>
 		<SignAssembly>false</SignAssembly>
 		<DelaySign>false</DelaySign>
 		<AssemblyOriginatorKeyFile>../VIEApps.Components.snk</AssemblyOriginatorKeyFile>
 		<Title>VIEApps NGX Caching</Title>
-		<Description>The .NET Standard 2.0 wrapper library for working with distributed cache (Memcached &amp; Redis)</Description>
+		<Description>Distributed cache (Redis &amp; Memcached) on  .NET Standard 2.0</Description>
 		<Authors>VIEApps.net</Authors>
 		<Copyright>© 2018 VIEApps.net</Copyright>
 		<PackageTags>cache;distributedcache;memcached;redis;vieapps;vieapps.components</PackageTags>
-		<PackageReleaseNotes>Upgrade to latest components</PackageReleaseNotes>
+		<PackageReleaseNotes>Improvement: add support of cancellation token</PackageReleaseNotes>
 		<PackageProjectUrl>https://github.com/vieapps/Components.Caching</PackageProjectUrl>
 		<RepositoryUrl>https://github.com/vieapps/Components.Caching</RepositoryUrl>
 	</PropertyGroup>
@@ -51,7 +51,7 @@
 		<PackageReference Include="Newtonsoft.Json" Version="11.0.2" />
 		<PackageReference Include="Newtonsoft.Json.Bson" Version="1.0.1" />
 		<PackageReference Include="StackExchange.Redis" Version="1.2.6" />
-		<PackageReference Include="VIEApps.Enyim.Caching" Version="1.4.4.1804" />
+		<PackageReference Include="VIEApps.Enyim.Caching" Version="1.4.5.1805" />
 	</ItemGroup>
 
 </Project>
