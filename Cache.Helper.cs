@@ -57,7 +57,7 @@ namespace net.vieapps.Components.Caching
 		internal static List<string> GetFragmentKeys(string key, int max)
 		{
 			var keys = new List<string>() { key };
-			for (var index = 1; index < max; index++)
+			for (var index = 1; index <= max; index++)
 				keys.Add(Helper.GetFragmentKey(key, index));
 			return keys;
 		}
@@ -164,7 +164,13 @@ namespace net.vieapps.Components.Caching
 					using (var writer = new BsonDataWriter(stream))
 					{
 						new JsonSerializer().Serialize(writer, value);
-						data = stream.GetBuffer();
+						if (stream.TryGetBuffer(out ArraySegment<byte> buffer))
+						{
+							data = new byte[buffer.Count];
+							Buffer.BlockCopy(buffer.Array, buffer.Offset, data, 0, buffer.Count);
+						}
+						else
+							data = stream.ToArray();
 					}
 				}
 			}
@@ -246,16 +252,6 @@ namespace net.vieapps.Components.Caching
 		#region Working with logs
 		internal static ILogger Logger = Enyim.Caching.Logger.CreateLogger<Cache>();
 
-		/// <summary>
-		/// Assigns the logger
-		/// </summary>
-		/// <param name="logger"></param>
-		public static void AssignLogger(ILogger logger)
-		{
-			if (logger != null)
-				Helper.Logger = logger;
-		}
-
 		internal static void WriteLogs(string region, List<string> logs, Exception ex)
 		{
 			if (ex != null)
@@ -318,19 +314,19 @@ namespace Microsoft.AspNetCore.Builder
 		/// <summary>
 		/// Calls to use the <see cref="ICache">VIEApps NGX Caching</see> service
 		/// </summary>
-		/// <param name="appBuilder"></param>
+		/// <param name="app"></param>
 		/// <returns></returns>
-		public static IApplicationBuilder UseCache(this IApplicationBuilder appBuilder)
+		public static IApplicationBuilder UseCache(this IApplicationBuilder app)
 		{
 			try
 			{
-				appBuilder.ApplicationServices.GetService<ILogger<ICache>>().LogInformation($"VIEApps NGX Caching service is {(appBuilder.ApplicationServices.GetService<ICache>() != null ? "" : "not-")}started");
+				app.ApplicationServices.GetService<ILogger<ICache>>().LogInformation($"VIEApps NGX Caching service is {(app.ApplicationServices.GetService<ICache>() != null ? "" : "not-")}started");
 			}
 			catch (Exception ex)
 			{
-				appBuilder.ApplicationServices.GetService<ILogger<ICache>>().LogError(ex, "VIEApps NGX Caching service is failed to start");
+				app.ApplicationServices.GetService<ILogger<ICache>>().LogError(ex, "VIEApps NGX Caching service is failed to start");
 			}
-			return appBuilder;
+			return app;
 		}
 	}
 }
