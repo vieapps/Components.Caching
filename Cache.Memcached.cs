@@ -318,6 +318,10 @@ namespace net.vieapps.Components.Caching
 				{
 					throw;
 				}
+				catch (OperationCanceledException)
+				{
+					throw;
+				}
 				catch (Exception ex)
 				{
 					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
@@ -343,6 +347,10 @@ namespace net.vieapps.Components.Caching
 					success = await Memcached.Client.StoreAsync(mode, this._GetKey(key), value, expiresAt, cancellationToken).ConfigureAwait(false);
 				}
 				catch (ArgumentException)
+				{
+					throw;
+				}
+				catch (OperationCanceledException)
 				{
 					throw;
 				}
@@ -488,6 +496,10 @@ namespace net.vieapps.Components.Caching
 			{
 				value = await Memcached.Client.GetAsync(this._GetKey(key), cancellationToken).ConfigureAwait(false);
 			}
+			catch (OperationCanceledException)
+			{
+				throw;
+			}
 			catch (Exception ex)
 			{
 				Helper.WriteLogs(this.Name, $"Error occurred while fetching an object from cache storage [{key}]", ex);
@@ -497,6 +509,10 @@ namespace net.vieapps.Components.Caching
 				try
 				{
 					value = await this._GetFromFragmentsAsync(key, value as byte[], cancellationToken).ConfigureAwait(false);
+				}
+				catch (OperationCanceledException)
+				{
+					throw;
 				}
 				catch (Exception ex)
 				{
@@ -545,6 +561,10 @@ namespace net.vieapps.Components.Caching
 			try
 			{
 				items = await Memcached.Client.GetAsync(keys.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => this._GetKey(key)), cancellationToken).ConfigureAwait(false);
+			}
+			catch (OperationCanceledException)
+			{
+				throw;
 			}
 			catch (Exception ex)
 			{
@@ -631,6 +651,10 @@ namespace net.vieapps.Components.Caching
 				var data = Helper.Combine(firstBlock, await this._GetAsFragmentsAsync(key, Enumerable.Range(1, info.Item1 - 1).ToList(), cancellationToken).ConfigureAwait(false));
 				return Helper.Deserialize(data, 8, data.Length - 8);
 			}
+			catch (OperationCanceledException)
+			{
+				throw;
+			}
 			catch (Exception ex)
 			{
 				Helper.WriteLogs(this.Name, $"Error occurred while serializing an object from fragmented data [{key}]", ex);
@@ -685,6 +709,10 @@ namespace net.vieapps.Components.Caching
 				try
 				{
 					success = await Memcached.Client.RemoveAsync(this._GetKey(key), cancellationToken).ConfigureAwait(false);
+				}
+				catch (OperationCanceledException)
+				{
+					throw;
 				}
 				catch (Exception ex)
 				{
@@ -831,13 +859,13 @@ namespace net.vieapps.Components.Caching
 			var fragments = Enumerable.Repeat(new byte[0], BitConverter.ToInt32(tmp, 0)).ToList();
 			if (fragments.Count > 1)
 			{
-				Func<int, Task> func = (index) =>
+				Task fetchAsync(int index)
 				{
 					return Task.Run(() => fragments[index] = Memcached.Client.Get<byte[]>(key + ":" + index));
-				};
+				}
 				var tasks = new List<Task>();
 				for (var index = 1; index < fragments.Count; index++)
-					tasks.Add(func(index));
+					tasks.Add(fetchAsync(index));
 				Task.WaitAll(tasks.ToArray(), 13000);
 			}
 
@@ -868,13 +896,13 @@ namespace net.vieapps.Components.Caching
 			var fragments = Enumerable.Repeat(new byte[0], BitConverter.ToInt32(tmp, 0)).ToList();
 			if (fragments.Count > 1)
 			{
-				async Task func(int index)
+				async Task fetchAsync(int index)
 				{
 					fragments[index] = await Memcached.Client.GetAsync<byte[]>(key + ":" + index, cancellationToken).ConfigureAwait(false);
 				}
 				var tasks = new List<Task>();
 				for (var index = 1; index < fragments.Count; index++)
-					tasks.Add(func(index));
+					tasks.Add(fetchAsync(index));
 				await Task.WhenAll(tasks).ConfigureAwait(false);
 			}
 
@@ -928,6 +956,10 @@ namespace net.vieapps.Components.Caching
 					regions.Add(name);
 					await Memcached.SetKeysAsync(Helper.RegionsKey, regions, cancellationToken).ConfigureAwait(false);
 				}
+			}
+			catch (OperationCanceledException)
+			{
+				throw;
 			}
 			catch (Exception ex)
 			{

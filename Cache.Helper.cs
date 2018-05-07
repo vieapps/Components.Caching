@@ -1,8 +1,9 @@
 #region Related components
 using System;
 using System.IO;
-using System.Text;
 using System.Linq;
+using System.Text;
+using System.Text.RegularExpressions;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -40,7 +41,7 @@ namespace net.vieapps.Components.Caching
 		{
 			return string.IsNullOrWhiteSpace(name)
 				? Helper.RegionName
-				: System.Text.RegularExpressions.Regex.Replace(name, "[^0-9a-zA-Z:-]+", "");
+				: Regex.Replace(name, "[^0-9a-zA-Z:-]+", "");
 		}
 
 		internal static string GetCacheKey(string region, string key)
@@ -298,9 +299,9 @@ namespace Microsoft.Extensions.DependencyInjection
 			services.AddOptions();
 			services.Configure(setupAction);
 			services.Add(ServiceDescriptor.Singleton<ICacheConfiguration, CacheConfiguration>());
-			services.Add(ServiceDescriptor.Singleton<ICache, Cache>(s => Cache.GetInstance(s)));
+			services.Add(ServiceDescriptor.Singleton<ICache, Cache>(serviceProvider => Cache.GetInstance(serviceProvider)));
 			if (addInstanceOfIDistributedCache)
-				services.Add(ServiceDescriptor.Singleton<IDistributedCache, Cache>(s => Cache.GetInstance(s)));
+				services.Add(ServiceDescriptor.Singleton<IDistributedCache, Cache>(serviceProvider => Cache.GetInstance(serviceProvider)));
 
 			return services;
 		}

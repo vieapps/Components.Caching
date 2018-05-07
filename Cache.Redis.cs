@@ -288,6 +288,10 @@ namespace net.vieapps.Components.Caching
 				{
 					throw;
 				}
+				catch (OperationCanceledException)
+				{
+					throw;
+				}
 				catch (Exception ex)
 				{
 					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
@@ -444,6 +448,10 @@ namespace net.vieapps.Components.Caching
 				{
 					throw;
 				}
+				catch (OperationCanceledException)
+				{
+					throw;
+				}
 				catch (Exception ex)
 				{
 					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
@@ -509,6 +517,10 @@ namespace net.vieapps.Components.Caching
 					success = await Redis.Client.ReplaceAsync(this._GetKey(key), value, validFor, cancellationToken).ConfigureAwait(false);
 				}
 				catch (ArgumentException)
+				{
+					throw;
+				}
+				catch (OperationCanceledException)
 				{
 					throw;
 				}
@@ -587,6 +599,10 @@ namespace net.vieapps.Components.Caching
 			{
 				value = await Redis.Client.GetAsync(this._GetKey(key), false, cancellationToken).ConfigureAwait(false);
 			}
+			catch (OperationCanceledException)
+			{
+				throw;
+			}
 			catch (Exception ex)
 			{
 				Helper.WriteLogs(this.Name, $"Error occurred while fetching an object from cache storage [{key}]", ex);
@@ -598,6 +614,10 @@ namespace net.vieapps.Components.Caching
 					try
 					{
 						value = await this._GetFromFragmentsAsync(key, value as byte[], cancellationToken).ConfigureAwait(false);
+					}
+					catch (OperationCanceledException)
+					{
+						throw;
 					}
 					catch (Exception ex)
 					{
@@ -673,6 +693,10 @@ namespace net.vieapps.Components.Caching
 			{
 				items = await Redis.Client.GetAsync(keys.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => this._GetKey(key)), cancellationToken).ConfigureAwait(false);
 			}
+			catch (OperationCanceledException)
+			{
+				throw;
+			}
 			catch (Exception ex)
 			{
 				Helper.WriteLogs(this.Name, "Error occurred while fetch a collection of objects from cache storage", ex);
@@ -693,6 +717,10 @@ namespace net.vieapps.Components.Caching
 			try
 			{
 				items = await Redis.Client.GetAsync<T>(keys.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => this._GetKey(key)), cancellationToken).ConfigureAwait(false);
+			}
+			catch (OperationCanceledException)
+			{
+				throw;
 			}
 			catch (Exception ex)
 			{
@@ -774,6 +802,10 @@ namespace net.vieapps.Components.Caching
 				var data = Helper.Combine(firstBlock, await this._GetAsFragmentsAsync(key, Enumerable.Range(1, info.Item1 - 1).ToList(), cancellationToken).ConfigureAwait(false));
 				return Helper.Deserialize(data, 8, data.Length - 8);
 			}
+			catch (OperationCanceledException)
+			{
+				throw;
+			}
 			catch (Exception ex)
 			{
 				Helper.WriteLogs(this.Name, $"Error occurred while serializing an object from fragmented data [{key}]", ex);
@@ -810,13 +842,17 @@ namespace net.vieapps.Components.Caching
 				{
 					success = await Redis.Client.RemoveAsync(this._GetKey(key), cancellationToken).ConfigureAwait(false);
 				}
+				catch (OperationCanceledException)
+				{
+					throw;
+				}
 				catch (Exception ex)
 				{
 					Helper.WriteLogs(this.Name, $"Error occurred while removing an object from cache storage [{key}]", ex);
 				}
 
 			if (success && this._storeKeys)
-				await this._RemoveKeyAsync(key).ConfigureAwait(false);
+				await this._RemoveKeyAsync(key, cancellationToken).ConfigureAwait(false);
 
 			return success;
 		}
