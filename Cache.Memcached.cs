@@ -47,7 +47,7 @@ namespace net.vieapps.Components.Caching
 			}
 
 			// register the region
-			Task.Run(async () => await Memcached.RegisterRegionAsync(this.Name).ConfigureAwait(false)).ConfigureAwait(false);
+			Task.Run(() => Memcached.RegisterRegionAsync(this.Name)).ConfigureAwait(false);
 		}
 
 		#region Get client (singleton)

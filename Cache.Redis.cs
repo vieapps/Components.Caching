@@ -47,7 +47,7 @@ namespace net.vieapps.Components.Caching
 			this._storeKeys = storeKeys;
 
 			// register the region
-			Task.Run(async () => await Redis.RegisterRegionAsync(this.Name).ConfigureAwait(false)).ConfigureAwait(false);
+			Task.Run(() => Redis.RegisterRegionAsync(this.Name)).ConfigureAwait(false);
 		}
 
 		#region Get client (singleton)

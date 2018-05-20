@@ -251,21 +251,17 @@ namespace net.vieapps.Components.Caching
 		#endregion
 
 		#region Working with logs
-		internal static ILogger Logger = Enyim.Caching.Logger.CreateLogger<Cache>();
+		internal static ILogger Logger { get; set; } = Enyim.Caching.Logger.CreateLogger<Cache>();
 
 		internal static void WriteLogs(string region, List<string> logs, Exception ex)
 		{
 			if (ex != null)
 			{
-				foreach (var log in logs)
-					Logger.LogDebug($"<{region}>: {log}");
-				Logger.LogError(ex, ex.Message);
+				logs.ForEach(log => Helper.Logger.LogInformation($"<{region}>: {log}"));
+				Helper.Logger.LogError(ex, ex.Message);
 			}
-			else if (Logger.IsEnabled(LogLevel.Debug))
-			{
-				foreach (var log in logs)
-					Logger.LogInformation(ex, $"<{region}>: {log}");
-			}
+			else if (Helper.Logger.IsEnabled(LogLevel.Debug))
+				logs.ForEach(log => Helper.Logger.LogInformation($"<{region}>: {log}"));
 		}
 
 		internal static void WriteLogs(string region, string log, Exception ex)
