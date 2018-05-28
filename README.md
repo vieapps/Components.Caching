@@ -1,16 +1,25 @@
 # VIEApps.Components.Caching
+
 A .NET Standard 2.0 wrapper library for working with distributed cache
+
 - Ready with .NET Core 2.0 and .NET Framework 4.6.1 (and higher)
 - Supported: Memcached & Redis
+
 ## NuGet
-- Package ID: VIEApps.Components.Caching
-- Details: https://www.nuget.org/packages/VIEApps.Components.Caching
+
+[![NuGet](https://img.shields.io/nuget/v/VIEApps.Components.Caching.svg)](https://www.nuget.org/packages/VIEApps.Components.Caching/)
+
 ## Dependencies
+
 - Memcached: [VIEApps.Enyim.Caching](https://github.com/vieapps/Enyim.Caching)
 - Redis: [StackExchange.Redis](https://github.com/StackExchange/StackExchange.Redis)
+
 ## Configuration (stand-alone/classical apps)
+
 Add the configuration settings into your app.config/web.config file
+
 ### Configure with two seperated sections
+
 ```xml
 <?xml version="1.0" encoding="utf-8"?>
 <configuration>
@@ -34,7 +43,9 @@ Add the configuration settings into your app.config/web.config file
 	</redis>
 </configuration>
 ```
+
 ### Configure with only one section
+
 ```xml
 <?xml version="1.0" encoding="utf-8"?>
 <configuration>
@@ -52,8 +63,11 @@ Add the configuration settings into your app.config/web.config file
 		<options allowAdmin="false" version="3.0" connectTimeout="4000" syncTimeout="2000" />
 	</cache>
 </configuration>
+
 ```
+
 ## Example of usage (stand-alone/classical apps)
+
 ```cs
 public class CreativeService
 {	
@@ -86,11 +100,17 @@ public class CreativeService
 	}
 }
 ```
+
 ## Configuration (ASP.NET Core 2.0 apps)
+
 TBD
+
 ## Example of usage (ASP.NET Core 2.0 apps)
+
 TBD
+
 ## Listing of all methods
+
 ```cs
 bool Set(string key, object value, int expirationTime = 0);
 bool Set(string key, object value, TimeSpan validFor);
@@ -145,5 +165,7 @@ Task ClearAsync();
 HashSet<string> GetKeys();
 Task<HashSet<string>> GetKeysAsync();
 ```
-## Session State Providers
+
+## Session State Providers (for ASP.NET)
+
 - See [VIEApps.Components.Caching.AspNet](https://github.com/vieapps/Components.Caching.AspNet)
