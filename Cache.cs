@@ -68,7 +68,7 @@ namespace net.vieapps.Components.Caching
 
 			Helper.Logger = (loggerFactory ?? Enyim.Caching.Logger.GetLoggerFactory()).CreateLogger<Cache>();
 			if (Helper.Logger.IsEnabled(LogLevel.Debug))
-				Helper.Logger.LogInformation($"A caching instance was created - Region: {this._cache.Name} - Expiration times: {this._cache.ExpirationTime} minute(s) - Type: {this._cache.GetType()}");
+				Helper.Logger.LogInformation($"An instance was created - Region: {this._cache.Name} - Expiration times: {this._cache.ExpirationTime} minute(s) - Type: {this._cache.GetType()}");
 		}
 
 		#region Get instance (singleton)
@@ -135,8 +135,8 @@ namespace net.vieapps.Components.Caching
 				var loggerFactory = svcProvider.GetService<ILoggerFactory>();
 				Cache.GetInstance(configuration as CacheConfiguration, loggerFactory);
 
-				var logger = loggerFactory?.CreateLogger<Cache>();
-				if (logger != null && logger.IsEnabled(LogLevel.Debug))
+				var logger = loggerFactory.CreateLogger<Cache>();
+				if (logger.IsEnabled(LogLevel.Debug))
 					logger.LogInformation($"An instance of VIEApps NGX Caching was created successful with integrated configuration - {configuration.Provider}: {configuration.RegionName} ({configuration.ExpirationTime} minutes)");
 			}
 			return Cache._Instance;

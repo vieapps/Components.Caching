@@ -14,11 +14,9 @@ namespace net.vieapps.Components.Caching
 	public static class RedisExtensions
 	{
 		internal static bool Set(this IDatabase redis, string key, byte[] value, TimeSpan validFor)
-		{
-			return string.IsNullOrWhiteSpace(key)
+			=> string.IsNullOrWhiteSpace(key)
 				? false
 				: redis.StringSet(key, value, validFor);
-		}
 
 		/// <summary>
 		/// Adds an item into cache with a specified key (if the key is already existed, then old cached item will be overriden)
@@ -29,11 +27,9 @@ namespace net.vieapps.Components.Caching
 		/// <param name="validFor"></param>
 		/// <returns></returns>
 		public static bool Set(this IDatabase redis, string key, object value, TimeSpan validFor)
-		{
-			return string.IsNullOrWhiteSpace(key)
+			=> string.IsNullOrWhiteSpace(key)
 				? false
 				: redis.Set(key, Helper.Serialize(value), validFor);
-		}
 
 		/// <summary>
 		/// Adds an item into cache with a specified key (if the key is already existed, then old cached item will be overriden)
@@ -44,9 +40,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="expiresAt"></param>
 		/// <returns></returns>
 		public static bool Set(this IDatabase redis, string key, object value, DateTime expiresAt)
-		{
-			return redis.Set(key, value, expiresAt.ToTimeSpan());
-		}
+			=> redis.Set(key, value, expiresAt.ToTimeSpan());
 
 		/// <summary>
 		/// Adds an item into cache with a specified key (if the key is already existed, then old cached item will be overriden)
@@ -57,16 +51,12 @@ namespace net.vieapps.Components.Caching
 		/// <param name="expirationTime"></param>
 		/// <returns></returns>
 		public static bool Set(this IDatabase redis, string key, object value, int expirationTime = 0)
-		{
-			return redis.Set(key, value, expirationTime > 0 ? TimeSpan.FromMinutes(expirationTime) : TimeSpan.Zero);
-		}
+			=> redis.Set(key, value, expirationTime > 0 ? TimeSpan.FromMinutes(expirationTime) : TimeSpan.Zero);
 
 		internal static Task<bool> SetAsync(this IDatabase redis, string key, byte[] value, TimeSpan validFor, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			return string.IsNullOrWhiteSpace(key)
+			=> string.IsNullOrWhiteSpace(key)
 				? Task.FromResult(false)
 				: redis.StringSetAsync(key, value, validFor).WithCancellationToken(cancellationToken);
-		}
 
 		/// <summary>
 		/// Adds an item into cache with a specified key (if the key is already existed, then old cached item will be overriden)
@@ -77,11 +67,9 @@ namespace net.vieapps.Components.Caching
 		/// <param name="validFor"></param>
 		/// <returns></returns>
 		public static Task<bool> SetAsync(this IDatabase redis, string key, object value, TimeSpan validFor, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			return string.IsNullOrWhiteSpace(key)
+			=> string.IsNullOrWhiteSpace(key)
 				? Task.FromResult(false)
 				: redis.SetAsync(key, Helper.Serialize(value), validFor).WithCancellationToken(cancellationToken);
-		}
 
 		/// <summary>
 		/// Adds an item into cache with a specified key (if the key is already existed, then old cached item will be overriden)
@@ -92,9 +80,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="expiresAt"></param>
 		/// <returns></returns>
 		public static Task<bool> SetAsync(this IDatabase redis, string key, object value, DateTime expiresAt, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			return redis.SetAsync(key, value, expiresAt.ToTimeSpan()).WithCancellationToken(cancellationToken);
-		}
+			=> redis.SetAsync(key, value, expiresAt.ToTimeSpan()).WithCancellationToken(cancellationToken);
 
 		/// <summary>
 		/// Adds an item into cache with a specified key (if the key is already existed, then old cached item will be overriden)
@@ -105,9 +91,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="expirationTime"></param>
 		/// <returns></returns>
 		public static Task<bool> SetAsync(this IDatabase redis, string key, object value, int expirationTime = 0, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			return redis.SetAsync(key, value, expirationTime > 0 ? TimeSpan.FromMinutes(expirationTime) : TimeSpan.Zero).WithCancellationToken(cancellationToken);
-		}
+			=> redis.SetAsync(key, value, expirationTime > 0 ? TimeSpan.FromMinutes(expirationTime) : TimeSpan.Zero).WithCancellationToken(cancellationToken);
 
 		/// <summary>
 		/// Adds an item into cache with a specified key (if the key is already existed, then old cached item will be overriden)
@@ -117,9 +101,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="values"></param>
 		/// <param name="validFor"></param>
 		public static void Set<T>(this IDatabase redis, IDictionary<string, T> values, TimeSpan validFor)
-		{
-			values?.Where(kvp => !string.IsNullOrWhiteSpace(kvp.Key)).ToList().ForEach(kvp => redis.StringSet(kvp.Key, Helper.Serialize(kvp.Value), validFor));
-		}
+			=> values?.Where(kvp => !string.IsNullOrWhiteSpace(kvp.Key)).ToList().ForEach(kvp => redis.StringSet(kvp.Key, Helper.Serialize(kvp.Value), validFor));
 
 		/// <summary>
 		/// Adds an item into cache with a specified key (if the key is already existed, then old cached item will be overriden)
@@ -130,19 +112,13 @@ namespace net.vieapps.Components.Caching
 		/// <param name="validFor"></param>
 		/// <returns></returns>
 		public static Task SetAsync<T>(this IDatabase redis, IDictionary<string, T> values, TimeSpan validFor, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			return Task.WhenAll(values?.Where(kvp => !string.IsNullOrWhiteSpace(kvp.Key)).Select(kvp => redis.StringSetAsync(kvp.Key, Helper.Serialize(kvp.Value), validFor).WithCancellationToken(cancellationToken)) ?? new List<Task<bool>>());
-		}
+			=> Task.WhenAll(values?.Where(kvp => !string.IsNullOrWhiteSpace(kvp.Key)).Select(kvp => redis.StringSetAsync(kvp.Key, Helper.Serialize(kvp.Value), validFor).WithCancellationToken(cancellationToken)) ?? new List<Task<bool>>());
 
 		internal static void Set(this IDatabase redis, IDictionary<string, byte[]> values, TimeSpan validFor)
-		{
-			values?.Where(kvp => !string.IsNullOrWhiteSpace(kvp.Key)).ToList().ForEach(kvp => redis.StringSet(kvp.Key, kvp.Value, validFor));
-		}
+			=> values?.Where(kvp => !string.IsNullOrWhiteSpace(kvp.Key)).ToList().ForEach(kvp => redis.StringSet(kvp.Key, kvp.Value, validFor));
 
 		internal static Task SetAsync(this IDatabase redis, IDictionary<string, byte[]> values, TimeSpan validFor, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			return Task.WhenAll(values?.Where(kvp => !string.IsNullOrWhiteSpace(kvp.Key)).Select(kvp => redis.StringSetAsync(kvp.Key, kvp.Value, validFor).WithCancellationToken(cancellationToken)) ?? new List<Task<bool>>());
-		}
+			=> Task.WhenAll(values?.Where(kvp => !string.IsNullOrWhiteSpace(kvp.Key)).Select(kvp => redis.StringSetAsync(kvp.Key, kvp.Value, validFor).WithCancellationToken(cancellationToken)) ?? new List<Task<bool>>());
 
 		/// <summary>
 		/// Adds an item into cache with a specified key when the the key is not existed
@@ -153,11 +129,9 @@ namespace net.vieapps.Components.Caching
 		/// <param name="validFor"></param>
 		/// <returns></returns>
 		public static bool Add(this IDatabase redis, string key, object value, TimeSpan validFor)
-		{
-			return string.IsNullOrWhiteSpace(key) || redis.Exists(key)
+			=> string.IsNullOrWhiteSpace(key) || redis.Exists(key)
 				? false
 				: redis.Set(key, value, validFor);
-		}
 
 		/// <summary>
 		/// Adds an item into cache with a specified key when the the key is not existed
@@ -168,9 +142,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="expiresAt"></param>
 		/// <returns></returns>
 		public static bool Add(this IDatabase redis, string key, object value, DateTime expiresAt)
-		{
-			return redis.Add(key, value, expiresAt.ToTimeSpan());
-		}
+			=> redis.Add(key, value, expiresAt.ToTimeSpan());
 
 		/// <summary>
 		/// Adds an item into cache with a specified key when the the key is not existed
@@ -181,9 +153,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="expirationTime"></param>
 		/// <returns></returns>
 		public static bool Add(this IDatabase redis, string key, object value, int expirationTime = 0)
-		{
-			return redis.Add(key, value, expirationTime > 0 ? TimeSpan.FromMinutes(expirationTime) : TimeSpan.Zero);
-		}
+			=> redis.Add(key, value, expirationTime > 0 ? TimeSpan.FromMinutes(expirationTime) : TimeSpan.Zero);
 
 		/// <summary>
 		/// Adds an item into cache with a specified key when the the key is not existed
@@ -194,11 +164,9 @@ namespace net.vieapps.Components.Caching
 		/// <param name="validFor"></param>
 		/// <returns></returns>
 		public static async Task<bool> AddAsync(this IDatabase redis, string key, object value, TimeSpan validFor, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			return string.IsNullOrWhiteSpace(key) || await redis.ExistsAsync(key, cancellationToken).ConfigureAwait(false)
+			=> string.IsNullOrWhiteSpace(key) || await redis.ExistsAsync(key, cancellationToken).ConfigureAwait(false)
 				? false
 				: await redis.SetAsync(key, value, validFor, cancellationToken).ConfigureAwait(false);
-		}
 
 		/// <summary>
 		/// Adds an item into cache with a specified key when the the key is not existed
@@ -209,9 +177,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="expiresAt"></param>
 		/// <returns></returns>
 		public static Task<bool> AddAsync(this IDatabase redis, string key, object value, DateTime expiresAt, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			return redis.AddAsync(key, value, expiresAt.ToTimeSpan(), cancellationToken);
-		}
+			=> redis.AddAsync(key, value, expiresAt.ToTimeSpan(), cancellationToken);
 
 		/// <summary>
 		/// Adds an item into cache with a specified key when the the key is not existed
@@ -222,9 +188,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="expirationTime"></param>
 		/// <returns></returns>
 		public static Task<bool> AddAsync(this IDatabase redis, string key, object value, int expirationTime = 0, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			return redis.AddAsync(key, value, expirationTime > 0 ? TimeSpan.FromMinutes(expirationTime) : TimeSpan.Zero, cancellationToken);
-		}
+			=> redis.AddAsync(key, value, expirationTime > 0 ? TimeSpan.FromMinutes(expirationTime) : TimeSpan.Zero, cancellationToken);
 
 		/// <summary>
 		/// Adds an item into cache with a specified key when the the key is existed (means update existed item)
@@ -235,11 +199,9 @@ namespace net.vieapps.Components.Caching
 		/// <param name="validFor"></param>
 		/// <returns></returns>
 		public static bool Replace(this IDatabase redis, string key, object value, TimeSpan validFor)
-		{
-			return string.IsNullOrWhiteSpace(key) || !redis.Exists(key)
+			=> string.IsNullOrWhiteSpace(key) || !redis.Exists(key)
 				? false
 				: redis.Set(key, value, validFor);
-		}
 
 		/// <summary>
 		/// Adds an item into cache with a specified key when the the key is existed (means update existed item)
@@ -250,9 +212,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="expiresAt"></param>
 		/// <returns></returns>
 		public static bool Replace(this IDatabase redis, string key, object value, DateTime expiresAt)
-		{
-			return redis.Replace(key, value, expiresAt.ToTimeSpan());
-		}
+			=> redis.Replace(key, value, expiresAt.ToTimeSpan());
 
 		/// <summary>
 		/// Adds an item into cache with a specified key when the the key is existed (means update existed item)
@@ -263,9 +223,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="expirationTime"></param>
 		/// <returns></returns>
 		public static bool Replace(this IDatabase redis, string key, object value, int expirationTime = 0)
-		{
-			return redis.Replace(key, value, expirationTime > 0 ? TimeSpan.FromMinutes(expirationTime) : TimeSpan.Zero);
-		}
+			=> redis.Replace(key, value, expirationTime > 0 ? TimeSpan.FromMinutes(expirationTime) : TimeSpan.Zero);
 
 		/// <summary>
 		/// Adds an item into cache with a specified key when the the key is existed (means update existed item)
@@ -276,11 +234,9 @@ namespace net.vieapps.Components.Caching
 		/// <param name="validFor"></param>
 		/// <returns></returns>
 		public static async Task<bool> ReplaceAsync(this IDatabase redis, string key, object value, TimeSpan validFor, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			return string.IsNullOrWhiteSpace(key) || !await redis.ExistsAsync(key, cancellationToken).ConfigureAwait(false)
+			=> string.IsNullOrWhiteSpace(key) || !await redis.ExistsAsync(key, cancellationToken).ConfigureAwait(false)
 				? false
 				: await redis.SetAsync(key, value, validFor, cancellationToken).ConfigureAwait(false);
-		}
 
 		/// <summary>
 		/// Adds an item into cache with a specified key when the the key is existed (means update existed item)
@@ -291,9 +247,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="expiresAt"></param>
 		/// <returns></returns>
 		public static Task<bool> ReplaceAsync(this IDatabase redis, string key, object value, DateTime expiresAt, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			return redis.ReplaceAsync(key, value, expiresAt.ToTimeSpan(), cancellationToken);
-		}
+			=> redis.ReplaceAsync(key, value, expiresAt.ToTimeSpan(), cancellationToken);
 
 		/// <summary>
 		/// Adds an item into cache with a specified key when the the key is existed (means update existed item)
@@ -304,9 +258,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="expirationTime"></param>
 		/// <returns></returns>
 		public static Task<bool> ReplaceAsync(this IDatabase redis, string key, object value, int expirationTime = 0, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			return redis.ReplaceAsync(key, value, expirationTime > 0 ? TimeSpan.FromMinutes(expirationTime) : TimeSpan.Zero, cancellationToken);
-		}
+			=> redis.ReplaceAsync(key, value, expirationTime > 0 ? TimeSpan.FromMinutes(expirationTime) : TimeSpan.Zero, cancellationToken);
 
 		internal static object Get(this IDatabase redis, string key, bool doDeserialize)
 		{
@@ -325,9 +277,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="key"></param>
 		/// <returns></returns>
 		public static object Get(this IDatabase redis, string key)
-		{
-			return redis.Get(key, true);
-		}
+			=> redis.Get(key, true);
 
 		internal static async Task<object> GetAsync(this IDatabase redis, string key, bool doDeserialize, CancellationToken cancellationToken = default(CancellationToken))
 		{
@@ -346,9 +296,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="key"></param>
 		/// <returns></returns>
 		public static Task<object> GetAsync(this IDatabase redis, string key, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			return redis.GetAsync(key, true, cancellationToken);
-		}
+			=> redis.GetAsync(key, true, cancellationToken);
 
 		/// <summary>
 		/// Retreives a cached item
@@ -409,9 +357,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="keys"></param>
 		/// <returns></returns>
 		public static IDictionary<string, object> Get(this IDatabase redis, IEnumerable<string> keys)
-		{
-			return redis.Get(keys, true);
-		}
+			=> redis.Get(keys, true);
 
 		internal static async Task<IDictionary<string, object>> GetAsync(this IDatabase redis, IEnumerable<string> keys, bool doDeserialize, CancellationToken cancellationToken = default(CancellationToken))
 		{
@@ -438,9 +384,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="keys"></param>
 		/// <returns></returns>
 		public static Task<IDictionary<string, object>> GetAsync(this IDatabase redis, IEnumerable<string> keys, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			return redis.GetAsync(keys, true, cancellationToken);
-		}
+			=> redis.GetAsync(keys, true, cancellationToken);
 
 		/// <summary>
 		/// Retreives a collection of cached items
@@ -495,11 +439,9 @@ namespace net.vieapps.Components.Caching
 		/// <param name="key"></param>
 		/// <returns></returns>
 		public static bool Exists(this IDatabase redis, string key)
-		{
-			return string.IsNullOrWhiteSpace(key)
+			=> string.IsNullOrWhiteSpace(key)
 				? false
 				: redis.KeyExists(key);
-		}
 
 		/// <summary>
 		/// Determines whether an item exists in the cache
@@ -508,11 +450,9 @@ namespace net.vieapps.Components.Caching
 		/// <param name="key"></param>
 		/// <returns></returns>
 		public static Task<bool> ExistsAsync(this IDatabase redis, string key, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			return string.IsNullOrWhiteSpace(key)
+			=> string.IsNullOrWhiteSpace(key)
 				? Task.FromResult(false)
 				: redis.KeyExistsAsync(key).WithCancellationToken(cancellationToken);
-		}
 
 		/// <summary>
 		/// Removes a cached item
@@ -521,11 +461,9 @@ namespace net.vieapps.Components.Caching
 		/// <param name="key"></param>
 		/// <returns></returns>
 		public static bool Remove(this IDatabase redis, string key)
-		{
-			return string.IsNullOrWhiteSpace(key)
+			=> string.IsNullOrWhiteSpace(key)
 				? false
 				: redis.KeyDelete(key);
-		}
 
 		/// <summary>
 		/// Removes a cached item
@@ -534,11 +472,9 @@ namespace net.vieapps.Components.Caching
 		/// <param name="key"></param>
 		/// <returns></returns>
 		public static Task<bool> RemoveAsync(this IDatabase redis, string key, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			return string.IsNullOrWhiteSpace(key)
+			=> string.IsNullOrWhiteSpace(key)
 				? Task.FromResult(false)
 				: redis.KeyDeleteAsync(key).WithCancellationToken(cancellationToken);
-		}
 
 		internal static bool UpdateSetMembers(this IDatabase redis, string key, string[] values)
 		{
@@ -564,9 +500,7 @@ namespace net.vieapps.Components.Caching
 		}
 
 		internal static bool UpdateSetMembers(this IDatabase redis, string key, string value)
-		{
-			return redis.UpdateSetMembers(key, new[] { value });
-		}
+			=> redis.UpdateSetMembers(key, new[] { value });
 
 		internal static async Task<bool> UpdateSetMembersAsync(this IDatabase redis, string key, string[] values, CancellationToken cancellationToken = default(CancellationToken))
 		{
@@ -592,9 +526,7 @@ namespace net.vieapps.Components.Caching
 		}
 
 		internal static Task<bool> UpdateSetMembersAsync(this IDatabase redis, string key, string value, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			return redis.UpdateSetMembersAsync(key, new[] { value }, cancellationToken);
-		}
+			=> redis.UpdateSetMembersAsync(key, new[] { value }, cancellationToken);
 
 		internal static bool RemoveSetMembers(this IDatabase redis, string key, string value)
 		{

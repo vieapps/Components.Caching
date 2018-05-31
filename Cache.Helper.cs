@@ -38,16 +38,11 @@ namespace net.vieapps.Components.Caching
 		internal static readonly string RegionName = "VIEApps-NGX-Cache";
 
 		internal static string GetRegionName(string name)
-		{
-			return string.IsNullOrWhiteSpace(name)
+			=> string.IsNullOrWhiteSpace(name)
 				? Helper.RegionName
 				: Regex.Replace(name, "[^0-9a-zA-Z:-]+", "");
-		}
 
-		internal static string GetCacheKey(string region, string key)
-		{
-			return region + "@" + key.Replace(" ", "-");
-		}
+		internal static string GetCacheKey(string region, string key) => region + "@" + key.Replace(" ", "-");
 
 		internal static string GetFragmentKey(string key, int index)
 		{
@@ -121,9 +116,7 @@ namespace net.vieapps.Components.Caching
 		}
 
 		internal static byte[] GetFirstBlock(List<byte[]> fragments)
-		{
-			return CacheUtils.Helper.Combine(BitConverter.GetBytes(Helper.FlagOfFirstFragmentBlock), BitConverter.GetBytes(fragments.Sum(f => f.Length)), fragments[0]);
-		}
+			=> CacheUtils.Helper.Combine(BitConverter.GetBytes(Helper.FlagOfFirstFragmentBlock), BitConverter.GetBytes(fragments.Sum(f => f.Length)), fragments[0]);
 
 		internal static Tuple<int, int> GetFragments(byte[] data)
 		{
@@ -144,6 +137,20 @@ namespace net.vieapps.Components.Caching
 		#endregion
 
 		#region Serialize & Deserialize
+		static MemoryStream CreateMemoryStream(byte[] buffer = null, int index = 0, int count = 0)
+		{
+			var stream = new Microsoft.IO.RecyclableMemoryStreamManager().GetStream();
+			if (buffer == null || buffer.Length < 1)
+				return stream;
+
+			index = index > -1 && index < buffer.Length ? index : 0;
+			count = count > 0 && count < buffer.Length - index ? count : buffer.Length - index;
+
+			stream.Write(buffer, index, count);
+			stream.Seek(0, SeekOrigin.Begin);
+			return stream;
+		}
+
 		/// <summary>
 		/// Serializes an object into array of bytes
 		/// </summary>
@@ -160,7 +167,7 @@ namespace net.vieapps.Components.Caching
 				typeFlag = value is JToken
 					? value is JArray ? Helper.FlagOfJsonArray : Helper.FlagOfJsonObject
 					: Helper.FlagOfExpandoObject;
-				using (var stream = new MemoryStream())
+				using (var stream = Helper.CreateMemoryStream())
 				{
 					using (var writer = new BsonDataWriter(stream))
 					{
@@ -187,10 +194,7 @@ namespace net.vieapps.Components.Caching
 				: data;
 		}
 
-		internal static object Deserialize(byte[] data, int start, int count)
-		{
-			return CacheUtils.Helper.Deserialize(data, (int)TypeCode.Object | 0x0100, start, count);
-		}
+		internal static object Deserialize(byte[] data, int start, int count) => CacheUtils.Helper.Deserialize(data, (int)TypeCode.Object | 0x0100, start, count);
 
 		/// <summary>
 		/// Deserializes an object from the array of bytes
@@ -204,7 +208,7 @@ namespace net.vieapps.Components.Caching
 
 			var typeFlag = Helper.GetFlags(data).Item1;
 			if (typeFlag.Equals(Helper.FlagOfJsonObject) || typeFlag.Equals(Helper.FlagOfJsonArray) || typeFlag.Equals(Helper.FlagOfExpandoObject))
-				using (var stream = new MemoryStream(data, 4, data.Length - 4))
+				using (var stream = Helper.CreateMemoryStream(data, 4, data.Length - 4))
 				{
 					using (var reader = new BsonDataReader(stream))
 					{

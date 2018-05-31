@@ -112,32 +112,20 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		/// <param name="loggerFactory"></param>
 		/// <param name="configuration"></param>
-		public static void PrepareClient(CacheConfiguration configuration, ILoggerFactory loggerFactory = null)
-		{
-			Memcached.GetClient(configuration, loggerFactory);
-		}
+		public static void PrepareClient(CacheConfiguration configuration, ILoggerFactory loggerFactory = null) => Memcached.GetClient(configuration, loggerFactory);
 
 		/// <summary>
 		/// Prepares the instance of memcached client
 		/// </summary>
 		/// <param name="loggerFactory"></param>
-		public static void PrepareClient(ILoggerFactory loggerFactory = null)
-		{
-			Memcached.GetClient(loggerFactory);
-		}
+		public static void PrepareClient(ILoggerFactory loggerFactory = null) => Memcached.GetClient(loggerFactory);
 
 		static MemcachedClient _Client;
 
 		/// <summary>
 		/// Gets the instance of the Memcached client
 		/// </summary>
-		public static MemcachedClient Client
-		{
-			get
-			{
-				return Memcached._Client ?? (Memcached._Client = Memcached.GetClient());
-			}
-		}
+		public static MemcachedClient Client => Memcached._Client ?? (Memcached._Client = Memcached.GetClient());
 		#endregion
 
 		#region Attributes
@@ -243,15 +231,9 @@ namespace net.vieapps.Components.Caching
 				this._UpdateKeys(123);
 		}
 
-		HashSet<string> _GetKeys()
-		{
-			return Memcached.FetchKeys(this._RegionKey);
-		}
+		HashSet<string> _GetKeys() => Memcached.FetchKeys(this._RegionKey);
 
-		Task<HashSet<string>> _GetKeysAsync(CancellationToken cancellationToken = default(CancellationToken))
-		{
-			return Memcached.FetchKeysAsync(this._RegionKey, cancellationToken);
-		}
+		Task<HashSet<string>> _GetKeysAsync(CancellationToken cancellationToken = default(CancellationToken)) => Memcached.FetchKeysAsync(this._RegionKey, cancellationToken);
 		#endregion
 
 		#region Set
@@ -279,9 +261,7 @@ namespace net.vieapps.Components.Caching
 		}
 
 		bool _Set(string key, object value, int expirationTime = 0, bool doPush = true, StoreMode mode = StoreMode.Set)
-		{
-			return this._Set(key, value, TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime), doPush, mode);
-		}
+			=> this._Set(key, value, TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime), doPush, mode);
 
 		bool _Set(string key, object value, DateTime expiresAt, bool doPush = true, StoreMode mode = StoreMode.Set)
 		{
@@ -334,9 +314,7 @@ namespace net.vieapps.Components.Caching
 		}
 
 		Task<bool> _SetAsync(string key, object value, int expirationTime = 0, bool doPush = true, StoreMode mode = StoreMode.Set, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			return this._SetAsync(key, value, TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime), doPush, mode, cancellationToken);
-		}
+			=> this._SetAsync(key, value, TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime), doPush, mode, cancellationToken);
 
 		async Task<bool> _SetAsync(string key, object value, DateTime expiresAt, bool doPush = true, StoreMode mode = StoreMode.Set, CancellationToken cancellationToken = default(CancellationToken))
 		{
@@ -391,9 +369,7 @@ namespace net.vieapps.Components.Caching
 		}
 
 		Task _SetAsync(IDictionary<string, object> items, string keyPrefix = null, int expirationTime = 0, StoreMode mode = StoreMode.Set, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			return this._SetAsync<object>(items, keyPrefix, expirationTime, mode, cancellationToken);
-		}
+			=> this._SetAsync<object>(items, keyPrefix, expirationTime, mode, cancellationToken);
 		#endregion
 
 		#region Set (Fragment)
@@ -442,18 +418,14 @@ namespace net.vieapps.Components.Caching
 		}
 
 		bool _SetAsFragments(string key, object value, int expirationTime = 0, StoreMode mode = StoreMode.Set)
-		{
-			return string.IsNullOrWhiteSpace(key) || value == null
+			=> string.IsNullOrWhiteSpace(key) || value == null
 				? false
 				: this._SetFragments(key, Helper.Split(Helper.Serialize(value, false)), expirationTime, mode);
-		}
 
 		Task<bool> _SetAsFragmentsAsync(string key, object value, int expirationTime = 0, StoreMode mode = StoreMode.Set, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			return string.IsNullOrWhiteSpace(key) || value == null
+			=> string.IsNullOrWhiteSpace(key) || value == null
 				? Task.FromResult(false)
 				: this._SetFragmentsAsync(key, Helper.Split(Helper.Serialize(value, false)), expirationTime, mode, cancellationToken);
-		}
 		#endregion
 
 		#region Get
@@ -548,9 +520,7 @@ namespace net.vieapps.Components.Caching
 		}
 
 		IDictionary<string, T> _Get<T>(IEnumerable<string> keys)
-		{
-			return this._Get(keys)?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value is T ? (T)kvp.Value : default(T));
-		}
+			=> this._Get(keys)?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value is T ? (T)kvp.Value : default(T));
 
 		async Task<IDictionary<string, object>> _GetAsync(IEnumerable<string> keys, CancellationToken cancellationToken = default(CancellationToken))
 		{
@@ -578,16 +548,11 @@ namespace net.vieapps.Components.Caching
 		}
 
 		async Task<IDictionary<string, T>> _GetAsync<T>(IEnumerable<string> keys, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			return (await this._GetAsync(keys, cancellationToken).ConfigureAwait(false))?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value is T ? (T)kvp.Value : default(T));
-		}
+			=> (await this._GetAsync(keys, cancellationToken).ConfigureAwait(false))?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value is T ? (T)kvp.Value : default(T));
 		#endregion
 
 		#region Get (Fragment)
-		Tuple<int, int> _GetFragments(string key)
-		{
-			return Helper.GetFragments(this._Get(key, false) as byte[]);
-		}
+		Tuple<int, int> _GetFragments(string key) => Helper.GetFragments(this._Get(key, false) as byte[]);
 
 		async Task<Tuple<int, int>> _GetFragmentsAsync(string key, CancellationToken cancellationToken = default(CancellationToken))
 		{
@@ -615,18 +580,14 @@ namespace net.vieapps.Components.Caching
 		}
 
 		List<byte[]> _GetAsFragments(string key, params int[] indexes)
-		{
-			return string.IsNullOrWhiteSpace(key) || indexes == null || indexes.Length < 1
+			=> string.IsNullOrWhiteSpace(key) || indexes == null || indexes.Length < 1
 				? null
 				: this._GetAsFragments(key, indexes.ToList());
-		}
 
 		Task<List<byte[]>> _GetAsFragmentsAsync(string key, CancellationToken cancellationToken = default(CancellationToken), params int[] indexes)
-		{
-			return string.IsNullOrWhiteSpace(key) || indexes == null || indexes.Length < 1
+			=> string.IsNullOrWhiteSpace(key) || indexes == null || indexes.Length < 1
 				? Task.FromResult<List<byte[]>>(null)
 				: this._GetAsFragmentsAsync(key, indexes.ToList(), cancellationToken);
-		}
 
 		object _GetFromFragments(string key, byte[] firstBlock)
 		{
@@ -809,28 +770,13 @@ namespace net.vieapps.Components.Caching
 		// -----------------------------------------------------
 
 		#region [Helper]
-		string _GetKey(string key)
-		{
-			return Helper.GetCacheKey(this.Name, key);
-		}
+		string _GetKey(string key) => Helper.GetCacheKey(this.Name, key);
 
-		string _GetFragmentKey(string key, int index)
-		{
-			return Helper.GetFragmentKey(key, index);
-		}
+		string _GetFragmentKey(string key, int index) => Helper.GetFragmentKey(key, index);
 
-		List<string> _GetFragmentKeys(string key, int max)
-		{
-			return Helper.GetFragmentKeys(key, max);
-		}
+		List<string> _GetFragmentKeys(string key, int max) => Helper.GetFragmentKeys(key, max);
 
-		string _RegionKey
-		{
-			get
-			{
-				return this._GetKey("<Keys-Of-Region>");
-			}
-		}
+		string _RegionKey => this._GetKey("<Keys-Of-Region>");
 		#endregion
 
 		#region [Static]
@@ -925,18 +871,12 @@ namespace net.vieapps.Components.Caching
 		/// <summary>
 		/// Gets the collection of all registered regions (in distributed cache)
 		/// </summary>
-		public static HashSet<string> GetRegions()
-		{
-			return Memcached.FetchKeys(Helper.RegionsKey);
-		}
+		public static HashSet<string> GetRegions() => Memcached.FetchKeys(Helper.RegionsKey);
 
 		/// <summary>
 		/// Gets the collection of all registered regions (in distributed cache)
 		/// </summary>
-		public static Task<HashSet<string>> GetRegionsAsync(CancellationToken cancellationToken = default(CancellationToken))
-		{
-			return Memcached.FetchKeysAsync(Helper.RegionsKey, cancellationToken);
-		}
+		public static Task<HashSet<string>> GetRegionsAsync(CancellationToken cancellationToken = default(CancellationToken)) => Memcached.FetchKeysAsync(Helper.RegionsKey, cancellationToken);
 
 		static async Task RegisterRegionAsync(string name, CancellationToken cancellationToken = default(CancellationToken))
 		{
@@ -986,31 +926,19 @@ namespace net.vieapps.Components.Caching
 		/// <summary>
 		/// Gets the collection of keys
 		/// </summary>
-		public HashSet<string> Keys
-		{
-			get
-			{
-				return this._GetKeys();
-			}
-		}
+		public HashSet<string> Keys => this._GetKeys();
 		#endregion
 
 		#region [Public] Keys
 		/// <summary>
 		/// Gets the collection of keys that associates with the cached items
 		/// </summary>
-		public HashSet<string> GetKeys()
-		{
-			return this._GetKeys();
-		}
+		public HashSet<string> GetKeys() => this._GetKeys();
 
 		/// <summary>
 		/// Gets the collection of keys that associates with the cached items
 		/// </summary>
-		public Task<HashSet<string>> GetKeysAsync(CancellationToken cancellationToken = default(CancellationToken))
-		{
-			return this._GetKeysAsync(cancellationToken);
-		}
+		public Task<HashSet<string>> GetKeysAsync(CancellationToken cancellationToken = default(CancellationToken)) => this._GetKeysAsync(cancellationToken);
 		#endregion
 
 		#region [Public] Set
@@ -1021,10 +949,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="value">The object that is to be cached</param>
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
-		public bool Set(string key, object value, int expirationTime = 0)
-		{
-			return this._Set(key, value, expirationTime, true, StoreMode.Set);
-		}
+		public bool Set(string key, object value, int expirationTime = 0) => this._Set(key, value, expirationTime, true, StoreMode.Set);
 
 		/// <summary>
 		/// Adds an item into cache with a specified key (if the key is already existed, then old cached item will be overriden)
@@ -1033,10 +958,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="value">The object that is to be cached</param>
 		/// <param name="validFor">The time when the item is invalidated in the cache</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
-		public bool Set(string key, object value, TimeSpan validFor)
-		{
-			return this._Set(key, value, validFor, true, StoreMode.Set);
-		}
+		public bool Set(string key, object value, TimeSpan validFor) => this._Set(key, value, validFor, true, StoreMode.Set);
 
 		/// <summary>
 		/// Adds an item into cache with a specified key (if the key is already existed, then old cached item will be overriden)
@@ -1045,10 +967,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="value">The object that is to be cached</param>
 		/// <param name="expiresAt">The time when the item is invalidated in the cache</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
-		public bool Set(string key, object value, DateTime expiresAt)
-		{
-			return this._Set(key, value, expiresAt, true, StoreMode.Set);
-		}
+		public bool Set(string key, object value, DateTime expiresAt) => this._Set(key, value, expiresAt, true, StoreMode.Set);
 
 		/// <summary>
 		/// Adds an item into cache with a specified key (if the key is already existed, then old cached item will be overriden)
@@ -1057,10 +976,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="value">The object that is to be cached</param>
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
-		public Task<bool> SetAsync(string key, object value, int expirationTime = 0, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			return this._SetAsync(key, value, expirationTime, true, StoreMode.Set, cancellationToken);
-		}
+		public Task<bool> SetAsync(string key, object value, int expirationTime = 0, CancellationToken cancellationToken = default(CancellationToken)) => this._SetAsync(key, value, expirationTime, true, StoreMode.Set, cancellationToken);
 
 		/// <summary>
 		/// Adds an item into cache with a specified key (if the key is already existed, then old cached item will be overriden)
@@ -1069,10 +985,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="value">The object that is to be cached</param>
 		/// <param name="validFor">The time when the item is invalidated in the cache</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
-		public Task<bool> SetAsync(string key, object value, TimeSpan validFor, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			return this._SetAsync(key, value, validFor, true, StoreMode.Set, cancellationToken);
-		}
+		public Task<bool> SetAsync(string key, object value, TimeSpan validFor, CancellationToken cancellationToken = default(CancellationToken)) => this._SetAsync(key, value, validFor, true, StoreMode.Set, cancellationToken);
 
 		/// <summary>
 		/// Adds an item into cache with a specified key (if the key is already existed, then old cached item will be overriden)
@@ -1081,10 +994,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="value">The object that is to be cached</param>
 		/// <param name="expiresAt">The time when the item is invalidated in the cache</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
-		public Task<bool> SetAsync(string key, object value, DateTime expiresAt, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			return this._SetAsync(key, value, expiresAt, true, StoreMode.Set, cancellationToken);
-		}
+		public Task<bool> SetAsync(string key, object value, DateTime expiresAt, CancellationToken cancellationToken = default(CancellationToken)) => this._SetAsync(key, value, expiresAt, true, StoreMode.Set, cancellationToken);
 		#endregion
 
 		#region [Public] Set (Multiple)
@@ -1094,10 +1004,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="items">The collection of items to add</param>
 		/// <param name="keyPrefix">The string that presents prefix of all keys</param>
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
-		public void Set(IDictionary<string, object> items, string keyPrefix = null, int expirationTime = 0)
-		{
-			this._Set(items, keyPrefix, expirationTime, StoreMode.Set);
-		}
+		public void Set(IDictionary<string, object> items, string keyPrefix = null, int expirationTime = 0) => this._Set(items, keyPrefix, expirationTime, StoreMode.Set);
 
 		/// <summary>
 		/// Adds a collection of items into cache
@@ -1106,10 +1013,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="items">The collection of items to add</param>
 		/// <param name="keyPrefix">The string that presents prefix of all keys</param>
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
-		public void Set<T>(IDictionary<string, T> items, string keyPrefix = null, int expirationTime = 0)
-		{
-			this._Set<T>(items, keyPrefix, expirationTime, StoreMode.Set);
-		}
+		public void Set<T>(IDictionary<string, T> items, string keyPrefix = null, int expirationTime = 0) => this._Set<T>(items, keyPrefix, expirationTime, StoreMode.Set);
 
 		/// <summary>
 		/// Adds a collection of items into cache
@@ -1117,10 +1021,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="items">The collection of items to add</param>
 		/// <param name="keyPrefix">The string that presents prefix of all keys</param>
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
-		public Task SetAsync(IDictionary<string, object> items, string keyPrefix = null, int expirationTime = 0, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			return this._SetAsync(items, keyPrefix, expirationTime, StoreMode.Set, cancellationToken);
-		}
+		public Task SetAsync(IDictionary<string, object> items, string keyPrefix = null, int expirationTime = 0, CancellationToken cancellationToken = default(CancellationToken)) => this._SetAsync(items, keyPrefix, expirationTime, StoreMode.Set, cancellationToken);
 
 		/// <summary>
 		/// Adds a collection of items into cache
@@ -1129,10 +1030,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="items">The collection of items to add</param>
 		/// <param name="keyPrefix">The string that presents prefix of all keys</param>
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
-		public Task SetAsync<T>(IDictionary<string, T> items, string keyPrefix = null, int expirationTime = 0, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			return this._SetAsync<T>(items, keyPrefix, expirationTime, StoreMode.Set, cancellationToken);
-		}
+		public Task SetAsync<T>(IDictionary<string, T> items, string keyPrefix = null, int expirationTime = 0, CancellationToken cancellationToken = default(CancellationToken)) => this._SetAsync<T>(items, keyPrefix, expirationTime, StoreMode.Set, cancellationToken);
 		#endregion
 
 		#region [Public] Set (Fragment)
@@ -1143,10 +1041,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="fragments">The collection that contains all fragments (object that serialized as binary - array bytes)</param>
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
-		public bool SetFragments(string key, List<byte[]> fragments, int expirationTime = 0)
-		{
-			return this._SetFragments(key, fragments, expirationTime, StoreMode.Set);
-		}
+		public bool SetFragments(string key, List<byte[]> fragments, int expirationTime = 0) => this._SetFragments(key, fragments, expirationTime, StoreMode.Set);
 
 		/// <summary>
 		/// Adds an item (as fragments) into cache with a specified key (if the key is already existed, then old cached item will be overriden)
@@ -1155,10 +1050,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="fragments">The collection that contains all fragments (object that serialized as binary - array bytes)</param>
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
-		public Task<bool> SetFragmentsAsync(string key, List<byte[]> fragments, int expirationTime = 0, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			return this._SetFragmentsAsync(key, fragments, expirationTime, StoreMode.Set, cancellationToken);
-		}
+		public Task<bool> SetFragmentsAsync(string key, List<byte[]> fragments, int expirationTime = 0, CancellationToken cancellationToken = default(CancellationToken)) => this._SetFragmentsAsync(key, fragments, expirationTime, StoreMode.Set, cancellationToken);
 
 		/// <summary>
 		/// Serializes object into array of bytes, splits into one or more fragments and updates into cache with a specified key (if the key is already existed, then old cached item will be overriden)
@@ -1167,10 +1059,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="value">The object that is to be cached</param>
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
-		public bool SetAsFragments(string key, object value, int expirationTime = 0)
-		{
-			return this._SetAsFragments(key, value, expirationTime, StoreMode.Set);
-		}
+		public bool SetAsFragments(string key, object value, int expirationTime = 0) => this._SetAsFragments(key, value, expirationTime, StoreMode.Set);
 
 		/// <summary>
 		/// Serializes object into array of bytes, splits into one or more fragments and updates into cache with a specified key (if the key is already existed, then old cached item will be overriden)
@@ -1179,10 +1068,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="value">The object that is to be cached</param>
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
-		public Task<bool> SetAsFragmentsAsync(string key, object value, int expirationTime = 0, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			return this._SetAsFragmentsAsync(key, value, expirationTime, StoreMode.Set, cancellationToken);
-		}
+		public Task<bool> SetAsFragmentsAsync(string key, object value, int expirationTime = 0, CancellationToken cancellationToken = default(CancellationToken)) => this._SetAsFragmentsAsync(key, value, expirationTime, StoreMode.Set, cancellationToken);
 		#endregion
 
 		#region [Public] Add
@@ -1193,10 +1079,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="value">The object that is to be cached</param>
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
-		public bool Add(string key, object value, int expirationTime = 0)
-		{
-			return this._Set(key, value, TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime), true, StoreMode.Add);
-		}
+		public bool Add(string key, object value, int expirationTime = 0) => this._Set(key, value, TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime), true, StoreMode.Add);
 
 		/// <summary>
 		/// Adds an item into cache with a specified key when the the key is not existed
@@ -1205,10 +1088,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="value">The object that is to be cached</param>
 		/// <param name="validFor">The time when the item is invalidated in the cache</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
-		public bool Add(string key, object value, TimeSpan validFor)
-		{
-			return this._Set(key, value, validFor, true, StoreMode.Add);
-		}
+		public bool Add(string key, object value, TimeSpan validFor) => this._Set(key, value, validFor, true, StoreMode.Add);
 
 		/// <summary>
 		/// Adds an item into cache with a specified key when the the key is not existed
@@ -1217,10 +1097,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="value">The object that is to be cached</param>
 		/// <param name="expiresAt">The time when the item is invalidated in the cache</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
-		public bool Add(string key, object value, DateTime expiresAt)
-		{
-			return this._Set(key, value, expiresAt, true, StoreMode.Add);
-		}
+		public bool Add(string key, object value, DateTime expiresAt) => this._Set(key, value, expiresAt, true, StoreMode.Add);
 
 		/// <summary>
 		/// Adds an item into cache with a specified key when the the key is not existed
@@ -1229,10 +1106,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="value">The object that is to be cached</param>
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
-		public Task<bool> AddAsync(string key, object value, int expirationTime = 0, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			return this._SetAsync(key, value, TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime), true, StoreMode.Add, cancellationToken);
-		}
+		public Task<bool> AddAsync(string key, object value, int expirationTime = 0, CancellationToken cancellationToken = default(CancellationToken)) => this._SetAsync(key, value, TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime), true, StoreMode.Add, cancellationToken);
 
 		/// <summary>
 		/// Adds an item into cache with a specified key when the the key is not existed
@@ -1241,10 +1115,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="value">The object that is to be cached</param>
 		/// <param name="validFor">The time when the item is invalidated in the cache</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
-		public Task<bool> AddAsync(string key, object value, TimeSpan validFor, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			return this._SetAsync(key, value, validFor, true, StoreMode.Add, cancellationToken);
-		}
+		public Task<bool> AddAsync(string key, object value, TimeSpan validFor, CancellationToken cancellationToken = default(CancellationToken)) => this._SetAsync(key, value, validFor, true, StoreMode.Add, cancellationToken);
 
 		/// <summary>
 		/// Adds an item into cache with a specified key when the the key is not existed
@@ -1253,10 +1124,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="value">The object that is to be cached</param>
 		/// <param name="expiresAt">The time when the item is invalidated in the cache</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
-		public Task<bool> AddAsync(string key, object value, DateTime expiresAt, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			return this._SetAsync(key, value, expiresAt, true, StoreMode.Add, cancellationToken);
-		}
+		public Task<bool> AddAsync(string key, object value, DateTime expiresAt, CancellationToken cancellationToken = default(CancellationToken)) => this._SetAsync(key, value, expiresAt, true, StoreMode.Add, cancellationToken);
 		#endregion
 
 		#region [Public] Replace
@@ -1267,10 +1135,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="value">The object that is to be cached</param>
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
-		public bool Replace(string key, object value, int expirationTime = 0)
-		{
-			return this._Set(key, value, TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime), true, StoreMode.Replace);
-		}
+		public bool Replace(string key, object value, int expirationTime = 0) => this._Set(key, value, TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime), true, StoreMode.Replace);
 
 		/// <summary>
 		/// Adds an item into cache with a specified key when the the key is existed (means update existed item)
@@ -1279,10 +1144,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="value">The object that is to be cached</param>
 		/// <param name="validFor">The time when the item is invalidated in the cache</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
-		public bool Replace(string key, object value, TimeSpan validFor)
-		{
-			return this._Set(key, value, validFor, true, StoreMode.Replace);
-		}
+		public bool Replace(string key, object value, TimeSpan validFor) => this._Set(key, value, validFor, true, StoreMode.Replace);
 
 		/// <summary>
 		/// Adds an item into cache with a specified key when the the key is existed (means update existed item)
@@ -1291,10 +1153,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="value">The object that is to be cached</param>
 		/// <param name="expiresAt">The time when the item is invalidated in the cache</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
-		public bool Replace(string key, object value, DateTime expiresAt)
-		{
-			return this._Set(key, value, expiresAt, true, StoreMode.Replace);
-		}
+		public bool Replace(string key, object value, DateTime expiresAt) => this._Set(key, value, expiresAt, true, StoreMode.Replace);
 
 		/// <summary>
 		/// Adds an item into cache with a specified key when the the key is existed (means update existed item)
@@ -1303,10 +1162,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="value">The object that is to be cached</param>
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
-		public Task<bool> ReplaceAsync(string key, object value, int expirationTime = 0, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			return this._SetAsync(key, value, TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime), true, StoreMode.Replace, cancellationToken);
-		}
+		public Task<bool> ReplaceAsync(string key, object value, int expirationTime = 0, CancellationToken cancellationToken = default(CancellationToken)) => this._SetAsync(key, value, TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime), true, StoreMode.Replace, cancellationToken);
 
 		/// <summary>
 		/// Adds an item into cache with a specified key when the the key is existed (means update existed item)
@@ -1315,10 +1171,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="value">The object that is to be cached</param>
 		/// <param name="validFor">The time when the item is invalidated in the cache</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
-		public Task<bool> ReplaceAsync(string key, object value, TimeSpan validFor, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			return this._SetAsync(key, value, validFor, true, StoreMode.Replace, cancellationToken);
-		}
+		public Task<bool> ReplaceAsync(string key, object value, TimeSpan validFor, CancellationToken cancellationToken = default(CancellationToken)) => this._SetAsync(key, value, validFor, true, StoreMode.Replace, cancellationToken);
 
 		/// <summary>
 		/// Adds an item into cache with a specified key when the the key is existed (means update existed item)
@@ -1327,10 +1180,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="value">The object that is to be cached</param>
 		/// <param name="expiresAt">The time when the item is invalidated in the cache</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
-		public Task<bool> ReplaceAsync(string key, object value, DateTime expiresAt, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			return this._SetAsync(key, value, expiresAt, true, StoreMode.Replace, cancellationToken);
-		}
+		public Task<bool> ReplaceAsync(string key, object value, DateTime expiresAt, CancellationToken cancellationToken = default(CancellationToken)) => this._SetAsync(key, value, expiresAt, true, StoreMode.Replace, cancellationToken);
 		#endregion
 
 		#region [Public] Get
@@ -1339,10 +1189,7 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		/// <param name="key">The string that presents key of cached item need to retreive</param>
 		/// <returns>The retrieved cache item, or a null reference if the key is not found</returns>
-		public object Get(string key)
-		{
-			return this._Get(key);
-		}
+		public object Get(string key) => this._Get(key);
 
 		/// <summary>
 		/// Retreives a cached item
@@ -1363,10 +1210,7 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		/// <param name="key">The string that presents key of cached item need to retreive</param>
 		/// <returns>The retrieved cache item, or a null reference if the key is not found</returns>
-		public Task<object> GetAsync(string key, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			return this._GetAsync(key, true, cancellationToken);
-		}
+		public Task<object> GetAsync(string key, CancellationToken cancellationToken = default(CancellationToken)) => this._GetAsync(key, true, cancellationToken);
 
 		/// <summary>
 		/// Retreives a cached item
@@ -1389,40 +1233,28 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		/// <param name="keys">The collection of items' keys</param>
 		/// <returns>The collection of cache items</returns>
-		public IDictionary<string, object> Get(IEnumerable<string> keys)
-		{
-			return this._Get(keys);
-		}
+		public IDictionary<string, object> Get(IEnumerable<string> keys) => this._Get(keys);
 
 		/// <summary>
 		/// Retreives a collection of cached items
 		/// </summary>
 		/// <param name="keys">The collection of items' keys</param>
 		/// <returns>The collection of cache items</returns>
-		public Task<IDictionary<string, object>> GetAsync(IEnumerable<string> keys, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			return this._GetAsync(keys, cancellationToken);
-		}
+		public Task<IDictionary<string, object>> GetAsync(IEnumerable<string> keys, CancellationToken cancellationToken = default(CancellationToken)) => this._GetAsync(keys, cancellationToken);
 
 		/// <summary>
 		/// Retreives a collection of cached items
 		/// </summary>
 		/// <param name="keys">The collection of items' keys</param>
 		/// <returns>The collection of cache items</returns>
-		public IDictionary<string, T> Get<T>(IEnumerable<string> keys)
-		{
-			return this._Get<T>(keys);
-		}
+		public IDictionary<string, T> Get<T>(IEnumerable<string> keys) => this._Get<T>(keys);
 
 		/// <summary>
 		/// Retreives a collection of cached items
 		/// </summary>
 		/// <param name="keys">The collection of items' keys</param>
 		/// <returns>The collection of cache items</returns>
-		public Task<IDictionary<string, T>> GetAsync<T>(IEnumerable<string> keys, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			return this._GetAsync<T>(keys, cancellationToken);
-		}
+		public Task<IDictionary<string, T>> GetAsync<T>(IEnumerable<string> keys, CancellationToken cancellationToken = default(CancellationToken)) => this._GetAsync<T>(keys, cancellationToken);
 		#endregion
 
 		#region [Public] Get (Fragment)
@@ -1431,20 +1263,14 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		/// <param name="key">The string that presents key of fragment information</param>
 		/// <returns>The information of fragments, first element is total number of fragments, second element is total length of data</returns>
-		public Tuple<int, int> GetFragments(string key)
-		{
-			return this._GetFragments(key);
-		}
+		public Tuple<int, int> GetFragments(string key) => this._GetFragments(key);
 
 		/// <summary>
 		/// Gets fragment information that associates with the key
 		/// </summary>
 		/// <param name="key">The string that presents key of fragment information</param>
 		/// <returns>The information of fragments, first element is total number of fragments, second element is total length of data</returns>
-		public Task<Tuple<int, int>> GetFragmentsAsync(string key, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			return this._GetFragmentsAsync(key, cancellationToken);
-		}
+		public Task<Tuple<int, int>> GetFragmentsAsync(string key, CancellationToken cancellationToken = default(CancellationToken)) => this._GetFragmentsAsync(key, cancellationToken);
 
 		/// <summary>
 		/// Gets cached of fragmented items that associates with the key and indexes
@@ -1452,10 +1278,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="key">The string that presents key of all fragmented items</param>
 		/// <param name="indexes">The collection that presents indexes of all fragmented items need to get</param>
 		/// <returns>The collection of array of bytes that presents serialized information of fragmented items</returns>
-		public List<byte[]> GetAsFragments(string key, List<int> indexes)
-		{
-			return this._GetAsFragments(key, indexes);
-		}
+		public List<byte[]> GetAsFragments(string key, List<int> indexes) => this._GetAsFragments(key, indexes);
 
 		/// <summary>
 		/// Gets cached of fragmented items that associates with the key and indexes
@@ -1463,10 +1286,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="key">The string that presents key of all fragmented items</param>
 		/// <param name="indexes">The collection that presents indexes of all fragmented items need to get</param>
 		/// <returns>The collection of array of bytes that presents serialized information of fragmented items</returns>
-		public Task<List<byte[]>> GetAsFragmentsAsync(string key, List<int> indexes, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			return this._GetAsFragmentsAsync(key, indexes, cancellationToken);
-		}
+		public Task<List<byte[]>> GetAsFragmentsAsync(string key, List<int> indexes, CancellationToken cancellationToken = default(CancellationToken)) => this._GetAsFragmentsAsync(key, indexes, cancellationToken);
 
 		/// <summary>
 		/// Gets cached of fragmented items that associates with the key and indexes
@@ -1474,10 +1294,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="key">The string that presents key of all fragmented items</param>
 		/// <param name="indexes">The collection that presents indexes of all fragmented items need to get</param>
 		/// <returns>The collection of array of bytes that presents serialized information of fragmented items</returns>
-		public List<byte[]> GetAsFragments(string key, params int[] indexes)
-		{
-			return this._GetAsFragments(key, indexes);
-		}
+		public List<byte[]> GetAsFragments(string key, params int[] indexes) => this._GetAsFragments(key, indexes);
 
 		/// <summary>
 		/// Gets cached of fragmented items that associates with the key and indexes
@@ -1485,10 +1302,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="key">The string that presents key of all fragmented items</param>
 		/// <param name="indexes">The collection that presents indexes of all fragmented items need to get</param>
 		/// <returns>The collection of array of bytes that presents serialized information of fragmented items</returns>
-		public Task<List<byte[]>> GetAsFragmentsAsync(string key, CancellationToken cancellationToken = default(CancellationToken), params int[] indexes)
-		{
-			return this._GetAsFragmentsAsync(key, cancellationToken, indexes);
-		}
+		public Task<List<byte[]>> GetAsFragmentsAsync(string key, CancellationToken cancellationToken = default(CancellationToken), params int[] indexes) => this._GetAsFragmentsAsync(key, cancellationToken, indexes);
 		#endregion
 
 		#region [Public] Remove
@@ -1497,20 +1311,14 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		/// <param name="key">The string that presents key of cached item need to remove</param>
 		/// <returns>Returns a boolean value indicating if the item is removed or not</returns>
-		public bool Remove(string key)
-		{
-			return this._Remove(key, true);
-		}
+		public bool Remove(string key) => this._Remove(key, true);
 
 		/// <summary>
 		/// Removes a cached item
 		/// </summary>
 		/// <param name="key">The string that presents key of cached item need to remove</param>
 		/// <returns>Returns a boolean value indicating if the item is removed or not</returns>
-		public Task<bool> RemoveAsync(string key, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			return this._RemoveAsync(key, true, cancellationToken);
-		}
+		public Task<bool> RemoveAsync(string key, CancellationToken cancellationToken = default(CancellationToken)) => this._RemoveAsync(key, true, cancellationToken);
 		#endregion
 
 		#region [Public] Remove (Multiple)
@@ -1519,20 +1327,14 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		/// <param name="keys">The collection that presents key of cached items need to remove</param>
 		/// <param name="keyPrefix">The string that presents prefix of all keys</param>
-		public void Remove(IEnumerable<string> keys, string keyPrefix = null)
-		{
-			this._Remove(keys, keyPrefix);
-		}
+		public void Remove(IEnumerable<string> keys, string keyPrefix = null) => this._Remove(keys, keyPrefix);
 
 		/// <summary>
 		/// Removes a collection of cached items
 		/// </summary>
 		/// <param name="keys">The collection that presents key of cached items need to remove</param>
 		/// <param name="keyPrefix">The string that presents prefix of all keys</param>
-		public Task RemoveAsync(IEnumerable<string> keys, string keyPrefix = null, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			return this._RemoveAsync(keys, keyPrefix, cancellationToken);
-		}
+		public Task RemoveAsync(IEnumerable<string> keys, string keyPrefix = null, CancellationToken cancellationToken = default(CancellationToken)) => this._RemoveAsync(keys, keyPrefix, cancellationToken);
 		#endregion
 
 		#region [Public] Remove (Fragment)
@@ -1540,19 +1342,13 @@ namespace net.vieapps.Components.Caching
 		/// Removes a cached item (with first 100 fragments) from cache storage
 		/// </summary>
 		/// <param name="key">The string that presents key of fragmented items need to be removed</param>
-		public void RemoveFragments(string key)
-		{
-			this._Remove(this._GetFragmentKeys(key, 100), null);
-		}
+		public void RemoveFragments(string key) => this._Remove(this._GetFragmentKeys(key, 100), null);
 
 		/// <summary>
 		/// Removes a cached item (with first 100 fragments) from cache storage
 		/// </summary>
 		/// <param name="key">The string that presents key of fragmented items need to be removed</param>
-		public Task RemoveFragmentsAsync(string key, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			return this._RemoveAsync(this._GetFragmentKeys(key, 100), null, cancellationToken);
-		}
+		public Task RemoveFragmentsAsync(string key, CancellationToken cancellationToken = default(CancellationToken)) => this._RemoveAsync(this._GetFragmentKeys(key, 100), null, cancellationToken);
 		#endregion
 
 		#region [Public] Exists
@@ -1561,38 +1357,26 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		/// <param name="key">The string that presents key of cached item need to check</param>
 		/// <returns>Returns a boolean value indicating if the object that associates with the key is cached or not</returns>
-		public bool Exists(string key)
-		{
-			return Memcached.Client.Exists(this._GetKey(key));
-		}
+		public bool Exists(string key) => Memcached.Client.Exists(this._GetKey(key));
 
 		/// <summary>
 		/// Determines whether an item exists in the cache
 		/// </summary>
 		/// <param name="key">The string that presents key of cached item need to check</param>
 		/// <returns>Returns a boolean value indicating if the object that associates with the key is cached or not</returns>
-		public Task<bool> ExistsAsync(string key, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			return Memcached.Client.ExistsAsync(this._GetKey(key), cancellationToken);
-		}
+		public Task<bool> ExistsAsync(string key, CancellationToken cancellationToken = default(CancellationToken)) => Memcached.Client.ExistsAsync(this._GetKey(key), cancellationToken);
 		#endregion
 
 		#region [Public] Clear
 		/// <summary>
 		/// Clears the cache storage of this isolated region
 		/// </summary>
-		public void Clear()
-		{
-			this._Clear();
-		}
+		public void Clear() => this._Clear();
 
 		/// <summary>
 		/// Clears the cache storage of this isolated region
 		/// </summary>
-		public Task ClearAsync(CancellationToken cancellationToken = default(CancellationToken))
-		{
-			return this._ClearAsync(cancellationToken);
-		}
+		public Task ClearAsync(CancellationToken cancellationToken = default(CancellationToken)) => this._ClearAsync(cancellationToken);
 		#endregion
 
 	}
