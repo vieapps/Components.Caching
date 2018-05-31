@@ -14,6 +14,8 @@ using Microsoft.Extensions.DependencyInjection;
 using CacheUtils;
 #endregion
 
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("VIEApps.Components.XUnitTests")]
+
 namespace net.vieapps.Components.Caching
 {
 	/// <summary>
