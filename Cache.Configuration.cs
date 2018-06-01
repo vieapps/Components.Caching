@@ -105,7 +105,7 @@ namespace net.vieapps.Components.Caching
 				throw new ArgumentNullException(nameof(configuration));
 
 			this.Provider = configuration.Section.Attributes["provider"]?.Value ?? "Redis";
-			this.RegionName = configuration.Section.Attributes["region"]?.Value ?? "VIEApps-NGX-NETCore-Cache";
+			this.RegionName = configuration.Section.Attributes["region"]?.Value ?? "VIEApps-NGX-Cache";
 			this.ExpirationTime = Convert.ToInt32(configuration.Section.Attributes["expirationTime"]?.Value ?? "30");
 
 			if (configuration.Section.SelectNodes("servers/add") is XmlNodeList servers)
@@ -127,7 +127,7 @@ namespace net.vieapps.Components.Caching
 					if (!string.IsNullOrWhiteSpace(option.Value))
 						this.Options += (this.Options != "" ? "," : "") + option.Name + "=" + option.Value;
 
-			if (Enum.TryParse<MemcachedProtocol>(configuration.Section.Attributes["protocol"]?.Value ?? "Binary", out MemcachedProtocol protocol))
+			if (Enum.TryParse(configuration.Section.Attributes["protocol"]?.Value ?? "Binary", out MemcachedProtocol protocol))
 				this.Protocol = protocol;
 
 			if (configuration.Section.SelectSingleNode("socketPool") is XmlNode socketpool)
@@ -144,6 +144,8 @@ namespace net.vieapps.Components.Caching
 					this.SocketPool.QueueTimeout = TimeSpan.Parse(socketpool.Attributes["queueTimeout"].Value);
 				if (socketpool.Attributes["receiveTimeout"]?.Value != null)
 					this.SocketPool.ReceiveTimeout = TimeSpan.Parse(socketpool.Attributes["receiveTimeout"].Value);
+				if (socketpool.Attributes["noDelay"]?.Value != null)
+					this.SocketPool.NoDelay = Convert.ToBoolean(socketpool.Attributes["noDelay"].Value);
 
 				var failurePolicy = socketpool.Attributes["failurePolicy"]?.Value;
 				if ("throttling" == failurePolicy)
@@ -215,7 +217,7 @@ namespace net.vieapps.Components.Caching
 
 		internal RedisClientConfiguration GetRedisConfiguration(ILoggerFactory loggerFactory)
 		{
-			return new RedisClientConfiguration()
+			return new RedisClientConfiguration
 			{
 				Servers = this.Servers.Where(s => s.Type.ToLower().Equals("redis")).Select(s => s.Address.IndexOf(":") > 0 ? ConfigurationHelper.ResolveToEndPoint(s.Address) as IPEndPoint : ConfigurationHelper.ResolveToEndPoint(s.Address, s.Port) as IPEndPoint).ToList(),
 				Options = this.Options

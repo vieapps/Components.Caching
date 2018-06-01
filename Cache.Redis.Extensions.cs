@@ -69,7 +69,7 @@ namespace net.vieapps.Components.Caching
 		public static Task<bool> SetAsync(this IDatabase redis, string key, object value, TimeSpan validFor, CancellationToken cancellationToken = default(CancellationToken))
 			=> string.IsNullOrWhiteSpace(key)
 				? Task.FromResult(false)
-				: redis.SetAsync(key, Helper.Serialize(value), validFor).WithCancellationToken(cancellationToken);
+				: redis.SetAsync(key, Helper.Serialize(value), validFor, cancellationToken);
 
 		/// <summary>
 		/// Adds an item into cache with a specified key (if the key is already existed, then old cached item will be overriden)
@@ -80,7 +80,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="expiresAt"></param>
 		/// <returns></returns>
 		public static Task<bool> SetAsync(this IDatabase redis, string key, object value, DateTime expiresAt, CancellationToken cancellationToken = default(CancellationToken))
-			=> redis.SetAsync(key, value, expiresAt.ToTimeSpan()).WithCancellationToken(cancellationToken);
+			=> redis.SetAsync(key, value, expiresAt.ToTimeSpan(), cancellationToken);
 
 		/// <summary>
 		/// Adds an item into cache with a specified key (if the key is already existed, then old cached item will be overriden)
@@ -91,7 +91,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="expirationTime"></param>
 		/// <returns></returns>
 		public static Task<bool> SetAsync(this IDatabase redis, string key, object value, int expirationTime = 0, CancellationToken cancellationToken = default(CancellationToken))
-			=> redis.SetAsync(key, value, expirationTime > 0 ? TimeSpan.FromMinutes(expirationTime) : TimeSpan.Zero).WithCancellationToken(cancellationToken);
+			=> redis.SetAsync(key, value, expirationTime > 0 ? TimeSpan.FromMinutes(expirationTime) : TimeSpan.Zero, cancellationToken);
 
 		/// <summary>
 		/// Adds an item into cache with a specified key (if the key is already existed, then old cached item will be overriden)

@@ -505,7 +505,7 @@ namespace net.vieapps.Components.Caching
 				Helper.WriteLogs(this.Name, $"Error occurred while fetching an object from cache storage [{key}]", ex);
 			}
 
-			if (value != null && (value as byte[]).Length > 8)
+			if (value != null && (value as byte[]).Length > 7)
 			{
 				if (autoGetFragments && Helper.GetFlags(value as byte[]).Item1.Equals(Helper.FlagOfFirstFragmentBlock))
 					try
@@ -551,7 +551,7 @@ namespace net.vieapps.Components.Caching
 				Helper.WriteLogs(this.Name, $"Error occurred while fetching an object from cache storage [{key}]", ex);
 			}
 
-			if (value != null && (value as byte[]).Length > 8)
+			if (value != null && (value as byte[]).Length > 7)
 			{
 				if (autoGetFragments && Helper.GetFlags(value as byte[]).Item1.Equals(Helper.FlagOfFirstFragmentBlock))
 					try
