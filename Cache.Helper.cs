@@ -137,20 +137,6 @@ namespace net.vieapps.Components.Caching
 		#endregion
 
 		#region Serialize & Deserialize
-		static MemoryStream CreateMemoryStream(byte[] buffer = null, int index = 0, int count = 0)
-		{
-			var stream = new Microsoft.IO.RecyclableMemoryStreamManager().GetStream();
-			if (buffer == null || buffer.Length < 1)
-				return stream;
-
-			index = index > -1 && index < buffer.Length ? index : 0;
-			count = count > 0 && count < buffer.Length - index ? count : buffer.Length - index;
-
-			stream.Write(buffer, index, count);
-			stream.Seek(0, SeekOrigin.Begin);
-			return stream;
-		}
-
 		/// <summary>
 		/// Serializes an object into array of bytes
 		/// </summary>
@@ -167,7 +153,7 @@ namespace net.vieapps.Components.Caching
 				typeFlag = value is JToken
 					? value is JArray ? Helper.FlagOfJsonArray : Helper.FlagOfJsonObject
 					: Helper.FlagOfExpandoObject;
-				using (var stream = Helper.CreateMemoryStream())
+				using (var stream = CacheUtils.Helper.CreateMemoryStream())
 				{
 					using (var writer = new BsonDataWriter(stream))
 					{
@@ -208,7 +194,7 @@ namespace net.vieapps.Components.Caching
 
 			var typeFlag = Helper.GetFlags(data).Item1;
 			if (typeFlag.Equals(Helper.FlagOfJsonObject) || typeFlag.Equals(Helper.FlagOfJsonArray) || typeFlag.Equals(Helper.FlagOfExpandoObject))
-				using (var stream = Helper.CreateMemoryStream(data, 4, data.Length - 4))
+				using (var stream = CacheUtils.Helper.CreateMemoryStream(data, 4, data.Length - 4))
 				{
 					using (var reader = new BsonDataReader(stream))
 					{
@@ -227,30 +213,6 @@ namespace net.vieapps.Components.Caching
 		{
 			var value = data != null ? Helper.Deserialize(data) : null;
 			return value != null && value is T ? (T)value : default(T);
-		}
-		#endregion
-
-		#region Support cancellation token
-		internal static async Task WithCancellationToken(this Task task, CancellationToken cancellationToken)
-		{
-			var tcs = new TaskCompletionSource<bool>();
-			using (cancellationToken.Register(state => ((TaskCompletionSource<bool>)state).TrySetResult(true), tcs, false))
-			{
-				if (task != await Task.WhenAny(task, tcs.Task).ConfigureAwait(false))
-					throw new OperationCanceledException(cancellationToken);
-			}
-			await task.ConfigureAwait(false);
-		}
-
-		internal static async Task<T> WithCancellationToken<T>(this Task<T> task, CancellationToken cancellationToken)
-		{
-			var tcs = new TaskCompletionSource<bool>();
-			using (cancellationToken.Register(state => ((TaskCompletionSource<bool>)state).TrySetResult(true), tcs, false))
-			{
-				if (task != await Task.WhenAny(task, tcs.Task).ConfigureAwait(false))
-					throw new OperationCanceledException(cancellationToken);
-			}
-			return await task.ConfigureAwait(false);
 		}
 		#endregion
 

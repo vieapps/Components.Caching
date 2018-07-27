@@ -216,13 +216,11 @@ namespace net.vieapps.Components.Caching
 		}
 
 		internal RedisClientConfiguration GetRedisConfiguration(ILoggerFactory loggerFactory)
-		{
-			return new RedisClientConfiguration
+			=> new RedisClientConfiguration
 			{
 				Servers = this.Servers.Where(s => s.Type.ToLower().Equals("redis")).Select(s => s.Address.IndexOf(":") > 0 ? ConfigurationHelper.ResolveToEndPoint(s.Address) as IPEndPoint : ConfigurationHelper.ResolveToEndPoint(s.Address, s.Port) as IPEndPoint).ToList(),
 				Options = this.Options
 			};
-		}
 	}
 
 	// -----------------------------------------------------------
@@ -310,13 +308,11 @@ namespace net.vieapps.Components.Caching
 	{
 		public object Create(object parent, object configContext, XmlNode section)
 		{
-			this._section = section;
+			this.Section = section;
 			return this;
 		}
 
-		XmlNode _section = null;
-
-		public XmlNode Section { get { return this._section; } }
+		public XmlNode Section { get; private set; } = null;
 	}
 
 	/// <summary>

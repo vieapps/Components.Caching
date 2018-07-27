@@ -5,14 +5,14 @@
 		<RootNamespace>net.vieapps.Components.Caching</RootNamespace>
 		<AssemblyName>VIEApps.Components.Caching</AssemblyName>
 		<AssemblyTitle>VIEApps NGX Caching</AssemblyTitle>
-		<AssemblyVersion>10.2.4.1806</AssemblyVersion>
-		<FileVersion>10.2.4.1806</FileVersion>
-		<InformationalVersion>v10.2.netstandard-2+rev:2018.06.01</InformationalVersion>
+		<AssemblyVersion>10.2.5.1808</AssemblyVersion>
+		<FileVersion>10.2.5.1808</FileVersion>
+		<InformationalVersion>v10.2.netstandard-2+rev:2018.08.01</InformationalVersion>
 		<Product>VIEApps NGX</Product>
 		<Company>VIEApps.net</Company>
 		<GeneratePackageOnBuild>false</GeneratePackageOnBuild>
 		<PackageId>VIEApps.Components.Caching</PackageId>
-		<Version>10.2.4.1806</Version>
+		<Version>10.2.5.1808</Version>
 		<SignAssembly>false</SignAssembly>
 		<AssemblyOriginatorKeyFile>../VIEApps.Components.snk</AssemblyOriginatorKeyFile>
 		<Title>VIEApps NGX Caching</Title>
@@ -47,11 +47,10 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Microsoft.IO.RecyclableMemoryStream" Version="1.2.2" />
 		<PackageReference Include="Newtonsoft.Json" Version="11.0.2" />
 		<PackageReference Include="Newtonsoft.Json.Bson" Version="1.0.1" />
 		<PackageReference Include="StackExchange.Redis" Version="1.2.6" />
-		<PackageReference Include="VIEApps.Enyim.Caching" Version="1.5.3.1806" />
+		<PackageReference Include="VIEApps.Enyim.Caching" Version="1.5.4.1808" />
 	</ItemGroup>
 
 </Project>
