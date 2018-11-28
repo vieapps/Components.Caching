@@ -34,9 +34,7 @@ namespace net.vieapps.Components.Caching
 			this.Name = Helper.GetRegionName(name);
 
 			// expiration time
-			this.ExpirationTime = expirationTime > 0
-				? expirationTime
-				: Helper.ExpirationTime;
+			this.ExpirationTime = expirationTime > 0 ? expirationTime : Helper.ExpirationTime;
 
 			// update keys
 			if (storeKeys)
