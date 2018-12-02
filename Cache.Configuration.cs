@@ -56,7 +56,7 @@ namespace net.vieapps.Components.Caching
 	{
 		public string Provider { get; set; } = "Redis";
 
-		public string RegionName { get; set; } = "VIEApps-NGX-NETCore-Cache";
+		public string RegionName { get; set; } = "VIEApps-NGX-Cache";
 
 		public int ExpirationTime { get; set; } = 30;
 

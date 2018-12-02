@@ -52,7 +52,7 @@ namespace net.vieapps.Components.Caching
 
 		internal static List<string> GetFragmentKeys(string key, int max)
 		{
-			var keys = new List<string>() { key };
+			var keys = new List<string> { key };
 			for (var index = 1; index <= max; index++)
 				keys.Add(Helper.GetFragmentKey(key, index));
 			return keys;
@@ -258,12 +258,11 @@ namespace Microsoft.Extensions.DependencyInjection
 			if (setupAction == null)
 				throw new ArgumentNullException(nameof(setupAction));
 
-			services.AddOptions();
-			services.Configure(setupAction);
+			services.AddOptions().Configure(setupAction);
 			services.Add(ServiceDescriptor.Singleton<ICacheConfiguration, CacheConfiguration>());
-			services.Add(ServiceDescriptor.Singleton<ICache, Cache>(serviceProvider => Cache.GetInstance(serviceProvider)));
+			services.Add(ServiceDescriptor.Singleton<ICache, Cache>(svcProvider => Cache.GetInstance(svcProvider)));
 			if (addInstanceOfIDistributedCache)
-				services.Add(ServiceDescriptor.Singleton<IDistributedCache, Cache>(serviceProvider => Cache.GetInstance(serviceProvider)));
+				services.Add(ServiceDescriptor.Singleton<IDistributedCache, Cache>(svcProvider => Cache.GetInstance(svcProvider)));
 
 			return services;
 		}
@@ -277,19 +276,19 @@ namespace Microsoft.AspNetCore.Builder
 		/// <summary>
 		/// Calls to use the <see cref="ICache">VIEApps NGX Caching</see> service
 		/// </summary>
-		/// <param name="app"></param>
+		/// <param name="appBuilder"></param>
 		/// <returns></returns>
-		public static IApplicationBuilder UseCache(this IApplicationBuilder app)
+		public static IApplicationBuilder UseCache(this IApplicationBuilder appBuilder)
 		{
 			try
 			{
-				app.ApplicationServices.GetService<ILogger<ICache>>().LogInformation($"VIEApps NGX Caching service is {(app.ApplicationServices.GetService<ICache>() != null ? "" : "not-")}started");
+				appBuilder.ApplicationServices.GetService<ILogger<ICache>>().LogInformation($"The service of VIEApps NGX Distributed Caching was{(appBuilder.ApplicationServices.GetService<ICache>() != null ? " " : " not ")}registered with application service providers");
 			}
 			catch (Exception ex)
 			{
-				app.ApplicationServices.GetService<ILogger<ICache>>().LogError(ex, "VIEApps NGX Caching service is failed to start");
+				appBuilder.ApplicationServices.GetService<ILogger<ICache>>().LogError(ex, $"Error occurred while collecting information of the service of VIEApps NGX Distributed Caching => {ex.Message}");
 			}
-			return app;
+			return appBuilder;
 		}
 	}
 }
