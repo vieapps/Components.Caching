@@ -8,7 +8,6 @@ using System.Threading.Tasks;
 using System.Configuration;
 using System.Diagnostics;
 
-using Enyim.Reflection;
 using Enyim.Caching.Configuration;
 using Enyim.Caching.Memcached;
 
@@ -102,7 +101,7 @@ namespace net.vieapps.Components.Caching
 		public CacheConfiguration(CacheConfigurationSectionHandler configuration)
 		{
 			if (configuration == null)
-				throw new ArgumentNullException(nameof(configuration));
+				throw new ArgumentNullException(nameof(configuration), "No configuration is found");
 
 			this.Provider = configuration.Section.Attributes["provider"]?.Value ?? "Redis";
 			this.RegionName = configuration.Section.Attributes["region"]?.Value ?? "VIEApps-NGX-Cache";
@@ -179,48 +178,6 @@ namespace net.vieapps.Components.Caching
 			if (configuration.Section.SelectSingleNode("nodeLocator") is XmlNode nodeLocator)
 				this.NodeLocator = nodeLocator.Attributes["type"]?.Value;
 		}
-
-		internal MemcachedClientConfiguration GetMemcachedConfiguration(ILoggerFactory loggerFactory)
-		{
-			var configuration = new MemcachedClientConfiguration(loggerFactory)
-			{
-				Protocol = this.Protocol
-			};
-
-			this.Servers.Where(s => s.Type.ToLower().Equals("memcached"))
-				.ToList()
-				.ForEach(s => configuration.Servers.Add(s.Address.IndexOf(":") > 0 ? ConfigurationHelper.ResolveToEndPoint(s.Address) : ConfigurationHelper.ResolveToEndPoint(s.Address, s.Port)));
-
-			configuration.SocketPool.MinPoolSize = this.SocketPool.MinPoolSize;
-			configuration.SocketPool.MaxPoolSize = this.SocketPool.MaxPoolSize;
-			configuration.SocketPool.ConnectionTimeout = this.SocketPool.ConnectionTimeout;
-			configuration.SocketPool.ReceiveTimeout = this.SocketPool.ReceiveTimeout;
-			configuration.SocketPool.QueueTimeout = this.SocketPool.QueueTimeout;
-			configuration.SocketPool.DeadTimeout = this.SocketPool.DeadTimeout;
-			configuration.SocketPool.FailurePolicyFactory = this.SocketPool.FailurePolicyFactory;
-
-			configuration.Authentication.Type = this.Authentication.Type;
-			foreach (var kvp in this.Authentication.Parameters)
-				configuration.Authentication.Parameters[kvp.Key] = kvp.Value;
-
-			if (!string.IsNullOrWhiteSpace(this.KeyTransformer))
-				configuration.KeyTransformer = FastActivator.Create(Type.GetType(this.KeyTransformer)) as IKeyTransformer;
-
-			if (!string.IsNullOrWhiteSpace(this.Transcoder))
-				configuration.Transcoder = FastActivator.Create(Type.GetType(this.Transcoder)) as ITranscoder;
-
-			if (!string.IsNullOrWhiteSpace(this.NodeLocator))
-				configuration.NodeLocator = Type.GetType(this.NodeLocator);
-
-			return configuration;
-		}
-
-		internal RedisClientConfiguration GetRedisConfiguration(ILoggerFactory loggerFactory)
-			=> new RedisClientConfiguration
-			{
-				Servers = this.Servers.Where(s => s.Type.ToLower().Equals("redis")).Select(s => s.Address.IndexOf(":") > 0 ? ConfigurationHelper.ResolveToEndPoint(s.Address) as IPEndPoint : ConfigurationHelper.ResolveToEndPoint(s.Address, s.Port) as IPEndPoint).ToList(),
-				Options = this.Options
-			};
 	}
 
 	// -----------------------------------------------------------
@@ -304,16 +261,7 @@ namespace net.vieapps.Components.Caching
 	/// <summary>
 	/// Configuration section handler of the caching component
 	/// </summary>
-	public class CacheConfigurationSectionHandler : IConfigurationSectionHandler
-	{
-		public object Create(object parent, object configContext, XmlNode section)
-		{
-			this.Section = section;
-			return this;
-		}
-
-		public XmlNode Section { get; private set; } = null;
-	}
+	public class CacheConfigurationSectionHandler : MemcachedClientConfigurationSectionHandler { }
 
 	/// <summary>
 	/// Configuration section handler of the Redis caching component

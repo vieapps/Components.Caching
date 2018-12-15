@@ -5,24 +5,24 @@
 		<RootNamespace>net.vieapps.Components.Caching</RootNamespace>
 		<AssemblyName>VIEApps.Components.Caching</AssemblyName>
 		<AssemblyTitle>VIEApps NGX Caching</AssemblyTitle>
-		<AssemblyVersion>10.2.1812.1</AssemblyVersion>
-		<FileVersion>10.2.1812.1</FileVersion>
-		<InformationalVersion>v10.2.netstandard-2+rev:2018.12.03-lstcmp</InformationalVersion>
+		<SignAssembly>false</SignAssembly>
+		<AssemblyOriginatorKeyFile>../VIEApps.Components.snk</AssemblyOriginatorKeyFile>
+		<AssemblyVersion>10.2.1812.2</AssemblyVersion>
+		<FileVersion>10.2.1812.2</FileVersion>
+		<InformationalVersion>v10.2.netstandard-2+rev:2018.12.04-lstcmp</InformationalVersion>
 		<Product>VIEApps NGX</Product>
 		<Company>VIEApps.net</Company>
 		<GeneratePackageOnBuild>false</GeneratePackageOnBuild>
 		<PackageId>VIEApps.Components.Caching</PackageId>
-		<Version>10.2.1812.1</Version>
-		<SignAssembly>false</SignAssembly>
-		<AssemblyOriginatorKeyFile>../VIEApps.Components.snk</AssemblyOriginatorKeyFile>
+		<Version>10.2.1812.2</Version>
 		<Title>VIEApps NGX Caching</Title>
 		<Description>Distributed cache (Redis &amp; Memcached) on .NET Standard 2.0</Description>
 		<Authors>VIEApps.net</Authors>
 		<Copyright>© 2018 VIEApps.net</Copyright>
 		<PackageTags>cache;caching;distributed;distributed-cache;distributed-caching;memcached;redis;vieapps;vieapps.components</PackageTags>
-		<PackageReleaseNotes>Upgrade to latest components for better performance</PackageReleaseNotes>
-		<PackageProjectUrl>https://github.com/vieapps/Components.Caching</PackageProjectUrl>
+		<PackageReleaseNotes>Upgrade to latest components</PackageReleaseNotes>
 		<PackageIconUrl>https://github.com/vieapps/Components.Utility/raw/master/logo.png</PackageIconUrl>
+		<PackageProjectUrl>https://github.com/vieapps/Components.Caching</PackageProjectUrl>
 		<RepositoryUrl>https://github.com/vieapps/Components.Caching</RepositoryUrl>
 	</PropertyGroup>
 
@@ -42,7 +42,7 @@
 		<None Remove=".DS_Store" />
 		<None Remove=".gitattributes" />
 		<None Remove=".gitignore" />
-		<None Remove="LICENSE" />
+		<None Remove="LICENSE.md" />
 		<None Remove="README.md" />
 	</ItemGroup>
 
@@ -50,7 +50,7 @@
 		<PackageReference Include="Newtonsoft.Json" Version="12.0.1" />
 		<PackageReference Include="Newtonsoft.Json.Bson" Version="1.0.2" />
 		<PackageReference Include="StackExchange.Redis" Version="2.0.519" />
-		<PackageReference Include="VIEApps.Enyim.Caching" Version="1.5.1812.1" />
+		<PackageReference Include="VIEApps.Enyim.Caching" Version="1.5.1812.2" />
 	</ItemGroup>
 
 </Project>

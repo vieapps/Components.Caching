@@ -3,6 +3,8 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Net;
+using System.Xml;
 using System.Text.RegularExpressions;
 using System.Collections.Generic;
 using System.Threading;
@@ -18,6 +20,10 @@ using Newtonsoft.Json.Bson;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
+
+using Enyim.Reflection;
+using Enyim.Caching.Configuration;
+using Enyim.Caching.Memcached;
 
 using net.vieapps.Components.Caching;
 #endregion
@@ -239,6 +245,84 @@ namespace net.vieapps.Components.Caching
 		}
 		#endregion
 
+		#region Working with configurations
+		/// <summary>
+		/// Gets the configuration for working with Redis
+		/// </summary>
+		/// <param name="configSection"></param>
+		/// <returns></returns>
+		public static RedisClientConfiguration GetRedisConfiguration(this CacheConfigurationSectionHandler configSection)
+		{
+			var configuration = new RedisClientConfiguration();
+			if (configSection.Section.SelectNodes("servers/add") is XmlNodeList servers)
+				foreach (XmlNode server in servers)
+				{
+					var address = server.Attributes["address"]?.Value ?? "localhost";
+					configuration.Servers.Add(address.IndexOf(":") > 0 ? ConfigurationHelper.ResolveToEndPoint(address, Int32.TryParse(server.Attributes["port"]?.Value ?? "6379", out int port) ? port : 6379) as IPEndPoint : ConfigurationHelper.ResolveToEndPoint(address) as IPEndPoint);
+				}
+
+			if (configSection.Section.SelectSingleNode("options") is XmlNode options)
+				foreach (XmlAttribute option in options.Attributes)
+					if (!string.IsNullOrWhiteSpace(option.Value))
+						configuration.Options += (configuration.Options != "" ? "," : "") + option.Name + "=" + option.Value;
+
+			return configuration;
+		}
+
+		/// <summary>
+		/// Gets the configuration for working with Redis
+		/// </summary>
+		/// <param name="cacheConfiguration"></param>
+		/// <returns></returns>
+		public static RedisClientConfiguration GetRedisConfiguration(this ICacheConfiguration cacheConfiguration)
+			=> new RedisClientConfiguration
+			{
+				Servers = cacheConfiguration.Servers.Where(s => s.Type.ToLower().Equals("redis")).Select(s => s.Address.IndexOf(":") > 0 ? ConfigurationHelper.ResolveToEndPoint(s.Address) as IPEndPoint : ConfigurationHelper.ResolveToEndPoint(s.Address, s.Port) as IPEndPoint).ToList(),
+				Options = cacheConfiguration.Options
+			};
+
+		/// <summary>
+		/// Gets the configuration for working with Memcached
+		/// </summary>
+		/// <param name="cacheConfiguration"></param>
+		/// <param name="loggerFactory"></param>
+		/// <returns></returns>
+		public static MemcachedClientConfiguration GetMemcachedConfiguration(this ICacheConfiguration cacheConfiguration, ILoggerFactory loggerFactory = null)
+		{
+			var configuration = new MemcachedClientConfiguration(loggerFactory)
+			{
+				Protocol = cacheConfiguration.Protocol
+			};
+
+			cacheConfiguration.Servers.Where(s => s.Type.ToLower().Equals("memcached"))
+				.ToList()
+				.ForEach(s => configuration.Servers.Add(s.Address.IndexOf(":") > 0 ? ConfigurationHelper.ResolveToEndPoint(s.Address) : ConfigurationHelper.ResolveToEndPoint(s.Address, s.Port)));
+
+			configuration.SocketPool.MinPoolSize = cacheConfiguration.SocketPool.MinPoolSize;
+			configuration.SocketPool.MaxPoolSize = cacheConfiguration.SocketPool.MaxPoolSize;
+			configuration.SocketPool.ConnectionTimeout = cacheConfiguration.SocketPool.ConnectionTimeout;
+			configuration.SocketPool.ReceiveTimeout = cacheConfiguration.SocketPool.ReceiveTimeout;
+			configuration.SocketPool.QueueTimeout = cacheConfiguration.SocketPool.QueueTimeout;
+			configuration.SocketPool.DeadTimeout = cacheConfiguration.SocketPool.DeadTimeout;
+			configuration.SocketPool.FailurePolicyFactory = cacheConfiguration.SocketPool.FailurePolicyFactory;
+
+			configuration.Authentication.Type = cacheConfiguration.Authentication.Type;
+			foreach (var kvp in cacheConfiguration.Authentication.Parameters)
+				configuration.Authentication.Parameters[kvp.Key] = kvp.Value;
+
+			if (!string.IsNullOrWhiteSpace(cacheConfiguration.KeyTransformer))
+				configuration.KeyTransformer = FastActivator.Create(Type.GetType(cacheConfiguration.KeyTransformer)) as IKeyTransformer;
+
+			if (!string.IsNullOrWhiteSpace(cacheConfiguration.Transcoder))
+				configuration.Transcoder = FastActivator.Create(Type.GetType(cacheConfiguration.Transcoder)) as ITranscoder;
+
+			if (!string.IsNullOrWhiteSpace(cacheConfiguration.NodeLocator))
+				configuration.NodeLocator = Type.GetType(cacheConfiguration.NodeLocator);
+
+			return configuration;
+		}
+		#endregion
+
 	}
 }
 
@@ -282,11 +366,11 @@ namespace Microsoft.AspNetCore.Builder
 		{
 			try
 			{
-				appBuilder.ApplicationServices.GetService<ILogger<ICache>>().LogInformation($"The service of VIEApps NGX Distributed Caching was{(appBuilder.ApplicationServices.GetService<ICache>() != null ? " " : " not ")}registered with application service providers");
+				appBuilder.ApplicationServices.GetService<ILogger<ICache>>().LogInformation($"The service of VIEApps NGX Caching was{(appBuilder.ApplicationServices.GetService<ICache>() != null ? " " : " not ")}registered with application service providers");
 			}
 			catch (Exception ex)
 			{
-				appBuilder.ApplicationServices.GetService<ILogger<ICache>>().LogError(ex, $"Error occurred while collecting information of the service of VIEApps NGX Distributed Caching => {ex.Message}");
+				appBuilder.ApplicationServices.GetService<ILogger<ICache>>().LogError(ex, $"Error occurred while collecting information of the service of VIEApps NGX Caching => {ex.Message}");
 			}
 			return appBuilder;
 		}
