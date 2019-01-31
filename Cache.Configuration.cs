@@ -53,6 +53,8 @@ namespace net.vieapps.Components.Caching
 	[Serializable]
 	public class CacheConfiguration : ICacheConfiguration
 	{
+		public CacheConfiguration() { }
+
 		public string Provider { get; set; } = "Redis";
 
 		public string RegionName { get; set; } = "VIEApps-NGX-Cache";
@@ -105,20 +107,14 @@ namespace net.vieapps.Components.Caching
 
 			this.Provider = configuration.Section.Attributes["provider"]?.Value ?? "Redis";
 			this.RegionName = configuration.Section.Attributes["region"]?.Value ?? "VIEApps-NGX-Cache";
-			this.ExpirationTime = Convert.ToInt32(configuration.Section.Attributes["expirationTime"]?.Value ?? "30");
+			if (Int32.TryParse(configuration.Section.Attributes["expirationTime"]?.Value ?? "30", out int intValue))
+				this.ExpirationTime = intValue;
 
 			if (configuration.Section.SelectNodes("servers/add") is XmlNodeList servers)
 				foreach (XmlNode server in servers)
 				{
 					var type = server.Attributes["type"]?.Value ?? "Redis";
-					var address = server.Attributes["address"]?.Value ?? "localhost";
-					var port = Convert.ToInt32(server.Attributes["port"]?.Value ?? (type.ToLower().Equals("redis") ? "6379" : "11211"));
-					this.Servers.Add(new CacheServer()
-					{
-						Address = address,
-						Port = port,
-						Type = type
-					});
+					this.Servers.Add(new CacheServer(server.Attributes["address"]?.Value ?? "localhost", Int32.TryParse(server.Attributes["port"]?.Value ?? (type.ToLower().Equals("redis") ? "6379" : "11211"), out int port) ? port : type.ToLower().Equals("redis") ? 6379 : 11211, type));
 				}
 
 			if (configuration.Section.SelectSingleNode("options") is XmlNode options)
@@ -131,28 +127,23 @@ namespace net.vieapps.Components.Caching
 
 			if (configuration.Section.SelectSingleNode("socketPool") is XmlNode socketpool)
 			{
-				if (socketpool.Attributes["maxPoolSize"]?.Value != null)
-					this.SocketPool.MaxPoolSize = Convert.ToInt32(socketpool.Attributes["maxPoolSize"].Value);
-				if (socketpool.Attributes["minPoolSize"]?.Value != null)
-					this.SocketPool.MinPoolSize = Convert.ToInt32(socketpool.Attributes["minPoolSize"].Value);
-				if (socketpool.Attributes["connectionTimeout"]?.Value != null)
-					this.SocketPool.ConnectionTimeout = TimeSpan.Parse(socketpool.Attributes["connectionTimeout"].Value);
-				if (socketpool.Attributes["deadTimeout"]?.Value != null)
-					this.SocketPool.DeadTimeout = TimeSpan.Parse(socketpool.Attributes["deadTimeout"].Value);
-				if (socketpool.Attributes["queueTimeout"]?.Value != null)
-					this.SocketPool.QueueTimeout = TimeSpan.Parse(socketpool.Attributes["queueTimeout"].Value);
-				if (socketpool.Attributes["receiveTimeout"]?.Value != null)
-					this.SocketPool.ReceiveTimeout = TimeSpan.Parse(socketpool.Attributes["receiveTimeout"].Value);
-				if (socketpool.Attributes["noDelay"]?.Value != null)
-					this.SocketPool.NoDelay = Convert.ToBoolean(socketpool.Attributes["noDelay"].Value);
+				if (Int32.TryParse(socketpool.Attributes["maxPoolSize"]?.Value, out intValue))
+					this.SocketPool.MaxPoolSize = intValue;
+				if (Int32.TryParse(socketpool.Attributes["minPoolSize"]?.Value, out intValue))
+					this.SocketPool.MinPoolSize = intValue;
+				if (TimeSpan.TryParse(socketpool.Attributes["connectionTimeout"]?.Value, out TimeSpan timespanValue))
+					this.SocketPool.ConnectionTimeout = timespanValue;
+				if (TimeSpan.TryParse(socketpool.Attributes["deadTimeout"]?.Value, out timespanValue))
+					this.SocketPool.DeadTimeout = timespanValue;
+				if (TimeSpan.TryParse(socketpool.Attributes["queueTimeout"]?.Value, out timespanValue))
+					this.SocketPool.QueueTimeout = timespanValue;
+				if (TimeSpan.TryParse(socketpool.Attributes["receiveTimeout"]?.Value, out timespanValue))
+					this.SocketPool.ReceiveTimeout = timespanValue;
+				if (Boolean.TryParse(socketpool.Attributes["noDelay"]?.Value, out bool boolValue))
+					this.SocketPool.NoDelay = boolValue;
 
-				var failurePolicy = socketpool.Attributes["failurePolicy"]?.Value;
-				if ("throttling" == failurePolicy)
-				{
-					var failureThreshold = Convert.ToInt32(socketpool.Attributes["failureThreshold"]?.Value ?? "4");
-					var resetAfter = TimeSpan.Parse(socketpool.Attributes["resetAfter"]?.Value ?? "00:05:00");
-					this.SocketPool.FailurePolicyFactory = new ThrottlingFailurePolicyFactory(failureThreshold, resetAfter);
-				}
+				if ("throttling" == socketpool.Attributes["failurePolicy"]?.Value)
+					this.SocketPool.FailurePolicyFactory = new ThrottlingFailurePolicyFactory(Int32.TryParse(socketpool.Attributes["failureThreshold"]?.Value, out intValue) ? intValue : 4, TimeSpan.TryParse(socketpool.Attributes["resetAfter"]?.Value, out timespanValue) ? timespanValue : TimeSpan.FromSeconds(5));
 			}
 
 			if (configuration.Section.SelectSingleNode("authentication") is XmlNode authentication)
@@ -188,6 +179,8 @@ namespace net.vieapps.Components.Caching
 	[Serializable]
 	public class CacheOptions : IOptions<CacheOptions>
 	{
+		public CacheOptions() { }
+
 		public string Provider { get; set; } = "Redis";
 
 		public string RegionName { get; set; } = "VIEApps-NGX-Cache";
@@ -226,6 +219,15 @@ namespace net.vieapps.Components.Caching
 		public int Port { get; set; }
 
 		public string Type { get; set; } = "Redis";
+
+		public CacheServer() { }
+
+		public CacheServer(string address, int port, string type = "Redis")
+		{
+			this.Address = address;
+			this.Port = port;
+			this.Type = type;
+		}
 	}
 
 	// -----------------------------------------------------------
@@ -236,6 +238,8 @@ namespace net.vieapps.Components.Caching
 	[Serializable]
 	public class RedisClientConfiguration
 	{
+		public RedisClientConfiguration() { }
+
 		public List<IPEndPoint> Servers { get; internal set; } = new List<IPEndPoint>();
 
 		public string Options { get; internal set; } = "";
@@ -249,6 +253,8 @@ namespace net.vieapps.Components.Caching
 	[Serializable]
 	public class RedisClientOptions : IOptions<RedisClientOptions>
 	{
+		public RedisClientOptions() { }
+
 		public List<IPEndPoint> Servers { get; set; } = new List<IPEndPoint>();
 
 		public string Options { get; set; } = "";

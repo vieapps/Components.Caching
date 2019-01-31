@@ -2,40 +2,33 @@
 
 	<PropertyGroup>
 		<TargetFramework>netstandard2.0</TargetFramework>
+		<WarningLevel>3</WarningLevel>
+		<NoWarn>1701;1702;1705;1066;0067</NoWarn>
+		<DocumentationFile>bin\$(Configuration)\netstandard2.0\VIEApps.Components.Caching.xml</DocumentationFile>
 		<RootNamespace>net.vieapps.Components.Caching</RootNamespace>
 		<AssemblyName>VIEApps.Components.Caching</AssemblyName>
 		<AssemblyTitle>VIEApps NGX Caching</AssemblyTitle>
 		<SignAssembly>false</SignAssembly>
 		<AssemblyOriginatorKeyFile>../VIEApps.Components.snk</AssemblyOriginatorKeyFile>
-		<AssemblyVersion>10.2.1812.2</AssemblyVersion>
-		<FileVersion>10.2.1812.2</FileVersion>
-		<InformationalVersion>v10.2.netstandard-2+rev:2018.12.04-lstcmp</InformationalVersion>
+		<AssemblyVersion>10.2.1902.1</AssemblyVersion>
+		<FileVersion>10.2.1902.1</FileVersion>
+		<InformationalVersion>v10.2.netstandard-2+rev:2019.01.32-latest.components.ipv6.supported</InformationalVersion>
 		<Product>VIEApps NGX</Product>
 		<Company>VIEApps.net</Company>
 		<GeneratePackageOnBuild>false</GeneratePackageOnBuild>
 		<PackageId>VIEApps.Components.Caching</PackageId>
-		<Version>10.2.1812.2</Version>
+		<Version>10.2.1902.1</Version>
 		<Title>VIEApps NGX Caching</Title>
 		<Description>Distributed cache (Redis &amp; Memcached) on .NET Standard 2.0</Description>
 		<Authors>VIEApps.net</Authors>
-		<Copyright>© 2018 VIEApps.net</Copyright>
+		<Copyright>© 2019 VIEApps.net</Copyright>
+		<PackageLicense>LICENSE.md</PackageLicense>
+		<PackageOutputPath>..\</PackageOutputPath>
 		<PackageTags>cache;caching;distributed;distributed-cache;distributed-caching;memcached;redis;vieapps;vieapps.components</PackageTags>
-		<PackageReleaseNotes>Upgrade to latest components</PackageReleaseNotes>
+		<PackageReleaseNotes>Upgrade to latest components and add objects of global configuration settings and supports of IPv6</PackageReleaseNotes>
 		<PackageIconUrl>https://github.com/vieapps/Components.Utility/raw/master/logo.png</PackageIconUrl>
 		<PackageProjectUrl>https://github.com/vieapps/Components.Caching</PackageProjectUrl>
 		<RepositoryUrl>https://github.com/vieapps/Components.Caching</RepositoryUrl>
-	</PropertyGroup>
-
-	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-		<WarningLevel>3</WarningLevel>
-		<NoWarn>1701;1702;1705;1066;0067</NoWarn>
-		<DocumentationFile>bin\Debug\netstandard2.0\VIEApps.Components.Caching.xml</DocumentationFile>
-	</PropertyGroup>
-
-	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
-		<WarningLevel>3</WarningLevel>
-		<NoWarn>1701;1702;1705;1066;0067</NoWarn>
-		<DocumentationFile>bin\Release\netstandard2.0\VIEApps.Components.Caching.xml</DocumentationFile>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -50,7 +43,7 @@
 		<PackageReference Include="Newtonsoft.Json" Version="12.0.1" />
 		<PackageReference Include="Newtonsoft.Json.Bson" Version="1.0.2" />
 		<PackageReference Include="StackExchange.Redis" Version="2.0.519" />
-		<PackageReference Include="VIEApps.Enyim.Caching" Version="1.5.1812.2" />
+		<PackageReference Include="VIEApps.Enyim.Caching" Version="1.6.1902.1" />
 	</ItemGroup>
 
 </Project>

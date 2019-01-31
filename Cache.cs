@@ -86,6 +86,7 @@ namespace net.vieapps.Components.Caching
 				return Cache._Configuration;
 			}
 		}
+
 		static Cache _Instance { get; set; } = null;
 
 		/// <summary>
@@ -99,7 +100,7 @@ namespace net.vieapps.Components.Caching
 			if (Cache._Instance == null)
 			{
 				Cache._Configuration = configuration ?? throw new ConfigurationErrorsException($"No configuration is found [{nameof(configuration)}]");
-				Cache._Instance = new Cache(configuration.RegionName, configuration.ExpirationTime, false, configuration.Provider);
+				Cache._Instance = new Cache(configuration.RegionName, configuration.ExpirationTime, false, configuration.Provider, loggerFactory);
 
 				if (configuration.Servers.Where(s => s.Type.ToLower().Equals("redis")).Count() > 0)
 					Redis.GetClient(configuration, loggerFactory);

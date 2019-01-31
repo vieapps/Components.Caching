@@ -258,7 +258,10 @@ namespace net.vieapps.Components.Caching
 				foreach (XmlNode server in servers)
 				{
 					var address = server.Attributes["address"]?.Value ?? "localhost";
-					configuration.Servers.Add(address.IndexOf(":") > 0 ? ConfigurationHelper.ResolveToEndPoint(address, Int32.TryParse(server.Attributes["port"]?.Value ?? "6379", out int port) ? port : 6379) as IPEndPoint : ConfigurationHelper.ResolveToEndPoint(address) as IPEndPoint);
+					var endpoint = (address.IndexOf(".") > 0 && address.IndexOf(":") > 0) || (address.IndexOf(":") > 0 && address.IndexOf("]:") > 0)
+						? ConfigurationHelper.ResolveToEndPoint(address)
+						: ConfigurationHelper.ResolveToEndPoint(address, Int32.TryParse(server.Attributes["port"]?.Value ?? "6379", out int port) ? port : 6379);
+					configuration.Servers.Add(endpoint as IPEndPoint);
 				}
 
 			if (configSection.Section.SelectSingleNode("options") is XmlNode options)
@@ -277,7 +280,7 @@ namespace net.vieapps.Components.Caching
 		public static RedisClientConfiguration GetRedisConfiguration(this ICacheConfiguration cacheConfiguration)
 			=> new RedisClientConfiguration
 			{
-				Servers = cacheConfiguration.Servers.Where(s => s.Type.ToLower().Equals("redis")).Select(s => s.Address.IndexOf(":") > 0 ? ConfigurationHelper.ResolveToEndPoint(s.Address) as IPEndPoint : ConfigurationHelper.ResolveToEndPoint(s.Address, s.Port) as IPEndPoint).ToList(),
+				Servers = cacheConfiguration.Servers.Where(s => s.Type.ToLower().Equals("redis")).Select(s => (s.Address.IndexOf(".") > 0 && s.Address.IndexOf(":") > 0) || (s.Address.IndexOf(":") > 0 && s.Address.IndexOf("]:") > 0) ? ConfigurationHelper.ResolveToEndPoint(s.Address) as IPEndPoint : ConfigurationHelper.ResolveToEndPoint(s.Address, s.Port) as IPEndPoint).ToList(),
 				Options = cacheConfiguration.Options
 			};
 
@@ -296,7 +299,7 @@ namespace net.vieapps.Components.Caching
 
 			cacheConfiguration.Servers.Where(s => s.Type.ToLower().Equals("memcached"))
 				.ToList()
-				.ForEach(s => configuration.Servers.Add(s.Address.IndexOf(":") > 0 ? ConfigurationHelper.ResolveToEndPoint(s.Address) : ConfigurationHelper.ResolveToEndPoint(s.Address, s.Port)));
+				.ForEach(s => configuration.Servers.Add((s.Address.IndexOf(".") > 0 && s.Address.IndexOf(":") > 0) || (s.Address.IndexOf(":") > 0 && s.Address.IndexOf("]:") > 0) ? ConfigurationHelper.ResolveToEndPoint(s.Address) : ConfigurationHelper.ResolveToEndPoint(s.Address, s.Port)));
 
 			configuration.SocketPool.MinPoolSize = cacheConfiguration.SocketPool.MinPoolSize;
 			configuration.SocketPool.MaxPoolSize = cacheConfiguration.SocketPool.MaxPoolSize;
@@ -311,10 +314,10 @@ namespace net.vieapps.Components.Caching
 				configuration.Authentication.Parameters[kvp.Key] = kvp.Value;
 
 			if (!string.IsNullOrWhiteSpace(cacheConfiguration.KeyTransformer))
-				configuration.KeyTransformer = FastActivator.Create(Type.GetType(cacheConfiguration.KeyTransformer)) as IKeyTransformer;
+				configuration.KeyTransformer = FastActivator.Create(cacheConfiguration.KeyTransformer) as IKeyTransformer;
 
 			if (!string.IsNullOrWhiteSpace(cacheConfiguration.Transcoder))
-				configuration.Transcoder = FastActivator.Create(Type.GetType(cacheConfiguration.Transcoder)) as ITranscoder;
+				configuration.Transcoder = FastActivator.Create(cacheConfiguration.Transcoder) as ITranscoder;
 
 			if (!string.IsNullOrWhiteSpace(cacheConfiguration.NodeLocator))
 				configuration.NodeLocator = Type.GetType(cacheConfiguration.NodeLocator);
