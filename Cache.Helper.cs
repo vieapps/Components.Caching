@@ -34,19 +34,16 @@ namespace net.vieapps.Components.Caching
 	{
 
 		#region Data
-		public const int ExpirationTime = 30;
 		public const int FlagOfJsonObject = 0xfb52;
 		public const int FlagOfJsonArray = 0xfc52;
 		public const int FlagOfExpandoObject = 0xfd52;
 		public const int FlagOfFirstFragmentBlock = 0xfe52;
 		internal static readonly int FragmentSize = (1024 * 1024) - 128;
 		internal static readonly string RegionsKey = "VIEApps-NGX-Regions";
-		internal static readonly string RegionName = "VIEApps-NGX-Cache";
 
-		internal static string GetRegionName(string name)
-			=> string.IsNullOrWhiteSpace(name)
-				? Helper.RegionName
-				: Regex.Replace(name, "[^0-9a-zA-Z:-]+", "");
+		public static int ExpirationTime => Cache.Configuration != null && Cache.Configuration.ExpirationTime > 0 ? Cache.Configuration.ExpirationTime : 30;
+
+		internal static string GetRegionName(string name)=> Regex.Replace(!string.IsNullOrWhiteSpace(name) ? name : Cache.Configuration?.RegionName ?? "VIEApps-NGX-Cache", "[^0-9a-zA-Z:-]+", "");
 
 		internal static string GetCacheKey(string region, string key) => region + "@" + key.Replace(" ", "-");
 

@@ -10,14 +10,14 @@
 		<AssemblyTitle>VIEApps NGX Caching</AssemblyTitle>
 		<SignAssembly>false</SignAssembly>
 		<AssemblyOriginatorKeyFile>../VIEApps.Components.snk</AssemblyOriginatorKeyFile>
-		<AssemblyVersion>10.2.1902.1</AssemblyVersion>
-		<FileVersion>10.2.1902.1</FileVersion>
-		<InformationalVersion>v10.2.netstandard-2+rev:2019.01.32-latest.components.ipv6.supported</InformationalVersion>
+		<AssemblyVersion>10.2.1903.1</AssemblyVersion>
+		<FileVersion>10.2.1903.1</FileVersion>
+		<InformationalVersion>v10.2.netstandard-2+rev:2019.03.01-litle.improvements</InformationalVersion>
 		<Product>VIEApps NGX</Product>
 		<Company>VIEApps.net</Company>
 		<GeneratePackageOnBuild>false</GeneratePackageOnBuild>
 		<PackageId>VIEApps.Components.Caching</PackageId>
-		<Version>10.2.1902.1</Version>
+		<Version>10.2.1903.1</Version>
 		<Title>VIEApps NGX Caching</Title>
 		<Description>Distributed cache (Redis &amp; Memcached) on .NET Standard 2.0</Description>
 		<Authors>VIEApps.net</Authors>
