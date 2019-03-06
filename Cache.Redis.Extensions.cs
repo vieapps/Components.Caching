@@ -4,7 +4,7 @@ using System.Linq;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-
+using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 using CacheUtils;
 #endregion
@@ -490,11 +490,15 @@ namespace net.vieapps.Components.Caching
 						redis.KeyDelete(key);
 						return redis.SetAdd(key, values.Where(v => !string.IsNullOrWhiteSpace(v)).Select(v => (RedisValue)v).ToArray()) > 0;
 					}
-					throw;
+					if (Helper.Logger.IsEnabled(LogLevel.Debug))
+						Helper.Logger.LogError(ex, $"Error occurred while updating region keys into Redis server => {ex.Message}");
+					throw ex;
 				}
-				catch (Exception)
+				catch (Exception ex)
 				{
-					throw;
+					if (Helper.Logger.IsEnabled(LogLevel.Debug))
+						Helper.Logger.LogError(ex, $"Error occurred while updating region keys into Redis server => {ex.Message}");
+					throw ex;
 				}
 			return false;
 		}
@@ -516,11 +520,15 @@ namespace net.vieapps.Components.Caching
 						await redis.KeyDeleteAsync(key).WithCancellationToken(cancellationToken).ConfigureAwait(false);
 						return await redis.SetAddAsync(key, values.Where(v => !string.IsNullOrWhiteSpace(v)).Select(v => (RedisValue)v).ToArray()).WithCancellationToken(cancellationToken).ConfigureAwait(false) > 0;
 					}
-					throw;
+					if (Helper.Logger.IsEnabled(LogLevel.Debug))
+						Helper.Logger.LogError(ex, $"Error occurred while updating region keys into Redis server => {ex.Message}");
+					throw ex;
 				}
-				catch (Exception)
+				catch (Exception ex)
 				{
-					throw;
+					if (Helper.Logger.IsEnabled(LogLevel.Debug))
+						Helper.Logger.LogError(ex, $"Error occurred while updating region keys into Redis server => {ex.Message}");
+					throw ex;
 				}
 			return false;
 		}
@@ -534,8 +542,10 @@ namespace net.vieapps.Components.Caching
 			{
 				return redis.SetRemove(key, value);
 			}
-			catch
+			catch (Exception ex)
 			{
+				if (Helper.Logger.IsEnabled(LogLevel.Debug))
+					Helper.Logger.LogError(ex, $"Error occurred while removing region keys from Redis server => {ex.Message}");
 				return false;
 			}
 		}
@@ -546,8 +556,10 @@ namespace net.vieapps.Components.Caching
 			{
 				return await redis.SetRemoveAsync(key, value).WithCancellationToken(cancellationToken).ConfigureAwait(false);
 			}
-			catch
+			catch (Exception ex)
 			{
+				if (Helper.Logger.IsEnabled(LogLevel.Debug))
+					Helper.Logger.LogError(ex, $"Error occurred while removing region keys from Redis server => {ex.Message}");
 				return false;
 			}
 		}
@@ -559,8 +571,10 @@ namespace net.vieapps.Components.Caching
 				var keys = redis.SetMembers(key);
 				return new HashSet<string>(keys?.Where(k => !k.IsNull).Select(k => k.ToString()) ?? new string[] { });
 			}
-			catch
+			catch (Exception ex)
 			{
+				if (Helper.Logger.IsEnabled(LogLevel.Debug))
+					Helper.Logger.LogError(ex, $"Error occurred while getting region keys from Redis server => {ex.Message}");
 				return new HashSet<string>();
 			}
 		}
@@ -572,8 +586,10 @@ namespace net.vieapps.Components.Caching
 				var keys = await redis.SetMembersAsync(key).WithCancellationToken(cancellationToken).ConfigureAwait(false);
 				return new HashSet<string>(keys?.Where(k => !k.IsNull).Select(k => k.ToString()) ?? new string[] { });
 			}
-			catch
+			catch (Exception ex)
 			{
+				if (Helper.Logger.IsEnabled(LogLevel.Debug))
+					Helper.Logger.LogError(ex, $"Error occurred while getting region keys from Redis server => {ex.Message}");
 				return new HashSet<string>();
 			}
 		}

@@ -66,7 +66,7 @@ namespace net.vieapps.Components.Caching
 				Memcached.GetClient(configuration.GetMemcachedConfiguration(loggerFactory), loggerFactory);
 				var logger = loggerFactory?.CreateLogger<Memcached>();
 				if (logger != null && logger.IsEnabled(LogLevel.Debug))
-					logger.LogInformation("The Memcached 's instance was created");
+					logger.LogInformation("The Memcached's instance was created");
 			}
 			return Memcached._Client;
 		}
@@ -80,14 +80,14 @@ namespace net.vieapps.Components.Caching
 					Memcached._Client = new MemcachedClient(memcachedSection, loggerFactory);
 					var logger = loggerFactory?.CreateLogger<Memcached>();
 					if (logger != null && logger.IsEnabled(LogLevel.Debug))
-						logger.LogInformation("The Memcached 's instance was created with stand-alone configuration (app.config/web.config) at the section named 'memcached'");
+						logger.LogInformation("The Memcached's instance was created with stand-alone configuration (app.config/web.config) at the section named 'memcached'");
 				}
 				else if (ConfigurationManager.GetSection("cache") is CacheConfigurationSectionHandler cacheSection)
 				{
 					Memcached.GetClient(new CacheConfiguration(cacheSection).GetMemcachedConfiguration(loggerFactory), loggerFactory);
 					var logger = loggerFactory?.CreateLogger<Memcached>();
 					if (logger != null && logger.IsEnabled(LogLevel.Debug))
-						logger.LogInformation("The Memcached 's instance was created with stand-alone configuration (app.config/web.config) at the section named 'cache'");
+						logger.LogInformation("The Memcached's instance was created with stand-alone configuration (app.config/web.config) at the section named 'cache'");
 				}
 				else
 				{
@@ -874,7 +874,7 @@ namespace net.vieapps.Components.Caching
 			var attempt = 0;
 			while (attempt < 123 && await Memcached.Client.ExistsAsync(Helper.RegionsKey + "-Registering", cancellationToken).ConfigureAwait(false))
 			{
-				await Task.Delay(234);
+				await Task.Delay(234).ConfigureAwait(false);
 				attempt++;
 			}
 			await Memcached.Client.StoreAsync(StoreMode.Set, Helper.RegionsKey + "-Registering", "v", TimeSpan.FromSeconds(13), cancellationToken).ConfigureAwait(false);

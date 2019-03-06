@@ -10,14 +10,14 @@
 		<AssemblyTitle>VIEApps NGX Caching</AssemblyTitle>
 		<SignAssembly>false</SignAssembly>
 		<AssemblyOriginatorKeyFile>../VIEApps.Components.snk</AssemblyOriginatorKeyFile>
-		<AssemblyVersion>10.2.1903.1</AssemblyVersion>
-		<FileVersion>10.2.1903.1</FileVersion>
-		<InformationalVersion>v10.2.netstandard-2+rev:2019.03.01-litle.improvements</InformationalVersion>
+		<AssemblyVersion>10.2.1903.3</AssemblyVersion>
+		<FileVersion>10.2.1903.3</FileVersion>
+		<InformationalVersion>v10.2.netstandard-2+rev:2019.03.06-code.refactors</InformationalVersion>
 		<Product>VIEApps NGX</Product>
 		<Company>VIEApps.net</Company>
 		<GeneratePackageOnBuild>false</GeneratePackageOnBuild>
 		<PackageId>VIEApps.Components.Caching</PackageId>
-		<Version>10.2.1903.1</Version>
+		<Version>10.2.1903.3</Version>
 		<Title>VIEApps NGX Caching</Title>
 		<Description>Distributed cache (Redis &amp; Memcached) on .NET Standard 2.0</Description>
 		<Authors>VIEApps.net</Authors>
@@ -25,7 +25,7 @@
 		<PackageLicense>LICENSE.md</PackageLicense>
 		<PackageOutputPath>..\</PackageOutputPath>
 		<PackageTags>cache;caching;distributed;distributed-cache;distributed-caching;memcached;redis;vieapps;vieapps.components</PackageTags>
-		<PackageReleaseNotes>Upgrade to latest components and add objects of global configuration settings and supports of IPv6</PackageReleaseNotes>
+		<PackageReleaseNotes>Do some refactoring</PackageReleaseNotes>
 		<PackageIconUrl>https://github.com/vieapps/Components.Utility/raw/master/logo.png</PackageIconUrl>
 		<PackageProjectUrl>https://github.com/vieapps/Components.Caching</PackageProjectUrl>
 		<RepositoryUrl>https://github.com/vieapps/Components.Caching</RepositoryUrl>

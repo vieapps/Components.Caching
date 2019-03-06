@@ -626,18 +626,14 @@ namespace net.vieapps.Components.Caching
 		}
 
 		byte[] IDistributedCache.Get(string key)
-		{
-			return string.IsNullOrWhiteSpace(key)
+			=> string.IsNullOrWhiteSpace(key)
 				? throw new ArgumentNullException(nameof(key))
 				: this.Get<byte[]>(key);
-		}
 
 		Task<byte[]> IDistributedCache.GetAsync(string key, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			return string.IsNullOrWhiteSpace(key)
+			=> string.IsNullOrWhiteSpace(key)
 				? Task.FromException<byte[]>(new ArgumentNullException(nameof(key)))
 				: this.GetAsync<byte[]>(key, cancellationToken);
-		}
 
 		void IDistributedCache.Refresh(string key)
 		{
@@ -667,11 +663,9 @@ namespace net.vieapps.Components.Caching
 		}
 
 		Task IDistributedCache.RemoveAsync(string key, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			return string.IsNullOrWhiteSpace(key)
+			=> string.IsNullOrWhiteSpace(key)
 				? Task.FromException(new ArgumentNullException(nameof(key)))
 				: this.RemoveAsync(new List<string>() { key, key.GetIDistributedCacheExpirationKey() }, null, cancellationToken);
-		}
 		#endregion
 
 	}

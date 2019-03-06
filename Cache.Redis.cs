@@ -149,11 +149,9 @@ namespace net.vieapps.Components.Caching
 		}
 
 		Task _UpdateKeyAsync(string key, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			return this._storeKeys
+			=> this._storeKeys
 				? Redis.Client.UpdateSetMembersAsync(this._RegionKey, this._GetKey(key), cancellationToken)
 				: Task.CompletedTask;
-		}
 
 		void _UpdateKeys<T>(IDictionary<string, T> items, string keyPrefix = null)
 		{
@@ -167,8 +165,7 @@ namespace net.vieapps.Components.Caching
 		}
 
 		Task _UpdateKeysAsync<T>(IDictionary<string, T> items, string keyPrefix = null, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			return this._storeKeys
+			=> this._storeKeys
 				? Redis.Client.UpdateSetMembersAsync(
 					this._RegionKey,
 					items != null
@@ -177,7 +174,6 @@ namespace net.vieapps.Components.Caching
 					cancellationToken
 				)
 				: Task.CompletedTask;
-		}
 
 		void _RemoveKey(string key)
 		{
@@ -656,7 +652,8 @@ namespace net.vieapps.Components.Caching
 		#region Get (Fragment)
 		Tuple<int, int> _GetFragments(string key) => Helper.GetFragments(this._Get(key, false) as byte[]);
 
-		async Task<Tuple<int, int>> _GetFragmentsAsync(string key, CancellationToken cancellationToken = default(CancellationToken)) => Helper.GetFragments(await this._GetAsync(key, false, cancellationToken).ConfigureAwait(false) as byte[]);
+		async Task<Tuple<int, int>> _GetFragmentsAsync(string key, CancellationToken cancellationToken = default(CancellationToken))
+			=> Helper.GetFragments(await this._GetAsync(key, false, cancellationToken).ConfigureAwait(false) as byte[]);
 
 		List<byte[]> _GetAsFragments(string key, List<int> indexes)
 		{
