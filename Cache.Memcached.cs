@@ -2,6 +2,7 @@
 using System;
 using System.Linq;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Configuration;
@@ -20,7 +21,7 @@ namespace net.vieapps.Components.Caching
 	/// Manipulates cached objects in isolated regions with Memcached
 	/// </summary>
 	[DebuggerDisplay("Memcached: {Name} ({ExpirationTime} minutes)")]
-	public sealed class Memcached : ICache
+	public sealed class Memcached : ICache, IDisposable
 	{
 		/// <summary>
 		/// Create new instance of Memcached
@@ -36,16 +37,19 @@ namespace net.vieapps.Components.Caching
 			// expiration time
 			this.ExpirationTime = expirationTime > 0 ? expirationTime : Helper.ExpirationTime;
 
-			// update keys
-			if (storeKeys)
-			{
-				this._storeKeys = true;
-				this._addedKeys = new HashSet<string>();
-				this._removedKeys = new HashSet<string>();
-			}
+			// store keys
+			this._storeKeys = storeKeys;
 
 			// register the region
 			Task.Run(() => Memcached.RegisterRegionAsync(this.Name)).ConfigureAwait(false);
+		}
+
+		public void Dispose() => this._lock.Dispose();
+
+		~Memcached()
+		{
+			this.Dispose();
+			GC.SuppressFinalize(this);
 		}
 
 		#region Get client (singleton)
@@ -117,114 +121,113 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		/// <param name="loggerFactory"></param>
 		public static void PrepareClient(ILoggerFactory loggerFactory = null) => Memcached.GetClient(loggerFactory);
+
 		#endregion
 
 		#region Attributes
-		bool _storeKeys = false, _isUpdatingKeys = false;
-		HashSet<string> _addedKeys, _removedKeys;
-		ReaderWriterLockSlim _locker = new ReaderWriterLockSlim(LockRecursionPolicy.SupportsRecursion);
+		readonly bool _storeKeys = false;
+		readonly ConcurrentQueue<string> _addedKeys = new ConcurrentQueue<string>();
+		readonly ConcurrentQueue<string> _removedKeys = new ConcurrentQueue<string>();
+		readonly SemaphoreSlim _lock = new SemaphoreSlim(1, 1);
+		bool _isUpdatingKeys = false;
 		#endregion
 
 		#region Keys
-		async Task _UpdateKeysAsync(int delay = 13, bool checkUpdatedKeys = true, Action callback = null, CancellationToken cancellationToken = default(CancellationToken))
+		async Task _PushKeysAsync(CancellationToken cancellationToken = default(CancellationToken))
 		{
-			// no key need to update, then stop
-			if (checkUpdatedKeys && this._addedKeys.Count < 1 && this._removedKeys.Count < 1)
+			// check state
+			if (!this._storeKeys || this._isUpdatingKeys)
 				return;
 
-			// if other task/thread is processing, then stop
-			if (this._isUpdatingKeys)
-				return;
-
-			// set flag
+			// process
 			this._isUpdatingKeys = true;
-			await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
-
-			// prepare
-			var syncKeys = await Memcached.FetchKeysAsync(this._RegionKey, cancellationToken).ConfigureAwait(false);
-
-			var totalRemovedKeys = this._removedKeys.Count;
-			var totalAddedKeys = this._addedKeys.Count;
-
-			// update removed keys
-			if (totalRemovedKeys > 0)
-				syncKeys = new HashSet<string>(syncKeys.Except(this._removedKeys));
-
-			// update added keys
-			if (totalAddedKeys > 0)
-				syncKeys = new HashSet<string>(syncKeys.Union(this._addedKeys));
-
-			// update keys
-			await Memcached.SetKeysAsync(this._RegionKey, syncKeys, cancellationToken).ConfigureAwait(false);
-
-			// delay a moment before re-checking
-			await Task.Delay(123, cancellationToken).ConfigureAwait(false);
-
-			// check to see new updated keys
-			if (!totalAddedKeys.Equals(this._addedKeys.Count) || !totalRemovedKeys.Equals(this._removedKeys.Count))
-			{
-				// delay a moment before re-updating
-				await Task.Delay(345, cancellationToken).ConfigureAwait(false);
-
-				// update keys
-				await Memcached.SetKeysAsync(this._RegionKey, new HashSet<string>(syncKeys.Except(this._removedKeys).Union(this._addedKeys)), cancellationToken).ConfigureAwait(false);
-			}
-
-			// clear keys
+			var flag = $"{this._RegionKey}-Updating";
 			try
 			{
-				this._locker.EnterWriteLock();
-				this._addedKeys.Clear();
-				this._removedKeys.Clear();
+				await this._lock.WaitAsync(cancellationToken).ConfigureAwait(false);
+				if (this._addedKeys.Count > 0 || this._removedKeys.Count > 0)
+				{
+					while (await Memcached.Client.GetAsync(flag, cancellationToken).ConfigureAwait(false) != null)
+						await Task.Delay(123, cancellationToken).ConfigureAwait(false);
+					if (this._addedKeys.Count > 0 || this._removedKeys.Count > 0)
+					{
+						await Memcached.Client.StoreAsync(StoreMode.Set, flag, "v", cancellationToken).ConfigureAwait(false);
+						var removedKeys = new List<string>();
+						var addedKeys = new List<string>();
+
+						while (this._removedKeys.Count > 0)
+							if (this._removedKeys.TryDequeue(out string key))
+								removedKeys.Add(key);
+						while (this._addedKeys.Count > 0)
+							if (this._addedKeys.TryDequeue(out string key))
+								addedKeys.Add(key);
+
+						await Task.Delay(123, cancellationToken).ConfigureAwait(false);
+
+						while (this._removedKeys.Count > 0)
+							if (this._removedKeys.TryDequeue(out string key))
+								removedKeys.Add(key);
+						while (this._addedKeys.Count > 0)
+							if (this._addedKeys.TryDequeue(out string key))
+								addedKeys.Add(key);
+
+						var syncKeys = await Memcached.FetchKeysAsync(this._RegionKey, cancellationToken).ConfigureAwait(false);
+						await Memcached.SetKeysAsync(this._RegionKey, new HashSet<string>(syncKeys.Except(removedKeys).Union(addedKeys)), cancellationToken).ConfigureAwait(false);
+					}
+				}
+			}
+			catch (OperationCanceledException)
+			{
+				throw;
 			}
 			catch (Exception ex)
 			{
-				Helper.WriteLogs(this.Name, "Error occurred while removes keys (after pushing process)", ex);
+				Helper.WriteLogs(this.Name, "Error occurred while updating region keys", ex);
 			}
 			finally
 			{
-				if (this._locker.IsWriteLockHeld)
-					this._locker.ExitWriteLock();
+				this._isUpdatingKeys = false;
+				this._lock.Release();
+				var removeTask = Task.Run(() => Memcached.Client.RemoveAsync(flag)).ConfigureAwait(false);
 			}
-
-			// remove flags
-			this._isUpdatingKeys = false;
-
-			// callback
-			callback?.Invoke();
 		}
 
-		void _UpdateKeys(int delay = 13, bool checkUpdatedKeys = true, Action callback = null)
+		void _PushKeys()
+			=> Task.Run(() => this._PushKeysAsync()).ConfigureAwait(false);
+
+		HashSet<string> _GetKeys()
+			=> Memcached.FetchKeys(this._RegionKey);
+
+		Task<HashSet<string>> _GetKeysAsync(CancellationToken cancellationToken = default(CancellationToken))
+			=> Memcached.FetchKeysAsync(this._RegionKey, cancellationToken);
+
+		void _ClearKeys()
+		{
+			try
+			{
+				while (this._addedKeys.Count > 0)
+					this._addedKeys.TryDequeue(out string key);
+				while (this._removedKeys.Count > 0)
+					this._removedKeys.TryDequeue(out string key);
+			}
+			catch (Exception ex)
+			{
+				Helper.WriteLogs(this.Name, "Error occurred while cleaning region keys", ex);
+			}
+		}
+
+		void _UpdateKey(string key, bool doPush, bool isRemoved = false)
 		{
 			if (this._storeKeys)
-				Task.Run(async () => await this._UpdateKeysAsync(delay, checkUpdatedKeys, callback).ConfigureAwait(false)).ConfigureAwait(false);
+			{
+				if (isRemoved)
+					this._removedKeys.Enqueue(key);
+				else
+					this._addedKeys.Enqueue(key);
+				if (doPush)
+					this._PushKeys();
+			}
 		}
-
-		void _UpdateKeys(string key, bool doPush)
-		{
-			if (this._storeKeys && !this._addedKeys.Contains(key))
-				try
-				{
-					this._locker.EnterWriteLock();
-					this._addedKeys.Add(key);
-				}
-				catch (Exception ex)
-				{
-					Helper.WriteLogs(this.Name, "Error occurred while updating the added keys of the region (for pushing)", ex);
-				}
-				finally
-				{
-					if (this._locker.IsWriteLockHeld)
-						this._locker.ExitWriteLock();
-				}
-
-			if (this._storeKeys && doPush && this._addedKeys.Count > 0)
-				this._UpdateKeys(123);
-		}
-
-		HashSet<string> _GetKeys() => Memcached.FetchKeys(this._RegionKey);
-
-		Task<HashSet<string>> _GetKeysAsync(CancellationToken cancellationToken = default(CancellationToken)) => Memcached.FetchKeysAsync(this._RegionKey, cancellationToken);
 		#endregion
 
 		#region Set
@@ -245,8 +248,8 @@ namespace net.vieapps.Components.Caching
 					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
 				}
 
-			if (success && this._storeKeys)
-				this._UpdateKeys(key, doPush);
+			if (success)
+				this._UpdateKey(key, doPush);
 
 			return success;
 		}
@@ -271,8 +274,8 @@ namespace net.vieapps.Components.Caching
 					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
 				}
 
-			if (success && this._storeKeys)
-				this._UpdateKeys(key, doPush);
+			if (success)
+				this._UpdateKey(key, doPush);
 
 			return success;
 		}
@@ -298,8 +301,8 @@ namespace net.vieapps.Components.Caching
 					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
 				}
 
-			if (success && this._storeKeys)
-				this._UpdateKeys(key, doPush);
+			if (success)
+				this._UpdateKey(key, doPush);
 
 			return success;
 		}
@@ -328,8 +331,8 @@ namespace net.vieapps.Components.Caching
 					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
 				}
 
-			if (success && this._storeKeys)
-				this._UpdateKeys(key, doPush);
+			if (success)
+				this._UpdateKey(key, doPush);
 
 			return success;
 		}
@@ -338,16 +341,17 @@ namespace net.vieapps.Components.Caching
 		#region Set (Multiple)
 		void _Set<T>(IDictionary<string, T> items, string keyPrefix = null, int expirationTime = 0, StoreMode mode = StoreMode.Set)
 		{
-			if (items != null)
-				items.Where(kvp => !string.IsNullOrWhiteSpace(kvp.Key)).ToList().ForEach(kvp => this._Set((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + kvp.Key, kvp.Value, expirationTime, false, mode));
-			if (this._storeKeys && this._addedKeys.Count > 0)
-				this._UpdateKeys(123);
+			if (items != null && items.Count > 0)
+			{
+				items.Where(kvp => !string.IsNullOrWhiteSpace(kvp.Key))
+					.ToList()
+					.ForEach(kvp => this._Set((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + kvp.Key, kvp.Value, expirationTime, false, mode));
+				this._PushKeys();
+			}
 		}
 
 		void _Set(IDictionary<string, object> items, string keyPrefix = null, int expirationTime = 0, StoreMode mode = StoreMode.Set)
-		{
-			this._Set<object>(items, keyPrefix, expirationTime, mode);
-		}
+			=> this._Set<object>(items, keyPrefix, expirationTime, mode);
 
 		async Task _SetAsync<T>(IDictionary<string, T> items, string keyPrefix = null, int expirationTime = 0, StoreMode mode = StoreMode.Set, CancellationToken cancellationToken = default(CancellationToken))
 		{
@@ -355,8 +359,7 @@ namespace net.vieapps.Components.Caching
 				? items.Where(kvp => !string.IsNullOrWhiteSpace(kvp.Key)).Select(kvp => this._SetAsync((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + kvp.Key, kvp.Value, expirationTime, false, mode, cancellationToken))
 				: new List<Task<bool>>()
 			).ConfigureAwait(false);
-			if (this._storeKeys && this._addedKeys.Count > 0)
-				this._UpdateKeys(123);
+			this._PushKeys();
 		}
 
 		Task _SetAsync(IDictionary<string, object> items, string keyPrefix = null, int expirationTime = 0, StoreMode mode = StoreMode.Set, CancellationToken cancellationToken = default(CancellationToken))
@@ -367,20 +370,16 @@ namespace net.vieapps.Components.Caching
 		bool _SetFragments(string key, List<byte[]> fragments, int expirationTime = 0, StoreMode mode = StoreMode.Set)
 		{
 			var success = fragments != null && fragments.Count > 0
-				? this._Set(key, new ArraySegment<byte>(Helper.GetFirstBlock(fragments)), expirationTime, false, mode)
+				? this._Set(key, new ArraySegment<byte>(fragments.GetFirstFragment()), expirationTime, true, mode)
 				: false;
 
-			if (success)
+			if (success && fragments.Count > 1)
 			{
-				if (fragments.Count > 1)
-				{
-					var items = new Dictionary<string, object>();
-					for (var index = 1; index < fragments.Count; index++)
-						items.Add(this._GetFragmentKey(key, index), new ArraySegment<byte>(fragments[index]));
-					this._Set(items, null, expirationTime, mode);
-				}
-				else
-					this._UpdateKeys(key, true);
+				var items = new Dictionary<string, object>();
+				for (var index = 1; index < fragments.Count; index++)
+					items.Add(this._GetFragmentKey(key, index), new ArraySegment<byte>(fragments[index]));
+				var validFor = TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime);
+				Task.Run(async () => await Task.WhenAll(items.Select(kvp => Memcached.Client.StoreAsync(mode, this._GetKey(kvp.Key), kvp.Value, validFor))).ConfigureAwait(false)).ConfigureAwait(false);
 			}
 
 			return success;
@@ -389,20 +388,16 @@ namespace net.vieapps.Components.Caching
 		async Task<bool> _SetFragmentsAsync(string key, List<byte[]> fragments, int expirationTime = 0, StoreMode mode = StoreMode.Set, CancellationToken cancellationToken = default(CancellationToken))
 		{
 			var success = fragments != null && fragments.Count > 0
-				? await this._SetAsync(key, new ArraySegment<byte>(Helper.GetFirstBlock(fragments)), expirationTime, false, mode, cancellationToken).ConfigureAwait(false)
+				? await this._SetAsync(key, new ArraySegment<byte>(fragments.GetFirstFragment()), expirationTime, true, mode, cancellationToken).ConfigureAwait(false)
 				: false;
 
-			if (success)
+			if (success && fragments.Count > 1)
 			{
-				if (fragments.Count > 1)
-				{
-					var items = new Dictionary<string, object>();
-					for (var index = 1; index < fragments.Count; index++)
-						items.Add(this._GetFragmentKey(key, index), new ArraySegment<byte>(fragments[index]));
-					await this._SetAsync(items, null, expirationTime, mode, cancellationToken).ConfigureAwait(false);
-				}
-				else
-					this._UpdateKeys(key, true);
+				var items = new Dictionary<string, object>();
+				for (var index = 1; index < fragments.Count; index++)
+					items.Add(this._GetFragmentKey(key, index), new ArraySegment<byte>(fragments[index]));
+				var validFor = TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime);
+				await Task.WhenAll(items.Select(kvp => Memcached.Client.StoreAsync(mode, this._GetKey(kvp.Key), kvp.Value, validFor, cancellationToken))).ConfigureAwait(false);
 			}
 
 			return success;
@@ -411,12 +406,12 @@ namespace net.vieapps.Components.Caching
 		bool _SetAsFragments(string key, object value, int expirationTime = 0, StoreMode mode = StoreMode.Set)
 			=> string.IsNullOrWhiteSpace(key) || value == null
 				? false
-				: this._SetFragments(key, Helper.Split(Helper.Serialize(value, false)), expirationTime, mode);
+				: this._SetFragments(key, Helper.Serialize(value).Split(), expirationTime, mode);
 
 		Task<bool> _SetAsFragmentsAsync(string key, object value, int expirationTime = 0, StoreMode mode = StoreMode.Set, CancellationToken cancellationToken = default(CancellationToken))
 			=> string.IsNullOrWhiteSpace(key) || value == null
 				? Task.FromResult(false)
-				: this._SetFragmentsAsync(key, Helper.Split(Helper.Serialize(value, false)), expirationTime, mode, cancellationToken);
+				: this._SetFragmentsAsync(key, Helper.Serialize(value).Split(), expirationTime, mode, cancellationToken);
 		#endregion
 
 		#region Get
@@ -504,7 +499,7 @@ namespace net.vieapps.Components.Caching
 				Helper.WriteLogs(this.Name, "Error occurred while fetch a collection of objects from cache storage", ex);
 			}
 
-			var objects = items?.ToDictionary(kvp => kvp.Key.Substring(this.Name.Length), kvp => kvp.Value);
+			var objects = items?.ToDictionary(kvp => kvp.Key.Substring(this.Name.Length + 1), kvp => kvp.Value);
 			return objects != null && objects.Count > 0
 				? objects
 				: null;
@@ -532,7 +527,7 @@ namespace net.vieapps.Components.Caching
 				Helper.WriteLogs(this.Name, "Error occurred while fetch a collection of objects from cache storage", ex);
 			}
 
-			var objects = items?.ToDictionary(kvp => kvp.Key.Substring(this.Name.Length), kvp => kvp.Value);
+			var objects = items?.ToDictionary(kvp => kvp.Key.Substring(this.Name.Length + 1), kvp => kvp.Value);
 			return objects != null && objects.Count > 0
 				? objects
 				: null;
@@ -543,18 +538,17 @@ namespace net.vieapps.Components.Caching
 		#endregion
 
 		#region Get (Fragment)
-		Tuple<int, int> _GetFragments(string key) => Helper.GetFragments(this._Get(key, false) as byte[]);
+		Tuple<int, int> _GetFragments(string key)
+			=> Helper.GetFragmentsInfo(this._Get(key, false) as byte[]);
 
 		async Task<Tuple<int, int>> _GetFragmentsAsync(string key, CancellationToken cancellationToken = default(CancellationToken))
-		{
-			return Helper.GetFragments(await this._GetAsync(key, false, cancellationToken).ConfigureAwait(false) as byte[]);
-		}
+			=> Helper.GetFragmentsInfo(await this._GetAsync(key, false, cancellationToken).ConfigureAwait(false) as byte[]);
 
 		List<byte[]> _GetAsFragments(string key, List<int> indexes)
 		{
 			var fragments = string.IsNullOrWhiteSpace(key) || indexes == null || indexes.Count < 1
 				? null
-				: this._Get(indexes.Select(index => index > 0 ? this._GetFragmentKey(key, index) : key));
+				: this._Get(indexes.Select(index => this._GetFragmentKey(key, index)));
 			return fragments != null
 				? fragments.OrderBy(kvp => kvp.Key).Select(kvp => kvp.Value as byte[]).ToList()
 				: new List<byte[]>();
@@ -564,7 +558,7 @@ namespace net.vieapps.Components.Caching
 		{
 			var fragments = string.IsNullOrWhiteSpace(key) || indexes == null || indexes.Count < 1
 				? null
-				: await this._GetAsync(indexes.Select(index => index > 0 ? this._GetFragmentKey(key, index) : key), cancellationToken).ConfigureAwait(false);
+				: await this._GetAsync(indexes.Select(index => this._GetFragmentKey(key, index)), cancellationToken).ConfigureAwait(false);
 			return fragments != null
 				? fragments.OrderBy(kvp => kvp.Key).Select(kvp => kvp.Value as byte[]).ToList()
 				: new List<byte[]>();
@@ -584,9 +578,8 @@ namespace net.vieapps.Components.Caching
 		{
 			try
 			{
-				var info = Helper.GetFragments(firstBlock);
-				var data = Helper.Combine(firstBlock, this._GetAsFragments(key, Enumerable.Range(1, info.Item1 - 1).ToList()));
-				return Helper.Deserialize(data, 8, data.Length - 8);
+				var info = firstBlock.GetFragmentsInfo();
+				return firstBlock.Combine(info.Item1 > 1 ? this._GetAsFragments(key, Enumerable.Range(1, info.Item1 - 1).ToList()) : new List<byte[]>()).DeserializeFromFragments();
 			}
 			catch (Exception ex)
 			{
@@ -599,9 +592,8 @@ namespace net.vieapps.Components.Caching
 		{
 			try
 			{
-				var info = Helper.GetFragments(firstBlock);
-				var data = Helper.Combine(firstBlock, await this._GetAsFragmentsAsync(key, Enumerable.Range(1, info.Item1 - 1).ToList(), cancellationToken).ConfigureAwait(false));
-				return Helper.Deserialize(data, 8, data.Length - 8);
+				var info = firstBlock.GetFragmentsInfo();
+				return firstBlock.Combine(info.Item1 > 1 ? await this._GetAsFragmentsAsync(key, Enumerable.Range(1, info.Item1 - 1).ToList(), cancellationToken).ConfigureAwait(false) : new List<byte[]>()).DeserializeFromFragments();
 			}
 			catch (OperationCanceledException)
 			{
@@ -629,27 +621,8 @@ namespace net.vieapps.Components.Caching
 					Helper.WriteLogs(this.Name, $"Error occurred while removing an object from cache storage [{key}]", ex);
 				}
 
-			if (success && this._storeKeys)
-			{
-				if (!this._removedKeys.Contains(key))
-					try
-					{
-						this._locker.EnterWriteLock();
-						this._removedKeys.Add(key);
-					}
-					catch (Exception ex)
-					{
-						Helper.WriteLogs(this.Name, "Error occurred while updating the removed keys (for pushing)", ex);
-					}
-					finally
-					{
-						if (this._locker.IsWriteLockHeld)
-							this._locker.ExitWriteLock();
-					}
-
-				if (doPush && this._removedKeys.Count > 0)
-					this._UpdateKeys(123);
-			}
+			if (success)
+				this._UpdateKey(key, doPush, true);
 
 			return success;
 		}
@@ -671,27 +644,8 @@ namespace net.vieapps.Components.Caching
 					Helper.WriteLogs(this.Name, $"Error occurred while removing an object from cache storage [{key}]", ex);
 				}
 
-			if (success && this._storeKeys)
-			{
-				if (!this._removedKeys.Contains(key))
-					try
-					{
-						this._locker.EnterWriteLock();
-						this._removedKeys.Add(key);
-					}
-					catch (Exception ex)
-					{
-						Helper.WriteLogs(this.Name, "Error occurred while updating the removed keys (for pushing)", ex);
-					}
-					finally
-					{
-						if (this._locker.IsWriteLockHeld)
-							this._locker.ExitWriteLock();
-					}
-
-				if (doPush && this._removedKeys.Count > 0)
-					this._UpdateKeys(123);
-			}
+			if (success)
+				this._UpdateKey(key, doPush, true);
 
 			return success;
 		}
@@ -701,73 +655,46 @@ namespace net.vieapps.Components.Caching
 		void _Remove(IEnumerable<string> keys, string keyPrefix = null)
 		{
 			keys?.Where(key => !string.IsNullOrWhiteSpace(key)).ToList().ForEach(key => this._Remove((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + key, false));
-			if (this._storeKeys && this._removedKeys.Count > 0)
-				this._UpdateKeys(123);
+			this._PushKeys();
 		}
 
 		async Task _RemoveAsync(IEnumerable<string> keys, string keyPrefix = null, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			await Task.WhenAll(keys?.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => this._RemoveAsync((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + key, false, cancellationToken)) ?? new List<Task<bool>>()).ConfigureAwait(false);
-			if (this._storeKeys && this._removedKeys.Count > 0)
-				this._UpdateKeys(123);
+			await Task.WhenAll(keys?.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => this._RemoveAsync((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + key, false, cancellationToken))).ConfigureAwait(false);
+			this._PushKeys();
 		}
 		#endregion
 
 		#region Clear
 		void _Clear()
-		{
-			this._Remove(this._GetKeys());
-			Memcached.Client.Remove(this._RegionKey);
-
-			if (this._storeKeys)
-				try
-				{
-					this._locker.EnterWriteLock();
-					this._addedKeys.Clear();
-					this._removedKeys.Clear();
-				}
-				catch { }
-				finally
-				{
-					if (this._locker.IsWriteLockHeld)
-						this._locker.ExitWriteLock();
-				}
-		}
+			=> Task.Run(() => this._ClearAsync()).ConfigureAwait(false);
 
 		async Task _ClearAsync(CancellationToken cancellationToken = default(CancellationToken))
 		{
 			var keys = await this._GetKeysAsync(cancellationToken).ConfigureAwait(false);
 			await Task.WhenAll(
 				this._RemoveAsync(keys, null, cancellationToken),
-				Memcached.Client.RemoveAsync(this._RegionKey, cancellationToken)
+				Memcached.Client.RemoveAsync(this._RegionKey, cancellationToken),
+				Memcached.Client.RemoveAsync(this._RegionKey + "-Updating", cancellationToken),
+				this._storeKeys ? Task.Run(() => this._ClearKeys()) : Task.CompletedTask
 			).ConfigureAwait(false);
-
-			if (this._storeKeys)
-				try
-				{
-					this._locker.EnterWriteLock();
-					this._addedKeys.Clear();
-					this._removedKeys.Clear();
-				}
-				catch { }
-				finally
-				{
-					if (this._locker.IsWriteLockHeld)
-						this._locker.ExitWriteLock();
-				}
 		}
 		#endregion
 
 		// -----------------------------------------------------
 
 		#region [Helper]
-		string _GetKey(string key) => Helper.GetCacheKey(this.Name, key);
+		string _GetKey(string key)
+			=> Helper.GetCacheKey(this.Name, key);
 
-		string _GetFragmentKey(string key, int index) => Helper.GetFragmentKey(key, index);
+		string _GetFragmentKey(string key, int index)
+			=> Helper.GetFragmentKey(key, index);
 
-		List<string> _GetFragmentKeys(string key, int max) => Helper.GetFragmentKeys(key, max);
+		List<string> _GetFragmentKeys(string key, int max)
+			=> Helper.GetFragmentKeys(key, max);
 
-		string _RegionKey => this._GetKey("<Keys-Of-Region>");
+		string _RegionKey
+			=> this._GetKey("<Keys-Of-Region>");
 		#endregion
 
 		#region [Static]
@@ -779,7 +706,7 @@ namespace net.vieapps.Components.Caching
 			{
 				var tasks = new List<Task>();
 				for (var index = 1; index < fragments.Count; index++)
-					tasks.Add(Memcached.Client.StoreAsync(StoreMode.Set, key + ":" + index, new ArraySegment<byte>(fragments[index]), cancellationToken));
+					tasks.Add(Memcached.Client.StoreAsync(StoreMode.Set, $"{key}:{index}", new ArraySegment<byte>(fragments[index]), cancellationToken));
 				await Task.WhenAll(tasks).ConfigureAwait(false);
 			}
 			return success;
@@ -798,7 +725,7 @@ namespace net.vieapps.Components.Caching
 			{
 				Task fetchAsync(int index)
 				{
-					return Task.Run(() => fragments[index] = Memcached.Client.Get<byte[]>(key + ":" + index));
+					return Task.Run(() => fragments[index] = Memcached.Client.Get<byte[]>($"{key}:{index}"));
 				}
 				var tasks = new List<Task>();
 				for (var index = 1; index < fragments.Count; index++)
@@ -835,7 +762,7 @@ namespace net.vieapps.Components.Caching
 			{
 				async Task fetchAsync(int index)
 				{
-					fragments[index] = await Memcached.Client.GetAsync<byte[]>(key + ":" + index, cancellationToken).ConfigureAwait(false);
+					fragments[index] = await Memcached.Client.GetAsync<byte[]>($"{key}:{index}", cancellationToken).ConfigureAwait(false);
 				}
 				var tasks = new List<Task>();
 				for (var index = 1; index < fragments.Count; index++)
@@ -862,25 +789,28 @@ namespace net.vieapps.Components.Caching
 		/// <summary>
 		/// Gets the collection of all registered regions (in distributed cache)
 		/// </summary>
-		public static HashSet<string> GetRegions() => Memcached.FetchKeys(Helper.RegionsKey);
+		public static HashSet<string> GetRegions()
+			=> Memcached.FetchKeys(Helper.RegionsKey);
 
 		/// <summary>
 		/// Gets the collection of all registered regions (in distributed cache)
 		/// </summary>
-		public static Task<HashSet<string>> GetRegionsAsync(CancellationToken cancellationToken = default(CancellationToken)) => Memcached.FetchKeysAsync(Helper.RegionsKey, cancellationToken);
+		public static Task<HashSet<string>> GetRegionsAsync(CancellationToken cancellationToken = default(CancellationToken))
+			=> Memcached.FetchKeysAsync(Helper.RegionsKey, cancellationToken);
 
 		static async Task RegisterRegionAsync(string name, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			var attempt = 0;
-			while (attempt < 123 && await Memcached.Client.ExistsAsync(Helper.RegionsKey + "-Registering", cancellationToken).ConfigureAwait(false))
-			{
-				await Task.Delay(234).ConfigureAwait(false);
-				attempt++;
-			}
-			await Memcached.Client.StoreAsync(StoreMode.Set, Helper.RegionsKey + "-Registering", "v", TimeSpan.FromSeconds(13), cancellationToken).ConfigureAwait(false);
-
+			var registeringKey = $"{Helper.RegionsKey}-Registering";
 			try
 			{
+				var attempt = 0;
+				while (attempt < 123 && await Memcached.Client.GetAsync(registeringKey, cancellationToken).ConfigureAwait(false) != null)
+				{
+					await Task.Delay(123, cancellationToken).ConfigureAwait(false);
+					attempt++;
+				}
+				await Memcached.Client.StoreAsync(StoreMode.Set, registeringKey, "v", TimeSpan.FromSeconds(13), cancellationToken).ConfigureAwait(false);
+
 				var regions = await Memcached.FetchKeysAsync(Helper.RegionsKey, cancellationToken).ConfigureAwait(false);
 				if (!regions.Contains(name))
 				{
@@ -896,8 +826,10 @@ namespace net.vieapps.Components.Caching
 			{
 				Helper.WriteLogs(name, $"Error occurred while registering a region: {ex.Message}", ex);
 			}
-
-			await Memcached.Client.RemoveAsync(Helper.RegionsKey + "-Registering", cancellationToken).ConfigureAwait(false);
+			finally
+			{
+				await Memcached.Client.RemoveAsync(registeringKey, cancellationToken).ConfigureAwait(false);
+			}
 		}
 		#endregion
 

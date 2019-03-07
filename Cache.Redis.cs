@@ -145,50 +145,41 @@ namespace net.vieapps.Components.Caching
 		void _UpdateKey(string key)
 		{
 			if (this._storeKeys)
-				Redis.Client.UpdateSetMembers(this._RegionKey, this._GetKey(key));
+				Redis.Client.UpdateSetMembers(this._RegionKey, key);
 		}
 
 		Task _UpdateKeyAsync(string key, CancellationToken cancellationToken = default(CancellationToken))
 			=> this._storeKeys
-				? Redis.Client.UpdateSetMembersAsync(this._RegionKey, this._GetKey(key), cancellationToken)
+				? Redis.Client.UpdateSetMembersAsync(this._RegionKey, key, cancellationToken)
 				: Task.CompletedTask;
 
-		void _UpdateKeys<T>(IDictionary<string, T> items, string keyPrefix = null)
+		void _UpdateKeys(IEnumerable<string> keys, string keyPrefix = null)
 		{
-			if (this._storeKeys)
-				Redis.Client.UpdateSetMembers(
-					this._RegionKey,
-					items != null
-						? items.Where(kvp => kvp.Key != null).Select(kvp => this._GetKey((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + kvp.Key)).ToArray()
-						: new string[] { }
-				);
+			if (this._storeKeys && keys != null && keys.Count() > 0)
+				Redis.Client.UpdateSetMembers(this._RegionKey, keys.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => (string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + key).ToArray());
 		}
 
-		Task _UpdateKeysAsync<T>(IDictionary<string, T> items, string keyPrefix = null, CancellationToken cancellationToken = default(CancellationToken))
-			=> this._storeKeys
-				? Redis.Client.UpdateSetMembersAsync(
-					this._RegionKey,
-					items != null
-						? items.Where(kvp => kvp.Key != null).Select(kvp => this._GetKey((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + kvp.Key)).ToArray()
-						: new string[] { },
-					cancellationToken
-				)
+		Task _UpdateKeysAsync(IEnumerable<string> keys, string keyPrefix = null, CancellationToken cancellationToken = default(CancellationToken))
+			=> this._storeKeys && keys != null && keys.Count() > 0
+				? Redis.Client.UpdateSetMembersAsync(this._RegionKey, keys.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => (string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + key).ToArray(), cancellationToken)
 				: Task.CompletedTask;
 
 		void _RemoveKey(string key)
 		{
 			if (this._storeKeys)
-				Redis.Client.RemoveSetMembers(this._RegionKey, this._GetKey(key));
+				Redis.Client.RemoveSetMembers(this._RegionKey, key);
 		}
 
 		Task _RemoveKeyAsync(string key, CancellationToken cancellationToken = default(CancellationToken))
 			=> this._storeKeys
-				? Redis.Client.RemoveSetMembersAsync(this._RegionKey, this._GetKey(key), cancellationToken)
+				? Redis.Client.RemoveSetMembersAsync(this._RegionKey, key, cancellationToken)
 				: Task.CompletedTask;
 
-		HashSet<string> _GetKeys() => Redis.Client.GetSetMembers(this._RegionKey);
+		HashSet<string> _GetKeys()
+			=> Redis.Client.GetSetMembers(this._RegionKey);
 
-		Task<HashSet<string>> _GetKeysAsync(CancellationToken cancellationToken = default(CancellationToken)) => Redis.Client.GetSetMembersAsync(this._RegionKey, cancellationToken);
+		Task<HashSet<string>> _GetKeysAsync(CancellationToken cancellationToken = default(CancellationToken))
+			=> Redis.Client.GetSetMembersAsync(this._RegionKey, cancellationToken);
 		#endregion
 
 		#region Set
@@ -209,7 +200,7 @@ namespace net.vieapps.Components.Caching
 					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
 				}
 
-			if (success && this._storeKeys)
+			if (success)
 				this._UpdateKey(key);
 
 			return success;
@@ -242,7 +233,7 @@ namespace net.vieapps.Components.Caching
 					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
 				}
 
-			if (success && this._storeKeys)
+			if (success)
 				await this._UpdateKeyAsync(key, cancellationToken).ConfigureAwait(false);
 
 			return success;
@@ -258,13 +249,13 @@ namespace net.vieapps.Components.Caching
 		#region Set (Multiple)
 		void _Set<T>(IDictionary<string, T> items, string keyPrefix = null, int expirationTime = 0)
 		{
-			Redis.Client.Set(items != null
+			Redis.Client.Set(
+				items != null
 					? items.Where(kvp => kvp.Key != null).ToDictionary(kvp => this._GetKey((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + kvp.Key), kvp => kvp.Value)
 					: new Dictionary<string, T>(),
 				TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime)
 			);
-			if (this._storeKeys)
-				this._UpdateKeys(items, keyPrefix);
+			this._UpdateKeys(items?.Keys, keyPrefix);
 		}
 
 		void _Set(IDictionary<string, object> items, string keyPrefix = null, int expirationTime = 0)
@@ -272,13 +263,14 @@ namespace net.vieapps.Components.Caching
 
 		Task _SetAsync<T>(IDictionary<string, T> items, string keyPrefix = null, int expirationTime = 0, CancellationToken cancellationToken = default(CancellationToken))
 			=> Task.WhenAll(
-				Redis.Client.SetAsync(items != null
-					? items.Where(kvp => kvp.Key != null).ToDictionary(kvp => this._GetKey((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + kvp.Key), kvp => kvp.Value)
-					: new Dictionary<string, T>(),
+				Redis.Client.SetAsync(
+					items != null
+						? items.Where(kvp => kvp.Key != null).ToDictionary(kvp => this._GetKey((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + kvp.Key), kvp => kvp.Value)
+						: new Dictionary<string, T>(),
 					TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime),
 					cancellationToken
 				),
-				this._storeKeys ? this._UpdateKeysAsync(items, keyPrefix, cancellationToken) : Task.CompletedTask
+				this._UpdateKeysAsync(items?.Keys, keyPrefix, cancellationToken)
 			);
 
 		Task _SetAsync(IDictionary<string, object> items, string keyPrefix = null, int expirationTime = 0, CancellationToken cancellationToken = default(CancellationToken))
@@ -290,15 +282,19 @@ namespace net.vieapps.Components.Caching
 		{
 			var validFor = TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime);
 			var success = fragments != null && fragments.Count > 0
-				? Redis.Client.Set(this._GetKey(key), Helper.GetFirstBlock(fragments), validFor)
+				? Redis.Client.Set(this._GetKey(key), fragments.GetFirstFragment(), validFor)
 				: false;
 
-			if (success && fragments.Count > 1)
+			if (success)
 			{
-				var items = new Dictionary<string, byte[]>();
-				for (var index = 1; index < fragments.Count; index++)
-					items[this._GetKey(this._GetFragmentKey(key, index))] = fragments[index];
-				Redis.Client.Set(items, validFor);
+				this._UpdateKey(key);
+				if (fragments.Count > 1)
+				{
+					var items = new Dictionary<string, byte[]>();
+					for (var index = 1; index < fragments.Count; index++)
+						items[this._GetKey(this._GetFragmentKey(key, index))] = fragments[index];
+					Redis.Client.Set(items, validFor);
+				}
 			}
 
 			return success;
@@ -308,15 +304,20 @@ namespace net.vieapps.Components.Caching
 		{
 			var validFor = TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime);
 			var success = fragments != null && fragments.Count > 0
-				? await Redis.Client.SetAsync(this._GetKey(key), Helper.GetFirstBlock(fragments), validFor, cancellationToken).ConfigureAwait(false)
+				? await Redis.Client.SetAsync(this._GetKey(key), fragments.GetFirstFragment(), validFor, cancellationToken).ConfigureAwait(false)
 				: false;
 
-			if (success && fragments.Count > 1)
+			if (success)
 			{
-				var items = new Dictionary<string, byte[]>();
-				for (var index = 1; index < fragments.Count; index++)
-					items[this._GetKey(this._GetFragmentKey(key, index))] = fragments[index];
-				await Redis.Client.SetAsync(items, validFor, cancellationToken).ConfigureAwait(false);
+				var tasks = new List<Task> { this._UpdateKeyAsync(key, cancellationToken) };
+				if (fragments.Count > 1)
+				{
+					var items = new Dictionary<string, byte[]>();
+					for (var index = 1; index < fragments.Count; index++)
+						items[this._GetKey(this._GetFragmentKey(key, index))] = fragments[index];
+					tasks.Add(Redis.Client.SetAsync(items, validFor, cancellationToken));
+				}
+				await Task.WhenAll(tasks);
 			}
 
 			return success;
@@ -325,12 +326,12 @@ namespace net.vieapps.Components.Caching
 		bool _SetAsFragments(string key, object value, int expirationTime = 0)
 			=> string.IsNullOrWhiteSpace(key) || value == null
 				? false
-				: this._SetFragments(key, Helper.Split(Helper.Serialize(value, false)), expirationTime);
+				: this._SetFragments(key, Helper.Serialize(value).Split(), expirationTime);
 
 		Task<bool> _SetAsFragmentsAsync(string key, object value, int expirationTime = 0, CancellationToken cancellationToken = default(CancellationToken))
 			=> string.IsNullOrWhiteSpace(key) || value == null
 				? Task.FromResult(false)
-				: this._SetFragmentsAsync(key, Helper.Split(Helper.Serialize(value, false)), expirationTime, cancellationToken);
+				: this._SetFragmentsAsync(key, Helper.Serialize(value).Split(), expirationTime, cancellationToken);
 		#endregion
 
 		#region Add
@@ -351,7 +352,7 @@ namespace net.vieapps.Components.Caching
 					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
 				}
 
-			if (success && this._storeKeys)
+			if (success)
 				this._UpdateKey(key);
 
 			return success;
@@ -384,7 +385,7 @@ namespace net.vieapps.Components.Caching
 					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
 				}
 
-			if (success && this._storeKeys)
+			if (success)
 				await this._UpdateKeyAsync(key, cancellationToken).ConfigureAwait(false);
 
 			return success;
@@ -415,7 +416,7 @@ namespace net.vieapps.Components.Caching
 					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
 				}
 
-			if (success && this._storeKeys)
+			if (success)
 				this._UpdateKey(key);
 
 			return success;
@@ -448,7 +449,7 @@ namespace net.vieapps.Components.Caching
 					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
 				}
 
-			if (success && this._storeKeys)
+			if (success)
 				await this._UpdateKeyAsync(key, cancellationToken).ConfigureAwait(false);
 
 			return success;
@@ -571,7 +572,7 @@ namespace net.vieapps.Components.Caching
 				Helper.WriteLogs(this.Name, "Error occurred while fetch a collection of objects from cache storage", ex);
 			}
 
-			var objects = items?.ToDictionary(kvp => kvp.Key.Substring(this.Name.Length), kvp => kvp.Value);
+			var objects = items?.ToDictionary(kvp => kvp.Key.Substring(this.Name.Length + 1), kvp => kvp.Value);
 			return objects != null && objects.Count > 0
 				? objects
 				: null;
@@ -592,7 +593,7 @@ namespace net.vieapps.Components.Caching
 				Helper.WriteLogs(this.Name, "Error occurred while fetch a collection of objects from cache storage", ex);
 			}
 
-			var objects = items?.ToDictionary(kvp => kvp.Key.Substring(this.Name.Length), kvp => kvp.Value);
+			var objects = items?.ToDictionary(kvp => kvp.Key.Substring(this.Name.Length + 1), kvp => kvp.Value);
 			return objects != null && objects.Count > 0
 				? objects
 				: null;
@@ -617,7 +618,7 @@ namespace net.vieapps.Components.Caching
 				Helper.WriteLogs(this.Name, "Error occurred while fetch a collection of objects from cache storage", ex);
 			}
 
-			var objects = items?.ToDictionary(kvp => kvp.Key.Substring(this.Name.Length), kvp => kvp.Value);
+			var objects = items?.ToDictionary(kvp => kvp.Key.Substring(this.Name.Length + 1), kvp => kvp.Value);
 			return objects != null && objects.Count > 0
 				? objects
 				: null;
@@ -650,16 +651,17 @@ namespace net.vieapps.Components.Caching
 		#endregion
 
 		#region Get (Fragment)
-		Tuple<int, int> _GetFragments(string key) => Helper.GetFragments(this._Get(key, false) as byte[]);
+		Tuple<int, int> _GetFragments(string key)
+			=> Helper.GetFragmentsInfo(this._Get(key, false) as byte[]);
 
 		async Task<Tuple<int, int>> _GetFragmentsAsync(string key, CancellationToken cancellationToken = default(CancellationToken))
-			=> Helper.GetFragments(await this._GetAsync(key, false, cancellationToken).ConfigureAwait(false) as byte[]);
+			=> Helper.GetFragmentsInfo(await this._GetAsync(key, false, cancellationToken).ConfigureAwait(false) as byte[]);
 
 		List<byte[]> _GetAsFragments(string key, List<int> indexes)
 		{
 			var fragments = string.IsNullOrWhiteSpace(key) || indexes == null || indexes.Count < 1
 				? null
-				: Redis.Client.Get(indexes.Select(index => this._GetKey(index > 0 ? this._GetFragmentKey(key, index) : key)), false);
+				: Redis.Client.Get(indexes.Select(index => this._GetKey(this._GetFragmentKey(key, index))), false);
 			return fragments != null
 				? fragments.OrderBy(kvp => kvp.Key).Select(kvp => kvp.Value as byte[]).ToList()
 				: new List<byte[]>();
@@ -669,7 +671,7 @@ namespace net.vieapps.Components.Caching
 		{
 			var fragments = string.IsNullOrWhiteSpace(key) || indexes == null || indexes.Count < 1
 				? null
-				: await Redis.Client.GetAsync(indexes.Select(index => this._GetKey(index > 0 ? this._GetFragmentKey(key, index) : key)), false, cancellationToken).ConfigureAwait(false);
+				: await Redis.Client.GetAsync(indexes.Select(index => this._GetKey(this._GetFragmentKey(key, index))), false, cancellationToken).ConfigureAwait(false);
 			return fragments != null
 				? fragments.OrderBy(kvp => kvp.Key).Select(kvp => kvp.Value as byte[]).ToList()
 				: new List<byte[]>();
@@ -689,9 +691,8 @@ namespace net.vieapps.Components.Caching
 		{
 			try
 			{
-				var info = Helper.GetFragments(firstBlock);
-				var data = Helper.Combine(firstBlock, this._GetAsFragments(key, Enumerable.Range(1, info.Item1 - 1).ToList()));
-				return Helper.Deserialize(data, 8, data.Length - 8);
+				var info = firstBlock.GetFragmentsInfo();
+				return firstBlock.Combine(info.Item1 > 1 ? this._GetAsFragments(key, Enumerable.Range(1, info.Item1 - 1).ToList()) : new List<byte[]>()).DeserializeFromFragments();
 			}
 			catch (Exception ex)
 			{
@@ -704,9 +705,8 @@ namespace net.vieapps.Components.Caching
 		{
 			try
 			{
-				var info = Helper.GetFragments(firstBlock);
-				var data = Helper.Combine(firstBlock, await this._GetAsFragmentsAsync(key, Enumerable.Range(1, info.Item1 - 1).ToList(), cancellationToken).ConfigureAwait(false));
-				return Helper.Deserialize(data, 8, data.Length - 8);
+				var info = firstBlock.GetFragmentsInfo();
+				return firstBlock.Combine(info.Item1 > 1 ? await this._GetAsFragmentsAsync(key, Enumerable.Range(1, info.Item1 - 1).ToList(), cancellationToken).ConfigureAwait(false) : new List<byte[]>()).DeserializeFromFragments();
 			}
 			catch (OperationCanceledException)
 			{
@@ -734,7 +734,7 @@ namespace net.vieapps.Components.Caching
 					Helper.WriteLogs(this.Name, $"Error occurred while removing an object from cache storage [{key}]", ex);
 				}
 
-			if (success && this._storeKeys)
+			if (success)
 				this._RemoveKey(key);
 
 			return success;
@@ -757,7 +757,7 @@ namespace net.vieapps.Components.Caching
 					Helper.WriteLogs(this.Name, $"Error occurred while removing an object from cache storage [{key}]", ex);
 				}
 
-			if (success && this._storeKeys)
+			if (success)
 				await this._RemoveKeyAsync(key, cancellationToken).ConfigureAwait(false);
 
 			return success;
@@ -769,7 +769,7 @@ namespace net.vieapps.Components.Caching
 			=> keys?.Where(key => !string.IsNullOrWhiteSpace(key)).ToList().ForEach(key => this._Remove((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + key));
 
 		Task _RemoveAsync(IEnumerable<string> keys, string keyPrefix = null, CancellationToken cancellationToken = default(CancellationToken))
-			=> Task.WhenAll(keys?.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => this._RemoveAsync((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + key, cancellationToken)) ?? new List<Task<bool>>());
+			=> Task.WhenAll(keys?.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => this._RemoveAsync((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + key, cancellationToken)));
 		#endregion
 
 		#region Remove (Fragment)

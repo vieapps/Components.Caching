@@ -63,12 +63,15 @@ namespace net.vieapps.Components.Caching
 		#endregion
 
 		#region Split & Combine
-		internal static byte[] Combine(byte[] first, IEnumerable<byte[]> arrays)
+		internal static byte[] Combine(this byte[] bytes, IEnumerable<byte[]> arrays)
 		{
-			var combined = new byte[first.Length + arrays.Where(a => a != null).Sum(a => a.Length)];
-			var offset = first.Length;
-			Buffer.BlockCopy(first, 0, combined, 0, offset);
-			arrays.Where(a => a != null).ToList().ForEach(a =>
+			if (arrays == null || arrays.Count() < 1)
+				return bytes;
+			var data = arrays.Where(a => a != null).ToList();
+			var combined = new byte[bytes.Length + data.Sum(a => a.Length)];
+			var offset = bytes.Length;
+			Buffer.BlockCopy(bytes, 0, combined, 0, offset);
+			data.ForEach(a =>
 			{
 				Buffer.BlockCopy(a, 0, combined, offset, a.Length);
 				offset += a.Length;
@@ -76,7 +79,7 @@ namespace net.vieapps.Components.Caching
 			return combined;
 		}
 
-		internal static List<byte[]> Split(byte[] data, int size = 0)
+		internal static List<byte[]> Split(this byte[] data, int size = 0)
 		{
 			var blocks = new List<byte[]>();
 			if (data != null && data.Length > 0)
@@ -98,8 +101,8 @@ namespace net.vieapps.Components.Caching
 		}
 		#endregion
 
-		#region Fragments
-		internal static Tuple<int, int> GetFlags(byte[] data, bool getLength = false)
+		#region Serialize & Deserialize
+		internal static Tuple<int, int> GetFlags(this byte[] data, bool getLength = false)
 		{
 			if (data == null || data.Length < 4)
 				return null;
@@ -118,28 +121,6 @@ namespace net.vieapps.Components.Caching
 			return new Tuple<int, int>(typeFlag, length);
 		}
 
-		internal static byte[] GetFirstBlock(List<byte[]> fragments)
-			=> CacheUtils.Helper.Combine(BitConverter.GetBytes(Helper.FlagOfFirstFragmentBlock), BitConverter.GetBytes(fragments.Sum(f => f.Length)), fragments[0]);
-
-		internal static Tuple<int, int> GetFragments(byte[] data)
-		{
-			var info = Helper.GetFlags(data, true);
-			if (info == null)
-				return null;
-
-			var blocks = 0;
-			var offset = 0;
-			var length = info.Item2;
-			while (offset < length)
-			{
-				blocks++;
-				offset += Helper.FragmentSize;
-			}
-			return new Tuple<int, int>(blocks, length);
-		}
-		#endregion
-
-		#region Serialize & Deserialize
 		/// <summary>
 		/// Serializes an object into array of bytes
 		/// </summary>
@@ -183,21 +164,10 @@ namespace net.vieapps.Components.Caching
 				: data;
 		}
 
-		internal static object Deserialize(byte[] data, int start, int count) => CacheUtils.Helper.Deserialize(data, (int)TypeCode.Object | 0x0100, start, count);
-
-		/// <summary>
-		/// Deserializes an object from the array of bytes
-		/// </summary>
-		/// <param name="data"></param>
-		/// <returns></returns>
-		public static object Deserialize(byte[] data)
+		internal static object Deserialize(byte[] data, int typeFlag, int start, int count)
 		{
-			if (data == null || data.Length < 4)
-				return null;
-
-			var typeFlag = Helper.GetFlags(data).Item1;
 			if (typeFlag.Equals(Helper.FlagOfJsonObject) || typeFlag.Equals(Helper.FlagOfJsonArray) || typeFlag.Equals(Helper.FlagOfExpandoObject))
-				using (var stream = CacheUtils.Helper.CreateMemoryStream(data, 4, data.Length - 4))
+				using (var stream = CacheUtils.Helper.CreateMemoryStream(data, start, count))
 				{
 					using (var reader = new BsonDataReader(stream))
 					{
@@ -209,13 +179,54 @@ namespace net.vieapps.Components.Caching
 					}
 				}
 			else
-				return CacheUtils.Helper.Deserialize(data, typeFlag, 4, data.Length - 4);
+				return CacheUtils.Helper.Deserialize(data, typeFlag, start, count);
 		}
+
+		internal static object Deserialize(byte[] data, int start, int count)
+			=> Helper.Deserialize(data, (int)TypeCode.Object | 0x0100, start, count);
+
+		/// <summary>
+		/// Deserializes an object from the array of bytes
+		/// </summary>
+		/// <param name="data"></param>
+		/// <returns></returns>
+		public static object Deserialize(byte[] data)
+			=> data == null || data.Length < 4
+				? null
+				: Helper.Deserialize(data, data.GetFlags().Item1, 4, data.Length - 4);
 
 		public static T Deserialize<T>(byte[] data)
 		{
 			var value = data != null ? Helper.Deserialize(data) : null;
 			return value != null && value is T ? (T)value : default(T);
+		}
+
+		internal static object DeserializeFromFragments(this byte[] data)
+		{
+			var tmp = new byte[4];
+			Buffer.BlockCopy(data, 8, tmp, 0, 4);
+			var typeFlag = BitConverter.ToInt32(tmp, 0);
+			return Helper.Deserialize(data, typeFlag, 12, data.Length - 12);
+		}
+
+		internal static byte[] GetFirstFragment(this List<byte[]> fragments)
+			=> CacheUtils.Helper.Combine(BitConverter.GetBytes(Helper.FlagOfFirstFragmentBlock), BitConverter.GetBytes(fragments.Where(f => f != null).Sum(f => f.Length)), fragments[0]);
+
+		internal static Tuple<int, int> GetFragmentsInfo(this byte[] data)
+		{
+			var info = data.GetFlags(true);
+			if (info == null)
+				return null;
+
+			var blocks = 0;
+			var offset = 0;
+			var length = info.Item2;
+			while (offset < length)
+			{
+				blocks++;
+				offset += Helper.FragmentSize;
+			}
+			return new Tuple<int, int>(blocks, length);
 		}
 		#endregion
 
