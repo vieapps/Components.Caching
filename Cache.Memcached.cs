@@ -29,7 +29,8 @@ namespace net.vieapps.Components.Caching
 		/// <param name="name">The string that presents name of isolated region of the cache</param>
 		/// <param name="expirationTime">The number that presents times (in minutes) for caching an item</param>
 		/// <param name="storeKeys">true to active store keys of the region (to clear or using with other purposes)</param>
-		public Memcached(string name, int expirationTime, bool storeKeys)
+		/// <param name="loggerFactory">The logger factory for working with logs</param>
+		public Memcached(string name, int expirationTime, bool storeKeys, ILoggerFactory loggerFactory = null)
 		{
 			// region name
 			this.Name = Helper.GetRegionName(name);
@@ -41,7 +42,9 @@ namespace net.vieapps.Components.Caching
 			this._storeKeys = storeKeys;
 
 			// register the region
-			Task.Run(() => Memcached.RegisterRegionAsync(this.Name)).ConfigureAwait(false);
+			Task.Run(() => Memcached.GetClient(loggerFactory))
+				.ContinueWith(async task => await Memcached.RegisterRegionAsync(this.Name).ConfigureAwait(false), TaskContinuationOptions.OnlyOnRanToCompletion)
+				.ConfigureAwait(false);
 		}
 
 		public void Dispose() => this._lock.Dispose();
@@ -133,25 +136,30 @@ namespace net.vieapps.Components.Caching
 		#endregion
 
 		#region Keys
+		void _NextRound()
+			=> Task.Run(async () =>
+			{
+				await Task.Delay(1234).ConfigureAwait(false);
+				this._PushKeys();
+			}).ConfigureAwait(false);
+
 		async Task _PushKeysAsync(CancellationToken cancellationToken = default(CancellationToken))
 		{
-			// check state
-			if (!this._storeKeys || this._isUpdatingKeys)
+			if (!this._storeKeys)
 				return;
+			else if (this._isUpdatingKeys || (this._addedKeys.Count < 1 && this._removedKeys.Count < 1))
+			{
+				this._NextRound();
+				return;
+			}
 
-			// process
 			this._isUpdatingKeys = true;
-			var flag = $"{this._RegionKey}-Updating";
 			try
 			{
 				await this._lock.WaitAsync(cancellationToken).ConfigureAwait(false);
 				if (this._addedKeys.Count > 0 || this._removedKeys.Count > 0)
-				{
-					while (await Memcached.Client.GetAsync(flag, cancellationToken).ConfigureAwait(false) != null)
-						await Task.Delay(123, cancellationToken).ConfigureAwait(false);
-					if (this._addedKeys.Count > 0 || this._removedKeys.Count > 0)
+					try
 					{
-						await Memcached.Client.StoreAsync(StoreMode.Set, flag, "v", cancellationToken).ConfigureAwait(false);
 						var removedKeys = new List<string>();
 						var addedKeys = new List<string>();
 
@@ -162,7 +170,10 @@ namespace net.vieapps.Components.Caching
 							if (this._addedKeys.TryDequeue(out string key))
 								addedKeys.Add(key);
 
-						await Task.Delay(123, cancellationToken).ConfigureAwait(false);
+						var flag = $"{this._RegionKey}-Updating";
+						while (await Memcached.Client.GetAsync(flag, cancellationToken).ConfigureAwait(false) != null)
+							await Task.Delay(123, cancellationToken).ConfigureAwait(false);
+						await Memcached.Client.StoreAsync(StoreMode.Set, flag, "v", cancellationToken).ConfigureAwait(false);
 
 						while (this._removedKeys.Count > 0)
 							if (this._removedKeys.TryDequeue(out string key))
@@ -172,9 +183,17 @@ namespace net.vieapps.Components.Caching
 								addedKeys.Add(key);
 
 						var syncKeys = await Memcached.FetchKeysAsync(this._RegionKey, cancellationToken).ConfigureAwait(false);
-						await Memcached.SetKeysAsync(this._RegionKey, new HashSet<string>(syncKeys.Except(removedKeys).Union(addedKeys)), cancellationToken).ConfigureAwait(false);
+						syncKeys = new HashSet<string>(syncKeys.Except(removedKeys).Union(addedKeys).Distinct());
+						await Memcached.SetKeysAsync(this._RegionKey, syncKeys, cancellationToken).ConfigureAwait(false);
 					}
-				}
+					catch (Exception)
+					{
+						throw;
+					}
+					finally
+					{
+						var remove = Task.Run(() => Memcached.Client.RemoveAsync($"{this._RegionKey}-Updating")).ConfigureAwait(false);
+					}
 			}
 			catch (OperationCanceledException)
 			{
@@ -188,8 +207,9 @@ namespace net.vieapps.Components.Caching
 			{
 				this._isUpdatingKeys = false;
 				this._lock.Release();
-				var removeTask = Task.Run(() => Memcached.Client.RemoveAsync(flag)).ConfigureAwait(false);
 			}
+
+			this._NextRound();
 		}
 
 		void _PushKeys()

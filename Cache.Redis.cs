@@ -33,7 +33,8 @@ namespace net.vieapps.Components.Caching
 		/// <param name="name">The string that presents name of isolated region of the cache</param>
 		/// <param name="expirationTime">The number that presents times (in minutes) for caching an item</param>
 		/// <param name="storeKeys">true to active store keys of the region (to clear or using with other purposes)</param>
-		public Redis(string name, int expirationTime, bool storeKeys)
+		/// <param name="loggerFactory">The logger factory for working with logs</param>
+		public Redis(string name, int expirationTime, bool storeKeys, ILoggerFactory loggerFactory = null)
 		{
 			// region name
 			this.Name = Helper.GetRegionName(name);
@@ -45,7 +46,9 @@ namespace net.vieapps.Components.Caching
 			this._storeKeys = storeKeys;
 
 			// register the region
-			Task.Run(() => Redis.RegisterRegionAsync(this.Name)).ConfigureAwait(false);
+			Task.Run(() => Redis.GetClient(loggerFactory))
+				.ContinueWith(async task => await Redis.RegisterRegionAsync(this.Name).ConfigureAwait(false), TaskContinuationOptions.OnlyOnRanToCompletion)
+				.ConfigureAwait(false);
 		}
 
 		#region Get client (singleton)

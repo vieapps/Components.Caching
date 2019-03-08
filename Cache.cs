@@ -63,8 +63,8 @@ namespace net.vieapps.Components.Caching
 		public Cache(string name, int expirationTime, bool storeKeys, string provider, ILoggerFactory loggerFactory = null)
 		{
 			this._cache = !string.IsNullOrWhiteSpace(provider) && provider.Trim().ToLower().Equals("memcached")
-				? new Memcached(name, expirationTime, storeKeys) as ICache
-				: new Redis(name, expirationTime, storeKeys) as ICache;
+				? new Memcached(name, expirationTime, storeKeys, loggerFactory) as ICache
+				: new Redis(name, expirationTime, storeKeys, loggerFactory) as ICache;
 
 			Helper.Logger = (loggerFactory ?? Enyim.Caching.Logger.GetLoggerFactory()).CreateLogger<Cache>();
 			if (Helper.Logger.IsEnabled(LogLevel.Debug))
@@ -143,6 +143,13 @@ namespace net.vieapps.Components.Caching
 			}
 			return Cache._Instance;
 		}
+
+		/// <summary>
+		/// Assigns a logger factory
+		/// </summary>
+		/// <param name="loggerFactory"></param>
+		public static void AssignLoggerFactory(ILoggerFactory loggerFactory)
+			=> Enyim.Caching.Logger.AssignLoggerFactory(loggerFactory);
 		#endregion
 
 		#region Properties

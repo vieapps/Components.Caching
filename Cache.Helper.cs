@@ -309,8 +309,8 @@ namespace net.vieapps.Components.Caching
 				.ToList()
 				.ForEach(s => configuration.Servers.Add((s.Address.IndexOf(".") > 0 && s.Address.IndexOf(":") > 0) || (s.Address.IndexOf(":") > 0 && s.Address.IndexOf("]:") > 0) ? ConfigurationHelper.ResolveToEndPoint(s.Address) : ConfigurationHelper.ResolveToEndPoint(s.Address, s.Port)));
 
-			configuration.SocketPool.MinPoolSize = cacheConfiguration.SocketPool.MinPoolSize;
 			configuration.SocketPool.MaxPoolSize = cacheConfiguration.SocketPool.MaxPoolSize;
+			configuration.SocketPool.MinPoolSize = cacheConfiguration.SocketPool.MinPoolSize;
 			configuration.SocketPool.ConnectionTimeout = cacheConfiguration.SocketPool.ConnectionTimeout;
 			configuration.SocketPool.ReceiveTimeout = cacheConfiguration.SocketPool.ReceiveTimeout;
 			configuration.SocketPool.QueueTimeout = cacheConfiguration.SocketPool.QueueTimeout;
