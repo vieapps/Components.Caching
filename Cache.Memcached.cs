@@ -43,7 +43,7 @@ namespace net.vieapps.Components.Caching
 
 			// register the region
 			Task.Run(() => Memcached.GetClient(loggerFactory))
-				.ContinueWith(async task => await Memcached.RegisterRegionAsync(this.Name).ConfigureAwait(false), TaskContinuationOptions.OnlyOnRanToCompletion)
+				.ContinueWith(async _ => await Memcached.RegisterRegionAsync(this.Name).ConfigureAwait(false), TaskContinuationOptions.OnlyOnRanToCompletion)
 				.ConfigureAwait(false);
 		}
 
@@ -136,22 +136,10 @@ namespace net.vieapps.Components.Caching
 		#endregion
 
 		#region Keys
-		void _NextRound()
-			=> Task.Run(async () =>
-			{
-				await Task.Delay(1234).ConfigureAwait(false);
-				this._PushKeys();
-			}).ConfigureAwait(false);
-
 		async Task _PushKeysAsync(CancellationToken cancellationToken = default(CancellationToken))
 		{
-			if (!this._storeKeys)
+			if (!this._storeKeys || this._isUpdatingKeys || (this._addedKeys.Count < 1 && this._removedKeys.Count < 1))
 				return;
-			else if (this._isUpdatingKeys || (this._addedKeys.Count < 1 && this._removedKeys.Count < 1))
-			{
-				this._NextRound();
-				return;
-			}
 
 			this._isUpdatingKeys = true;
 			try
@@ -192,7 +180,15 @@ namespace net.vieapps.Components.Caching
 					}
 					finally
 					{
-						var remove = Task.Run(() => Memcached.Client.RemoveAsync($"{this._RegionKey}-Updating")).ConfigureAwait(false);
+						var next = Task.Run(async () =>
+						{
+							await Memcached.Client.RemoveAsync($"{this._RegionKey}-Updating").ConfigureAwait(false);
+							if (this._addedKeys.Count > 0 || this._removedKeys.Count > 0)
+							{
+								await Task.Delay(1234).ConfigureAwait(false);
+								this._PushKeys();
+							}
+						}).ConfigureAwait(false);
 					}
 			}
 			catch (OperationCanceledException)
@@ -208,8 +204,6 @@ namespace net.vieapps.Components.Caching
 				this._isUpdatingKeys = false;
 				this._lock.Release();
 			}
-
-			this._NextRound();
 		}
 
 		void _PushKeys()
@@ -674,13 +668,15 @@ namespace net.vieapps.Components.Caching
 		#region Remove (Multiple)
 		void _Remove(IEnumerable<string> keys, string keyPrefix = null)
 		{
-			keys?.Where(key => !string.IsNullOrWhiteSpace(key)).ToList().ForEach(key => this._Remove((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + key, false));
+			(keys ?? new List<string>()).Where(key => !string.IsNullOrWhiteSpace(key))
+				.ToList()
+				.ForEach(key => this._Remove((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + key, false));
 			this._PushKeys();
 		}
 
 		async Task _RemoveAsync(IEnumerable<string> keys, string keyPrefix = null, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			await Task.WhenAll(keys?.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => this._RemoveAsync((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + key, false, cancellationToken))).ConfigureAwait(false);
+			await Task.WhenAll((keys ?? new List<string>()).Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => this._RemoveAsync((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + key, false, cancellationToken))).ConfigureAwait(false);
 			this._PushKeys();
 		}
 		#endregion

@@ -47,7 +47,7 @@ namespace net.vieapps.Components.Caching
 
 			// register the region
 			Task.Run(() => Redis.GetClient(loggerFactory))
-				.ContinueWith(async task => await Redis.RegisterRegionAsync(this.Name).ConfigureAwait(false), TaskContinuationOptions.OnlyOnRanToCompletion)
+				.ContinueWith(async _ => await Redis.RegisterRegionAsync(this.Name).ConfigureAwait(false), TaskContinuationOptions.OnlyOnRanToCompletion)
 				.ConfigureAwait(false);
 		}
 

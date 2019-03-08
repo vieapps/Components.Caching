@@ -63,6 +63,12 @@ namespace net.vieapps.Components.Caching
 		#endregion
 
 		#region Split & Combine
+		/// <summary>
+		/// Combines the collection of array of bytes
+		/// </summary>
+		/// <param name="bytes"></param>
+		/// <param name="arrays"></param>
+		/// <returns></returns>
 		public static byte[] Combine(this byte[] bytes, IEnumerable<byte[]> arrays)
 		{
 			if (arrays == null || arrays.Count() < 1)
@@ -79,6 +85,12 @@ namespace net.vieapps.Components.Caching
 			return combined;
 		}
 
+		/// <summary>
+		/// Splits to the collection of array of bytes
+		/// </summary>
+		/// <param name="data"></param>
+		/// <param name="size"></param>
+		/// <returns></returns>
 		public static List<byte[]> Split(this byte[] data, int size = 0)
 		{
 			var blocks = new List<byte[]>();
@@ -102,6 +114,12 @@ namespace net.vieapps.Components.Caching
 		#endregion
 
 		#region Serialize & Deserialize
+		/// <summary>
+		/// Gets the flags
+		/// </summary>
+		/// <param name="data"></param>
+		/// <param name="getLength"></param>
+		/// <returns></returns>
 		public static Tuple<int, int> GetFlags(this byte[] data, bool getLength = false)
 		{
 			if (data == null || data.Length < 4)
@@ -164,7 +182,15 @@ namespace net.vieapps.Components.Caching
 				: data;
 		}
 
-		internal static object Deserialize(byte[] data, int typeFlag, int start, int count)
+		/// <summary>
+		/// Deserializes an object from the array of bytes
+		/// </summary>
+		/// <param name="data"></param>
+		/// <param name="typeFlag"></param>
+		/// <param name="start"></param>
+		/// <param name="count"></param>
+		/// <returns></returns>
+		public static object Deserialize(byte[] data, int typeFlag, int start, int count)
 		{
 			if (typeFlag.Equals(Helper.FlagOfJsonObject) || typeFlag.Equals(Helper.FlagOfJsonArray) || typeFlag.Equals(Helper.FlagOfExpandoObject))
 				using (var stream = CacheUtils.Helper.CreateMemoryStream(data, start, count))
@@ -182,7 +208,14 @@ namespace net.vieapps.Components.Caching
 				return CacheUtils.Helper.Deserialize(data, typeFlag, start, count);
 		}
 
-		internal static object Deserialize(byte[] data, int start, int count)
+		/// <summary>
+		/// Deserializes an object from the array of bytes
+		/// </summary>
+		/// <param name="data"></param>
+		/// <param name="start"></param>
+		/// <param name="count"></param>
+		/// <returns></returns>
+		public static object Deserialize(byte[] data, int start, int count)
 			=> Helper.Deserialize(data, (int)TypeCode.Object | 0x0100, start, count);
 
 		/// <summary>
@@ -195,13 +228,19 @@ namespace net.vieapps.Components.Caching
 				? null
 				: Helper.Deserialize(data, data.GetFlags().Item1, 4, data.Length - 4);
 
+		/// <summary>
+		/// Deserializes an object from the array of bytes
+		/// </summary>
+		/// <typeparam name="T"></typeparam>
+		/// <param name="data"></param>
+		/// <returns></returns>
 		public static T Deserialize<T>(byte[] data)
 		{
 			var value = data != null ? Helper.Deserialize(data) : null;
 			return value != null && value is T ? (T)value : default(T);
 		}
 
-		public static object DeserializeFromFragments(this byte[] data)
+		internal static object DeserializeFromFragments(this byte[] data)
 		{
 			var tmp = new byte[4];
 			Buffer.BlockCopy(data, 8, tmp, 0, 4);
@@ -209,9 +248,19 @@ namespace net.vieapps.Components.Caching
 			return Helper.Deserialize(data, typeFlag, 12, data.Length - 12);
 		}
 
+		/// <summary>
+		/// Gets the first fragment with attached information
+		/// </summary>
+		/// <param name="fragments"></param>
+		/// <returns></returns>
 		public static byte[] GetFirstFragment(this List<byte[]> fragments)
 			=> CacheUtils.Helper.Combine(BitConverter.GetBytes(Helper.FlagOfFirstFragmentBlock), BitConverter.GetBytes(fragments.Where(f => f != null).Sum(f => f.Length)), fragments[0]);
 
+		/// <summary>
+		/// Gets information of fragments
+		/// </summary>
+		/// <param name="data"></param>
+		/// <returns></returns>
 		public static Tuple<int, int> GetFragmentsInfo(this byte[] data)
 		{
 			var info = data.GetFlags(true);
