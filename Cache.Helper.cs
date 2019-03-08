@@ -38,16 +38,16 @@ namespace net.vieapps.Components.Caching
 		public const int FlagOfJsonArray = 0xfc52;
 		public const int FlagOfExpandoObject = 0xfd52;
 		public const int FlagOfFirstFragmentBlock = 0xfe52;
-		internal static readonly int FragmentSize = (1024 * 1024) - 128;
+		public static readonly int FragmentSize = (1024 * 1024) - 128;
 		internal static readonly string RegionsKey = "VIEApps-NGX-Regions";
 
 		public static int ExpirationTime => Cache.Configuration != null && Cache.Configuration.ExpirationTime > 0 ? Cache.Configuration.ExpirationTime : 30;
 
-		internal static string GetRegionName(string name)=> Regex.Replace(!string.IsNullOrWhiteSpace(name) ? name : Cache.Configuration?.RegionName ?? "VIEApps-NGX-Cache", "[^0-9a-zA-Z:-]+", "");
+		public static string GetRegionName(string name)=> Regex.Replace(!string.IsNullOrWhiteSpace(name) ? name : Cache.Configuration?.RegionName ?? "VIEApps-NGX-Cache", "[^0-9a-zA-Z:-]+", "");
 
-		internal static string GetCacheKey(string region, string key) => region + "@" + key.Replace(" ", "-");
+		public static string GetCacheKey(string region, string key) => region + "@" + key.Replace(" ", "-");
 
-		internal static string GetFragmentKey(string key, int index)
+		public static string GetFragmentKey(string key, int index)
 		{
 			var fragmentKey = "0" + index.ToString();
 			return key.Replace(" ", "-") + "$[Fragment<" + fragmentKey.Substring(fragmentKey.Length - 2) + ">]";
@@ -63,7 +63,7 @@ namespace net.vieapps.Components.Caching
 		#endregion
 
 		#region Split & Combine
-		internal static byte[] Combine(this byte[] bytes, IEnumerable<byte[]> arrays)
+		public static byte[] Combine(this byte[] bytes, IEnumerable<byte[]> arrays)
 		{
 			if (arrays == null || arrays.Count() < 1)
 				return bytes;
@@ -79,7 +79,7 @@ namespace net.vieapps.Components.Caching
 			return combined;
 		}
 
-		internal static List<byte[]> Split(this byte[] data, int size = 0)
+		public static List<byte[]> Split(this byte[] data, int size = 0)
 		{
 			var blocks = new List<byte[]>();
 			if (data != null && data.Length > 0)
@@ -102,7 +102,7 @@ namespace net.vieapps.Components.Caching
 		#endregion
 
 		#region Serialize & Deserialize
-		internal static Tuple<int, int> GetFlags(this byte[] data, bool getLength = false)
+		public static Tuple<int, int> GetFlags(this byte[] data, bool getLength = false)
 		{
 			if (data == null || data.Length < 4)
 				return null;
@@ -201,7 +201,7 @@ namespace net.vieapps.Components.Caching
 			return value != null && value is T ? (T)value : default(T);
 		}
 
-		internal static object DeserializeFromFragments(this byte[] data)
+		public static object DeserializeFromFragments(this byte[] data)
 		{
 			var tmp = new byte[4];
 			Buffer.BlockCopy(data, 8, tmp, 0, 4);
@@ -209,10 +209,10 @@ namespace net.vieapps.Components.Caching
 			return Helper.Deserialize(data, typeFlag, 12, data.Length - 12);
 		}
 
-		internal static byte[] GetFirstFragment(this List<byte[]> fragments)
+		public static byte[] GetFirstFragment(this List<byte[]> fragments)
 			=> CacheUtils.Helper.Combine(BitConverter.GetBytes(Helper.FlagOfFirstFragmentBlock), BitConverter.GetBytes(fragments.Where(f => f != null).Sum(f => f.Length)), fragments[0]);
 
-		internal static Tuple<int, int> GetFragmentsInfo(this byte[] data)
+		public static Tuple<int, int> GetFragmentsInfo(this byte[] data)
 		{
 			var info = data.GetFlags(true);
 			if (info == null)

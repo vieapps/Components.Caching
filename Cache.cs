@@ -33,7 +33,8 @@ namespace net.vieapps.Components.Caching
 		/// <param name="expirationTime">Time for caching an item (in minutes)</param>
 		/// <param name="storeKeys">true to active store all keys of the region (to clear or use with other purposes further)</param>
 		/// <param name="loggerFactory">The logger factory for working with logs</param>
-		public Cache(string name = null, int expirationTime = 0, bool storeKeys = false, ILoggerFactory loggerFactory = null) : this(name, expirationTime, storeKeys, null, loggerFactory) { }
+		public Cache(string name = null, int expirationTime = 0, bool storeKeys = false, ILoggerFactory loggerFactory = null)
+			: this(name, expirationTime, storeKeys, null, loggerFactory) { }
 
 		/// <summary>
 		/// Create a new instance of distributed cache with isolated region
@@ -41,7 +42,8 @@ namespace net.vieapps.Components.Caching
 		/// <param name="name">The string that presents name of isolated region</param>
 		/// <param name="provider">The string that presents the caching provider ('Redis' or 'Memcached') - the default provider is 'Redis'</param>
 		/// <param name="loggerFactory">The logger factory for working with logs</param>
-		public Cache(string name, string provider, ILoggerFactory loggerFactory = null) : this(name, 0, false, provider, loggerFactory) { }
+		public Cache(string name, string provider, ILoggerFactory loggerFactory = null)
+			: this(name, 0, false, provider, loggerFactory) { }
 
 		/// <summary>
 		/// Create a new instance of distributed cache with isolated region
@@ -50,7 +52,8 @@ namespace net.vieapps.Components.Caching
 		/// <param name="expirationTime">Time for caching an item (in minutes)</param>
 		/// <param name="provider">The string that presents the caching provider ('Redis' or 'Memcached') - the default provider is 'Redis'</param>
 		/// <param name="loggerFactory">The logger factory for working with logs</param>
-		public Cache(string name, int expirationTime, string provider, ILoggerFactory loggerFactory = null) : this(name, expirationTime, false, provider, loggerFactory) { }
+		public Cache(string name, int expirationTime, string provider, ILoggerFactory loggerFactory = null)
+			: this(name, expirationTime, false, provider, loggerFactory) { }
 
 		/// <summary>
 		/// Create a new instance of distributed cache with isolated region
