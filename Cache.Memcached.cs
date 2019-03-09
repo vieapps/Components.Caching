@@ -159,7 +159,7 @@ namespace net.vieapps.Components.Caching
 								addedKeys.Add(key);
 
 						var flag = $"{this._RegionKey}-Updating";
-						while (await Memcached.Client.GetAsync(flag, cancellationToken).ConfigureAwait(false) != null)
+						while (await Memcached.Client.GetAsync(flag, cancellationToken).ConfigureAwait(false) != null || await Memcached.Client.GetAsync($"{this._RegionKey}-Cleaning", cancellationToken).ConfigureAwait(false) != null)
 							await Task.Delay(123, cancellationToken).ConfigureAwait(false);
 						await Memcached.Client.StoreAsync(StoreMode.Set, flag, "v", cancellationToken).ConfigureAwait(false);
 
@@ -687,13 +687,27 @@ namespace net.vieapps.Components.Caching
 
 		async Task _ClearAsync(CancellationToken cancellationToken = default(CancellationToken))
 		{
-			var keys = await this._GetKeysAsync(cancellationToken).ConfigureAwait(false);
-			await Task.WhenAll(
-				this._RemoveAsync(keys, null, cancellationToken),
-				Memcached.Client.RemoveAsync(this._RegionKey, cancellationToken),
-				Memcached.Client.RemoveAsync(this._RegionKey + "-Updating", cancellationToken),
-				this._storeKeys ? Task.Run(() => this._ClearKeys()) : Task.CompletedTask
-			).ConfigureAwait(false);
+			var flag = $"{this._RegionKey}-Cleaning";
+			try
+			{
+				await this._lock.WaitAsync(cancellationToken).ConfigureAwait(false);
+				await Memcached.Client.StoreAsync(StoreMode.Set, flag, "v", cancellationToken).ConfigureAwait(false);
+				var keys = await this._GetKeysAsync(cancellationToken).ConfigureAwait(false);
+				await Task.WhenAll(keys.Select(key => Memcached.Client.RemoveAsync(this._GetKey(key), cancellationToken))).ConfigureAwait(false);
+				await Task.WhenAll(
+					Memcached.Client.RemoveAsync(this._RegionKey, cancellationToken),
+					this._storeKeys ? Task.Run(() => this._ClearKeys()) : Task.CompletedTask
+				).ConfigureAwait(false);
+			}
+			catch (Exception ex)
+			{
+				Helper.WriteLogs(this.Name, $"Error occurred while cleaning => {ex.Message}", ex);
+			}
+			finally
+			{
+				this._lock.Release();
+				await Memcached.Client.RemoveAsync(flag, cancellationToken).ConfigureAwait(false);
+			}
 		}
 		#endregion
 
@@ -716,7 +730,7 @@ namespace net.vieapps.Components.Caching
 		#region [Static]
 		internal static async Task<bool> SetKeysAsync(string key, HashSet<string> keys, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			var fragments = Helper.Split(Helper.Serialize(keys, false));
+			var fragments = Helper.Serialize(keys, false).Split();
 			var success = await Memcached.Client.StoreAsync(StoreMode.Set, key, new ArraySegment<byte>(CacheUtils.Helper.Combine(BitConverter.GetBytes(fragments.Count), fragments[0])), cancellationToken).ConfigureAwait(false);
 			if (success && fragments.Count > 1)
 			{
@@ -752,12 +766,10 @@ namespace net.vieapps.Components.Caching
 			tmp = new byte[data.Length - 4];
 			Buffer.BlockCopy(data, 4, tmp, 0, data.Length - 4);
 			fragments[0] = tmp;
-			data = Helper.Combine(new byte[0], fragments);
+			data = new byte[0].Combine(fragments);
 			try
 			{
-				return data.Length > 0
-					? Helper.Deserialize(data, 0, data.Length) as HashSet<string>
-					: new HashSet<string>();
+				return Helper.Deserialize(data, 0, data.Length) as HashSet<string>;
 			}
 			catch
 			{
@@ -789,12 +801,10 @@ namespace net.vieapps.Components.Caching
 			tmp = new byte[data.Length - 4];
 			Buffer.BlockCopy(data, 4, tmp, 0, data.Length - 4);
 			fragments[0] = tmp;
-			data = Helper.Combine(new byte[0], fragments);
+			data = new byte[0].Combine(fragments);
 			try
 			{
-				return data.Length > 0
-					? Helper.Deserialize(data, 0, data.Length) as HashSet<string>
-					: new HashSet<string>();
+				return Helper.Deserialize(data, 0, data.Length) as HashSet<string>;
 			}
 			catch
 			{
@@ -816,16 +826,16 @@ namespace net.vieapps.Components.Caching
 
 		static async Task RegisterRegionAsync(string name, CancellationToken cancellationToken = default(CancellationToken))
 		{
-			var registeringKey = $"{Helper.RegionsKey}-Registering";
+			var flag = $"{Helper.RegionsKey}-Registering";
 			try
 			{
 				var attempt = 0;
-				while (attempt < 123 && await Memcached.Client.GetAsync(registeringKey, cancellationToken).ConfigureAwait(false) != null)
+				while (attempt < 123 && await Memcached.Client.GetAsync(flag, cancellationToken).ConfigureAwait(false) != null)
 				{
 					await Task.Delay(123, cancellationToken).ConfigureAwait(false);
 					attempt++;
 				}
-				await Memcached.Client.StoreAsync(StoreMode.Set, registeringKey, "v", TimeSpan.FromSeconds(13), cancellationToken).ConfigureAwait(false);
+				await Memcached.Client.StoreAsync(StoreMode.Set, flag, "v", cancellationToken).ConfigureAwait(false);
 
 				var regions = await Memcached.FetchKeysAsync(Helper.RegionsKey, cancellationToken).ConfigureAwait(false);
 				if (!regions.Contains(name))
@@ -840,11 +850,11 @@ namespace net.vieapps.Components.Caching
 			}
 			catch (Exception ex)
 			{
-				Helper.WriteLogs(name, $"Error occurred while registering a region: {ex.Message}", ex);
+				Helper.WriteLogs(name, $"Error occurred while registering the region => {ex.Message}", ex);
 			}
 			finally
 			{
-				await Memcached.Client.RemoveAsync(registeringKey, cancellationToken).ConfigureAwait(false);
+				await Memcached.Client.RemoveAsync(flag, cancellationToken).ConfigureAwait(false);
 			}
 		}
 		#endregion
