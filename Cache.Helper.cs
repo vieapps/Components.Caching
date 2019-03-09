@@ -313,13 +313,14 @@ namespace net.vieapps.Components.Caching
 			var configuration = new RedisClientConfiguration();
 			if (configSection.Section.SelectNodes("servers/add") is XmlNodeList servers)
 				foreach (XmlNode server in servers)
-				{
-					var address = server.Attributes["address"]?.Value ?? "localhost";
-					var endpoint = (address.IndexOf(".") > 0 && address.IndexOf(":") > 0) || (address.IndexOf(":") > 0 && address.IndexOf("]:") > 0)
-						? ConfigurationHelper.ResolveToEndPoint(address)
-						: ConfigurationHelper.ResolveToEndPoint(address, Int32.TryParse(server.Attributes["port"]?.Value ?? "6379", out int port) ? port : 6379);
-					configuration.Servers.Add(endpoint as IPEndPoint);
-				}
+					if ("redis".Equals((server.Attributes["type"]?.Value ?? "Redis").Trim().ToLower()))
+					{
+						var address = server.Attributes["address"]?.Value ?? "localhost";
+						var endpoint = (address.IndexOf(".") > 0 && address.IndexOf(":") > 0) || (address.IndexOf(":") > 0 && address.IndexOf("]:") > 0)
+							? ConfigurationHelper.ResolveToEndPoint(address)
+							: ConfigurationHelper.ResolveToEndPoint(address, Int32.TryParse(server.Attributes["port"]?.Value ?? "6379", out int port) ? port : 6379);
+						configuration.Servers.Add(endpoint as IPEndPoint);
+					}
 
 			if (configSection.Section.SelectSingleNode("options") is XmlNode options)
 				foreach (XmlAttribute option in options.Attributes)
@@ -340,6 +341,15 @@ namespace net.vieapps.Components.Caching
 				Servers = cacheConfiguration.Servers.Where(s => s.Type.ToLower().Equals("redis")).Select(s => (s.Address.IndexOf(".") > 0 && s.Address.IndexOf(":") > 0) || (s.Address.IndexOf(":") > 0 && s.Address.IndexOf("]:") > 0) ? ConfigurationHelper.ResolveToEndPoint(s.Address) as IPEndPoint : ConfigurationHelper.ResolveToEndPoint(s.Address, s.Port) as IPEndPoint).ToList(),
 				Options = cacheConfiguration.Options
 			};
+
+		/// <summary>
+		/// Gets the configuration for working with Memcached
+		/// </summary>
+		/// <param name="configSection"></param>
+		/// <param name="loggerFactory"></param>
+		/// <returns></returns>
+		public static MemcachedClientConfiguration GetMemcachedConfiguration(this CacheConfigurationSectionHandler configSection, ILoggerFactory loggerFactory = null)
+			=> new MemcachedClientConfiguration(loggerFactory, configSection);
 
 		/// <summary>
 		/// Gets the configuration for working with Memcached

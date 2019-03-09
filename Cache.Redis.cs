@@ -53,7 +53,7 @@ namespace net.vieapps.Components.Caching
 
 		#region Get client (singleton)
 		static ConnectionMultiplexer _Connection = null;
-		static IDatabase _Client;
+		static IDatabase _Client = null;
 
 		/// <summary>
 		/// Gets the instance of the Redis client
@@ -65,16 +65,19 @@ namespace net.vieapps.Components.Caching
 			if (Redis._Connection == null)
 			{
 				var connectionString = "";
-				configuration.Servers.ForEach(server => connectionString += (connectionString != "" ? "," : "") + server.Address.ToString() + ":" + server.Port.ToString());
-				if (!string.IsNullOrWhiteSpace(configuration.Options))
-					connectionString += (connectionString != "" ? "," : "") + configuration.Options;
+				configuration.Servers.ForEach(server => connectionString += (connectionString != "" ? "," : "") + $"{server.Address}:{server.Port}");
+				connectionString += string.IsNullOrWhiteSpace(configuration.Options) ? "" : (connectionString != "" ? "," : "") + configuration.Options;
+				var logger = (loggerFactory ?? Enyim.Caching.Logger.GetLoggerFactory()).CreateLogger<Redis>();
+
 				try
 				{
 					Redis._Connection = string.IsNullOrWhiteSpace(connectionString) ? null : ConnectionMultiplexer.Connect(connectionString);
+					if (logger.IsEnabled(LogLevel.Trace))
+						logger.LogDebug($"The Redis's connection was established => {connectionString}");
 				}
 				catch (Exception ex)
 				{
-					loggerFactory?.CreateLogger<Redis>()?.LogError(ex, $"Error occurred while creating the Redis's connection [{connectionString}]");
+					logger.LogError(ex, $"Error occurred while creating the Redis's connection [{connectionString}]");
 					throw new ConfigurationErrorsException($"Error occurred while creating the Redis's connection [{connectionString}]", ex);
 				}
 			}
@@ -89,9 +92,9 @@ namespace net.vieapps.Components.Caching
 					throw new ArgumentNullException(nameof(configuration), "No configuration is found");
 
 				Redis._Client = Redis.GetClient(configuration.GetRedisConfiguration(), loggerFactory);
-				var logger = loggerFactory?.CreateLogger<Redis>();
-				if (logger != null && logger.IsEnabled(LogLevel.Debug))
-					logger.LogInformation("The Redis's instance was created");
+				var logger = (loggerFactory ?? Enyim.Caching.Logger.GetLoggerFactory()).CreateLogger<Redis>();
+				if (logger.IsEnabled(LogLevel.Debug))
+					logger.LogDebug($"The Redis's instance was created");
 			}
 			return Redis._Client;
 		}
@@ -103,20 +106,20 @@ namespace net.vieapps.Components.Caching
 				if (ConfigurationManager.GetSection("redis") is RedisClientConfigurationSectionHandler redisSection)
 				{
 					Redis._Client = Redis.GetClient(redisSection.GetRedisConfiguration(), loggerFactory);
-					var logger = loggerFactory?.CreateLogger<Redis>();
-					if (logger != null && logger.IsEnabled(LogLevel.Debug))
-						logger.LogInformation("The Redis's instance was created with stand-alone configuration (app.config/web.config) at the section named 'redis'");
+					var logger = (loggerFactory ?? Enyim.Caching.Logger.GetLoggerFactory()).CreateLogger<Redis>();
+					if (logger.IsEnabled(LogLevel.Debug))
+						logger.LogDebug("The Redis's instance was created with stand-alone configuration (app.config/web.config) at the section named 'redis'");
 				}
 				else if (ConfigurationManager.GetSection("cache") is CacheConfigurationSectionHandler cacheSection)
 				{
 					Redis._Client = Redis.GetClient(cacheSection.GetRedisConfiguration(), loggerFactory);
-					var logger = loggerFactory?.CreateLogger<Redis>();
-					if (logger != null && logger.IsEnabled(LogLevel.Debug))
-						logger.LogInformation("The Redis's instance was created with stand-alone configuration (app.config/web.config) at the section named 'cache'");
+					var logger = (loggerFactory ?? Enyim.Caching.Logger.GetLoggerFactory()).CreateLogger<Redis>();
+					if (logger.IsEnabled(LogLevel.Debug))
+						logger.LogDebug("The Redis's instance was created with stand-alone configuration (app.config/web.config) at the section named 'cache'");
 				}
 				else
 				{
-					loggerFactory?.CreateLogger<Redis>()?.LogError("No configuration is found");
+					(loggerFactory ?? Enyim.Caching.Logger.GetLoggerFactory()).CreateLogger<Redis>().LogError("No configuration is found");
 					throw new ConfigurationErrorsException("No configuration is found, the configuration file (app.config/web.config) must have a section named 'redis' or 'cache'.");
 				}
 			}
