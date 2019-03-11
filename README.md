@@ -32,7 +32,7 @@ Add the configuration settings into your app.config/web.config file
 			<add address="192.168.1.2" port="11211" />
 			<add address="192.168.1.3" port="11211" />
 		</servers>
-		<socketPool minPoolSize="10" maxPoolSize="250" deadTimeout="00:01:00" connectionTimeout="00:00:05" receiveTimeout="00:00:05" />
+		<socketPool minPoolSize="10" maxPoolSize="512" deadTimeout="00:01:00" connectionTimeout="00:00:05" receiveTimeout="00:00:05" />
 	</memcached>
 	<redis>
 		<servers>
@@ -52,14 +52,14 @@ Add the configuration settings into your app.config/web.config file
 	<configSections>
 		<section name="cache" type="net.vieapps.Components.Caching.CacheConfigurationSectionHandler, VIEApps.Components.Caching" />
 	</configSections>
-	<cache>
+	<cache provider="Redis" expirationTime="30">
 		<servers>
 			<add address="192.168.1.2" port="11211" type="Memcached" />
 			<add address="192.168.1.3" port="11211" type="Memcached" />
 			<add address="192.168.1.4" port="6379" type="Redis" />
 			<add address="192.168.1.5" port="6379" type="Redis" />
 		</servers>
-		<socketPool minPoolSize="10" maxPoolSize="250" deadTimeout="00:01:00" connectionTimeout="00:00:05" receiveTimeout="00:00:05" />
+		<socketPool minPoolSize="10" maxPoolSize="512" deadTimeout="00:01:00" connectionTimeout="00:00:05" receiveTimeout="00:00:05" />
 		<options abortConnect="false" allowAdmin="false" connectTimeout="5000" syncTimeout="2000" />
 	</cache>
 </configuration>
