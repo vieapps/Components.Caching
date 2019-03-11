@@ -66,8 +66,8 @@ namespace net.vieapps.Components.Caching
 		public Cache(string name, int expirationTime, bool storeKeys, string provider, ILoggerFactory loggerFactory = null)
 		{
 			this._cache = !string.IsNullOrWhiteSpace(provider) && provider.Trim().ToLower().Equals("memcached")
-				? new Memcached(name, expirationTime, storeKeys, loggerFactory ?? Enyim.Caching.Logger.GetLoggerFactory()) as ICache
-				: new Redis(name, expirationTime, storeKeys, loggerFactory ?? Enyim.Caching.Logger.GetLoggerFactory()) as ICache;
+				? new Memcached(name, expirationTime, storeKeys, loggerFactory) as ICache
+				: new Redis(name, expirationTime, storeKeys, loggerFactory) as ICache;
 
 			Helper.Logger = (loggerFactory ?? Enyim.Caching.Logger.GetLoggerFactory()).CreateLogger<Cache>();
 			if (Helper.Logger.IsEnabled(LogLevel.Debug))

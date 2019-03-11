@@ -32,14 +32,14 @@ Add the configuration settings into your app.config/web.config file
 			<add address="192.168.1.2" port="11211" />
 			<add address="192.168.1.3" port="11211" />
 		</servers>
-		<socketPool minPoolSize="10" maxPoolSize="250" deadTimeout="00:01:00" connectionTimeout="00:00:05" receiveTimeout="00:00:01" />
+		<socketPool minPoolSize="10" maxPoolSize="250" deadTimeout="00:01:00" connectionTimeout="00:00:05" receiveTimeout="00:00:05" />
 	</memcached>
 	<redis>
 		<servers>
 			<add address="192.168.1.4" port="6379" />
 			<add address="192.168.1.5" port="6379" />
 		</servers>
-		<options allowAdmin="false" version="3.0" connectTimeout="4000" syncTimeout="2000" />
+		<options abortConnect="false" allowAdmin="false" connectTimeout="5000" syncTimeout="2000" />
 	</redis>
 </configuration>
 ```
@@ -59,8 +59,8 @@ Add the configuration settings into your app.config/web.config file
 			<add address="192.168.1.4" port="6379" type="Redis" />
 			<add address="192.168.1.5" port="6379" type="Redis" />
 		</servers>
-		<socketPool minPoolSize="10" maxPoolSize="250" deadTimeout="00:01:00" connectionTimeout="00:00:05" receiveTimeout="00:00:01" />
-		<options allowAdmin="false" version="3.0" connectTimeout="4000" syncTimeout="2000" />
+		<socketPool minPoolSize="10" maxPoolSize="250" deadTimeout="00:01:00" connectionTimeout="00:00:05" receiveTimeout="00:00:05" />
+		<options abortConnect="false" allowAdmin="false" connectTimeout="5000" syncTimeout="2000" />
 	</cache>
 </configuration>
 

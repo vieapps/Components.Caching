@@ -23,8 +23,9 @@ namespace net.vieapps.Components.Caching
 	/// Manipulates cached objects in isolated regions with Redis
 	/// </summary>
 	[DebuggerDisplay("Redis: {Name} ({ExpirationTime} minutes)")]
-	public sealed class Redis : ICache
+	public sealed class Redis : ICache, IDisposable
 	{
+		readonly SemaphoreSlim _lock = new SemaphoreSlim(1, 1);
 		readonly bool _storeKeys;
 
 		/// <summary>
@@ -51,6 +52,14 @@ namespace net.vieapps.Components.Caching
 				.ConfigureAwait(false);
 		}
 
+		public void Dispose() => this._lock.Dispose();
+
+		~Redis()
+		{
+			this.Dispose();
+			GC.SuppressFinalize(this);
+		}
+
 		#region Get client (singleton)
 		static ConnectionMultiplexer _Connection = null;
 		static IDatabase _Client = null;
@@ -67,8 +76,8 @@ namespace net.vieapps.Components.Caching
 				var connectionString = "";
 				configuration.Servers.ForEach(server => connectionString += (connectionString != "" ? "," : "") + $"{server.Address}:{server.Port}");
 				connectionString += string.IsNullOrWhiteSpace(configuration.Options) ? "" : (connectionString != "" ? "," : "") + configuration.Options;
-				var logger = (loggerFactory ?? Enyim.Caching.Logger.GetLoggerFactory()).CreateLogger<Redis>();
 
+				var logger = (loggerFactory ?? Enyim.Caching.Logger.GetLoggerFactory()).CreateLogger<Redis>();
 				try
 				{
 					Redis._Connection = string.IsNullOrWhiteSpace(connectionString) ? null : ConnectionMultiplexer.Connect(connectionString);
@@ -77,8 +86,8 @@ namespace net.vieapps.Components.Caching
 				}
 				catch (Exception ex)
 				{
-					logger.LogError(ex, $"Error occurred while creating the Redis's connection [{connectionString}]");
-					throw new ConfigurationErrorsException($"Error occurred while creating the Redis's connection [{connectionString}]", ex);
+					logger.LogError(ex, $"Error occurred while creating the Redis's connection [{connectionString}] => {ex.Message}");
+					throw new ConfigurationErrorsException($"Error occurred while creating the Redis's connection [{connectionString}] => {ex.Message}", ex);
 				}
 			}
 			return Redis._Connection?.GetDatabase();
@@ -131,20 +140,23 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		/// <param name="loggerFactory"></param>
 		/// <param name="configuration"></param>
-		public static void PrepareClient(RedisClientConfiguration configuration, ILoggerFactory loggerFactory = null) => Redis.GetClient(configuration, loggerFactory);
+		public static void PrepareClient(RedisClientConfiguration configuration, ILoggerFactory loggerFactory = null)
+			=> Redis.GetClient(configuration, loggerFactory);
 
 		/// <summary>
 		/// Prepares the instance of redis client
 		/// </summary>
 		/// <param name="configuration"></param>
 		/// <param name="loggerFactory"></param>
-		public static void PrepareClient(ICacheConfiguration configuration, ILoggerFactory loggerFactory = null) => Redis.GetClient(configuration, loggerFactory);
+		public static void PrepareClient(ICacheConfiguration configuration, ILoggerFactory loggerFactory = null)
+			=> Redis.GetClient(configuration, loggerFactory);
 
 		/// <summary>
 		/// Prepares the instance of redis client
 		/// </summary>
 		/// <param name="loggerFactory"></param>
-		public static void PrepareClient(ILoggerFactory loggerFactory = null) => Redis.GetClient(loggerFactory);
+		public static void PrepareClient(ILoggerFactory loggerFactory = null)
+			=> Redis.GetClient(loggerFactory);
 		#endregion
 
 		#region Keys
@@ -789,17 +801,41 @@ namespace net.vieapps.Components.Caching
 		#region Clear
 		void _Clear()
 		{
-			this._Remove(this._GetKeys());
-			Redis.Client.Remove(this._RegionKey);
+			try
+			{
+				this._lock.Wait();
+				this._Remove(this._GetKeys());
+				Redis.Client.Remove(this._RegionKey);
+			}
+			catch (Exception ex)
+			{
+				Helper.WriteLogs(this.Name, $"Error occurred while cleaning => {ex.Message}", ex);
+			}
+			finally
+			{
+				this._lock.Release();
+			}
 		}
 
 		async Task _ClearAsync(CancellationToken cancellationToken = default(CancellationToken))
 		{
-			var keys = await this._GetKeysAsync(cancellationToken).ConfigureAwait(false);
-			await Task.WhenAll(
-				this._RemoveAsync(keys, null, cancellationToken),
-				Redis.Client.RemoveAsync(this._RegionKey, cancellationToken)
-			).ConfigureAwait(false);
+			try
+			{
+				await this._lock.WaitAsync(cancellationToken).ConfigureAwait(false);
+				var keys = await this._GetKeysAsync(cancellationToken).ConfigureAwait(false);
+				await Task.WhenAll(
+					this._RemoveAsync(keys, null, cancellationToken),
+					Redis.Client.RemoveAsync(this._RegionKey, cancellationToken)
+				).ConfigureAwait(false);
+			}
+			catch (Exception ex)
+			{
+				Helper.WriteLogs(this.Name, $"Error occurred while cleaning => {ex.Message}", ex);
+			}
+			finally
+			{
+				this._lock.Release();
+			}
 		}
 		#endregion
 
@@ -819,12 +855,14 @@ namespace net.vieapps.Components.Caching
 		/// <summary>
 		/// Gets the collection of all registered regions (in distributed cache)
 		/// </summary>
-		public static HashSet<string> GetRegions() => Redis.Client.GetSetMembers(Helper.RegionsKey);
+		public static HashSet<string> GetRegions()
+			=> Redis.Client.GetSetMembers(Helper.RegionsKey);
 
 		/// <summary>
 		/// Gets the collection of all registered regions (in distributed cache)
 		/// </summary>
-		public static Task<HashSet<string>> GetRegionsAsync(CancellationToken cancellationToken = default(CancellationToken)) => Redis.Client.GetSetMembersAsync(Helper.RegionsKey, cancellationToken);
+		public static Task<HashSet<string>> GetRegionsAsync(CancellationToken cancellationToken = default(CancellationToken))
+			=> Redis.Client.GetSetMembersAsync(Helper.RegionsKey, cancellationToken);
 
 		static async Task RegisterRegionAsync(string name, CancellationToken cancellationToken = default(CancellationToken))
 		{

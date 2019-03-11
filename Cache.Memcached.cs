@@ -110,20 +110,23 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		/// <param name="loggerFactory"></param>
 		/// <param name="configuration"></param>
-		public static void PrepareClient(IMemcachedClientConfiguration configuration, ILoggerFactory loggerFactory = null) => Memcached.GetClient(configuration, loggerFactory);
+		public static void PrepareClient(IMemcachedClientConfiguration configuration, ILoggerFactory loggerFactory = null)
+			=> Memcached.GetClient(configuration, loggerFactory);
 
 		/// <summary>
 		/// Prepares the instance of memcached client
 		/// </summary>
 		/// <param name="configuration"></param>
 		/// <param name="loggerFactory"></param>
-		public static void PrepareClient(ICacheConfiguration configuration, ILoggerFactory loggerFactory = null) => Memcached.GetClient(configuration, loggerFactory);
+		public static void PrepareClient(ICacheConfiguration configuration, ILoggerFactory loggerFactory = null)
+			=> Memcached.GetClient(configuration, loggerFactory);
 
 		/// <summary>
 		/// Prepares the instance of memcached client
 		/// </summary>
 		/// <param name="loggerFactory"></param>
-		public static void PrepareClient(ILoggerFactory loggerFactory = null) => Memcached.GetClient(loggerFactory);
+		public static void PrepareClient(ILoggerFactory loggerFactory = null)
+			=> Memcached.GetClient(loggerFactory);
 		#endregion
 
 		#region Attributes
