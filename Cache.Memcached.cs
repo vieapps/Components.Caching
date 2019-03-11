@@ -42,9 +42,11 @@ namespace net.vieapps.Components.Caching
 			this._storeKeys = storeKeys;
 
 			// register the region
-			Task.Run(() => Memcached.GetClient(loggerFactory))
-				.ContinueWith(async _ => await Memcached.RegisterRegionAsync(this.Name).ConfigureAwait(false), TaskContinuationOptions.OnlyOnRanToCompletion)
-				.ConfigureAwait(false);
+			Task.Run(async () =>
+				{
+					await Task.Delay(1234).ConfigureAwait(false);
+					await Memcached.RegisterRegionAsync(this.Name).ConfigureAwait(false);
+				}).ConfigureAwait(false);
 		}
 
 		public void Dispose() => this._lock.Dispose();
@@ -58,75 +60,44 @@ namespace net.vieapps.Components.Caching
 		#region Get client (singleton)
 		static MemcachedClient _Client;
 
+		static MemcachedClient GetClient(IMemcachedClientConfiguration configuration, ILoggerFactory loggerFactory = null)
+			=> Memcached._Client ?? (Memcached._Client = new MemcachedClient(loggerFactory, configuration));
+
+		internal static void GetClient(ICacheConfiguration configuration, ILoggerFactory loggerFactory = null)
+		{
+			if (configuration == null)
+				throw new ConfigurationErrorsException($"No configuration is found [{nameof(configuration)}]");
+			Memcached.GetClient(configuration.GetMemcachedConfiguration(loggerFactory), loggerFactory);
+		}
+
 		/// <summary>
 		/// Gets the instance of the Memcached client
 		/// </summary>
-		public static MemcachedClient Client => Memcached._Client ?? (Memcached._Client = Memcached.GetClient());
-
-		internal static MemcachedClient GetClient(IMemcachedClientConfiguration configuration, ILoggerFactory loggerFactory = null)
-			=> Memcached._Client ?? (Memcached._Client = new MemcachedClient(loggerFactory, configuration));
-
-		internal static MemcachedClient GetClient(ICacheConfiguration configuration, ILoggerFactory loggerFactory = null)
+		public static MemcachedClient Client
 		{
-			if (Memcached._Client == null)
+			get
 			{
-				Memcached.GetClient(configuration.GetMemcachedConfiguration(loggerFactory), loggerFactory);
-				var logger = (loggerFactory ?? Logger.GetLoggerFactory()).CreateLogger<Memcached>();
-				if (logger.IsEnabled(LogLevel.Debug))
-					logger.LogDebug("The Memcached's instance was created");
+				if (Memcached._Client == null)
+				{
+					var logger = Logger.GetLoggerFactory().CreateLogger<Redis>();
+					if (ConfigurationManager.GetSection("memcached") is MemcachedClientConfigurationSectionHandler memcachedSection)
+					{
+						Memcached._Client = new MemcachedClient(memcachedSection, Logger.GetLoggerFactory());
+						if (logger.IsEnabled(LogLevel.Debug))
+							logger.LogDebug("The Memcached's instance was created with stand-alone configuration (app.config/web.config) at the section named 'memcached'");
+					}
+					else if (ConfigurationManager.GetSection("cache") is CacheConfigurationSectionHandler cacheSection)
+					{
+						Memcached.GetClient(new CacheConfiguration(cacheSection).GetMemcachedConfiguration(Logger.GetLoggerFactory()), Logger.GetLoggerFactory());
+						if (logger.IsEnabled(LogLevel.Debug))
+							logger.LogDebug("The Memcached's instance was created with stand-alone configuration (app.config/web.config) at the section named 'cache'");
+					}
+					else
+						throw new ConfigurationErrorsException("No configuration section is found, the configuration file (app.config/web.config) must have a section named 'memcached' or 'cache'.");
+				}
+				return Memcached._Client;
 			}
-			return Memcached._Client;
 		}
-
-		internal static MemcachedClient GetClient(ILoggerFactory loggerFactory = null)
-		{
-			if (Memcached._Client == null)
-			{
-				if (ConfigurationManager.GetSection("memcached") is MemcachedClientConfigurationSectionHandler memcachedSection)
-				{
-					Memcached._Client = new MemcachedClient(memcachedSection, loggerFactory);
-					var logger = (loggerFactory ?? Logger.GetLoggerFactory()).CreateLogger<Memcached>();
-					if (logger.IsEnabled(LogLevel.Debug))
-						logger.LogDebug("The Memcached's instance was created with stand-alone configuration (app.config/web.config) at the section named 'memcached'");
-				}
-				else if (ConfigurationManager.GetSection("cache") is CacheConfigurationSectionHandler cacheSection)
-				{
-					Memcached.GetClient(new CacheConfiguration(cacheSection).GetMemcachedConfiguration(loggerFactory), loggerFactory);
-					var logger = (loggerFactory ?? Logger.GetLoggerFactory()).CreateLogger<Memcached>();
-					if (logger.IsEnabled(LogLevel.Debug))
-						logger.LogDebug("The Memcached's instance was created with stand-alone configuration (app.config/web.config) at the section named 'cache'");
-				}
-				else
-				{
-					(loggerFactory ?? Logger.GetLoggerFactory()).CreateLogger<Memcached>().LogError("No configuration is found");
-					throw new ConfigurationErrorsException("No configuration is found, the configuration file (app.config/web.config) must have a section named 'memcached' or 'cache'.");
-				}
-			}
-			return Memcached._Client;
-		}
-
-		/// <summary>
-		/// Prepares the instance of memcached client
-		/// </summary>
-		/// <param name="loggerFactory"></param>
-		/// <param name="configuration"></param>
-		public static void PrepareClient(IMemcachedClientConfiguration configuration, ILoggerFactory loggerFactory = null)
-			=> Memcached.GetClient(configuration, loggerFactory);
-
-		/// <summary>
-		/// Prepares the instance of memcached client
-		/// </summary>
-		/// <param name="configuration"></param>
-		/// <param name="loggerFactory"></param>
-		public static void PrepareClient(ICacheConfiguration configuration, ILoggerFactory loggerFactory = null)
-			=> Memcached.GetClient(configuration, loggerFactory);
-
-		/// <summary>
-		/// Prepares the instance of memcached client
-		/// </summary>
-		/// <param name="loggerFactory"></param>
-		public static void PrepareClient(ILoggerFactory loggerFactory = null)
-			=> Memcached.GetClient(loggerFactory);
 		#endregion
 
 		#region Attributes

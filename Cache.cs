@@ -74,23 +74,18 @@ namespace net.vieapps.Components.Caching
 				Helper.Logger.LogDebug($"The VIEApps NGX Caching's instance was created - {this._cache.GetType().ToString().Split('.').Last()}: {this._cache.Name} ({this._cache.ExpirationTime} minutes)");
 		}
 
-		#region Get instance (singleton)
-		static ICacheConfiguration _Configuration = null;
+		#region Get singleton instance
+		internal static Cache _Instance { get; set; } = null;
+
+		static ICacheConfiguration _Configuration { get; set; } = null;
 
 		/// <summary>
 		/// Gets the global settings of the caching component
 		/// </summary>
 		public static ICacheConfiguration Configuration
 		{
-			get
-			{
-				if (Cache._Configuration == null && ConfigurationManager.GetSection("cache") is CacheConfigurationSectionHandler configSection)
-					Cache._Configuration = new CacheConfiguration(configSection);
-				return Cache._Configuration;
-			}
+			get => Cache._Configuration ?? (Cache._Configuration = new CacheConfiguration(ConfigurationManager.GetSection("cache") is CacheConfigurationSectionHandler configSection ? configSection : null));
 		}
-
-		static Cache _Instance { get; set; } = null;
 
 		/// <summary>
 		/// Gets the instance of caching component
@@ -102,7 +97,15 @@ namespace net.vieapps.Components.Caching
 		{
 			if (Cache._Instance == null)
 			{
-				Cache._Configuration = configuration ?? throw new ConfigurationErrorsException($"No configuration is found [{nameof(configuration)}]");
+				Helper.Logger = (loggerFactory ?? Enyim.Caching.Logger.GetLoggerFactory()).CreateLogger<Cache>();
+				if (configuration == null)
+				{
+					var ex = new ConfigurationErrorsException($"No configuration is found [{nameof(configuration)}]");
+					Helper.Logger.LogError(ex, $"No configuration");
+					throw ex;
+				}
+
+				Cache._Configuration = configuration;
 				Cache._Instance = new Cache(configuration.RegionName, configuration.ExpirationTime, false, configuration.Provider, loggerFactory);
 
 				if (configuration.Servers.Where(s => s.Type.ToLower().Equals("redis")).Count() > 0)
@@ -110,8 +113,6 @@ namespace net.vieapps.Components.Caching
 
 				if (configuration.Servers.Where(s => s.Type.ToLower().Equals("memcached")).Count() > 0)
 					Memcached.GetClient(configuration, loggerFactory);
-
-				Helper.Logger = (loggerFactory ?? Enyim.Caching.Logger.GetLoggerFactory()).CreateLogger<Cache>();
 			}
 			return Cache._Instance;
 		}
@@ -138,8 +139,10 @@ namespace net.vieapps.Components.Caching
 		{
 			if (Cache._Instance == null)
 			{
-				Cache.GetInstance(svcProvider.GetService<ICacheConfiguration>(), svcProvider.GetService<ILoggerFactory>());
-				var logger = svcProvider.GetService<ILoggerFactory>().CreateLogger<Cache>();
+				var loggerFactory = svcProvider.GetService<ILoggerFactory>();
+				Cache.AssignLoggerFactory(loggerFactory);
+				Cache.GetInstance(svcProvider.GetService<ICacheConfiguration>(), loggerFactory);
+				var logger = loggerFactory.CreateLogger<Cache>();
 				if (logger.IsEnabled(LogLevel.Debug))
 					logger.LogDebug($"The VIEApps NGX Caching's instance was created with integrated configuration (appsettings.json) - {Cache.Configuration.Provider}: {Cache.Configuration.RegionName} ({Cache.Configuration.ExpirationTime} minutes)");
 			}
