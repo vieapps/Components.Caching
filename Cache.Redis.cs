@@ -49,7 +49,7 @@ namespace net.vieapps.Components.Caching
 			// register the region
 			Task.Run(async () =>
 				{
-					await Task.Delay(1234).ConfigureAwait(false);
+					await Task.Delay(2345).ConfigureAwait(false);
 					await Redis.RegisterRegionAsync(this.Name).ConfigureAwait(false);
 				}).ConfigureAwait(false);
 		}
@@ -63,10 +63,10 @@ namespace net.vieapps.Components.Caching
 		}
 
 		#region Get client (singleton)
-		static ConnectionMultiplexer _Connection = null;
-		static IDatabase _Client = null;
+		static ConnectionMultiplexer _Connection { get; set; } = null;
+		static IDatabase _Client { get; set; } = null;
 
-		static IDatabase GetClient(RedisClientConfiguration configuration, ILoggerFactory loggerFactory = null)
+		internal static IDatabase GetClient(RedisClientConfiguration configuration, ILoggerFactory loggerFactory = null)
 		{
 			if (Redis._Client == null)
 			{
@@ -94,13 +94,6 @@ namespace net.vieapps.Components.Caching
 					logger.LogDebug($"The redis's instance was created");
 			}
 			return Redis._Client;
-		}
-
-		internal static void GetClient(ICacheConfiguration configuration, ILoggerFactory loggerFactory = null)
-		{
-			if (configuration == null)
-				throw new ConfigurationErrorsException($"No configuration is found [{nameof(configuration)}]");
-			Redis.GetClient(configuration.GetRedisConfiguration(), loggerFactory);
 		}
 
 		/// <summary>
