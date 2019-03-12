@@ -40,6 +40,14 @@ namespace net.vieapps.Components.Caching
 		/// Create a new instance of distributed cache with isolated region
 		/// </summary>
 		/// <param name="name">The string that presents name of isolated region</param>
+		/// <param name="loggerFactory">The logger factory for working with logs</param>
+		public Cache(string name, ILoggerFactory loggerFactory = null)
+			: this(name, 0, false, null, loggerFactory) { }
+
+		/// <summary>
+		/// Create a new instance of distributed cache with isolated region
+		/// </summary>
+		/// <param name="name">The string that presents name of isolated region</param>
 		/// <param name="provider">The string that presents the caching provider ('Redis' or 'Memcached') - the default provider is 'Redis'</param>
 		/// <param name="loggerFactory">The logger factory for working with logs</param>
 		public Cache(string name, string provider, ILoggerFactory loggerFactory = null)
@@ -65,7 +73,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="loggerFactory">The logger factory for working with logs</param>
 		public Cache(string name, int expirationTime, bool storeKeys, string provider, ILoggerFactory loggerFactory = null)
 		{
-			this._cache = !string.IsNullOrWhiteSpace(provider) && provider.Trim().ToLower().Equals("memcached")
+			this._cache = (string.IsNullOrWhiteSpace(provider) ? Cache.Configuration?.Provider ?? "Redis" : provider).Trim().ToLower().Equals("memcached")
 				? new Memcached(name, expirationTime, storeKeys, loggerFactory) as ICache
 				: new Redis(name, expirationTime, storeKeys, loggerFactory) as ICache;
 
