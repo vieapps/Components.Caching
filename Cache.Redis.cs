@@ -48,10 +48,10 @@ namespace net.vieapps.Components.Caching
 
 			// register the region
 			Task.Run(async () =>
-				{
-					await Task.Delay(2345).ConfigureAwait(false);
-					await Redis.RegisterRegionAsync(this.Name).ConfigureAwait(false);
-				}).ConfigureAwait(false);
+			{
+				await Task.Delay(2345).ConfigureAwait(false);
+				await Redis.RegisterRegionAsync(this.Name).ConfigureAwait(false);
+			}).ConfigureAwait(false);
 		}
 
 		public void Dispose() => this._lock.Dispose();
