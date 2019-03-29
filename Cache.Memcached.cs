@@ -49,7 +49,8 @@ namespace net.vieapps.Components.Caching
 			}).ConfigureAwait(false);
 		}
 
-		public void Dispose() => this._lock.Dispose();
+		public void Dispose()
+			=> this._lock.Dispose();
 
 		~Memcached()
 		{

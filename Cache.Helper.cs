@@ -43,9 +43,11 @@ namespace net.vieapps.Components.Caching
 
 		public static int ExpirationTime => Cache.Configuration != null && Cache.Configuration.ExpirationTime > 0 ? Cache.Configuration.ExpirationTime : 30;
 
-		public static string GetRegionName(string name)=> Regex.Replace(!string.IsNullOrWhiteSpace(name) ? name : Cache.Configuration?.RegionName ?? "VIEApps-NGX-Cache", "[^0-9a-zA-Z:-]+", "");
+		public static string GetRegionName(string name)
+			=> Regex.Replace(!string.IsNullOrWhiteSpace(name) ? name : Cache.Configuration?.RegionName ?? "VIEApps-NGX-Cache", "[^0-9a-zA-Z:-]+", "");
 
-		public static string GetCacheKey(string region, string key) => region + "@" + key.Replace(" ", "-");
+		public static string GetCacheKey(string region, string key)
+			=> region + "@" + key.Replace(" ", "-");
 
 		public static string GetFragmentKey(string key, int index)
 		{
