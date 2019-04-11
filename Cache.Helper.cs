@@ -38,7 +38,7 @@ namespace net.vieapps.Components.Caching
 		public const int FlagOfJsonArray = 0xfc52;
 		public const int FlagOfExpandoObject = 0xfd52;
 		public const int FlagOfFirstFragmentBlock = 0xfe52;
-		public static readonly int FragmentSize = (1024 * 1024) - 128;
+		public static readonly int FragmentSize = (1024 * 1024) - 256;
 		internal static readonly string RegionsKey = "VIEApps-NGX-Regions";
 
 		public static int ExpirationTime => Cache.Configuration != null && Cache.Configuration.ExpirationTime > 0 ? Cache.Configuration.ExpirationTime : 30;
