@@ -49,7 +49,7 @@ namespace net.vieapps.Components.Caching
 			// register the region
 			Task.Run(async () =>
 			{
-				await Task.Delay(2345).ConfigureAwait(false);
+				await Task.Delay(Redis.ConnectionTimeout > 0 ? Redis.ConnectionTimeout + 123 : 5432).ConfigureAwait(false);
 				await Redis.RegisterRegionAsync(this.Name).ConfigureAwait(false);
 			}).ConfigureAwait(false);
 		}
@@ -66,11 +66,21 @@ namespace net.vieapps.Components.Caching
 		#region Get client (singleton)
 		static ConnectionMultiplexer _Connection { get; set; } = null;
 		static IDatabase _Client { get; set; } = null;
+		static int ConnectionTimeout { get; set; }
 
 		internal static IDatabase GetClient(RedisClientConfiguration configuration, ILoggerFactory loggerFactory = null)
 		{
 			if (Redis._Client == null)
 			{
+				var connectTimeout = "5000";
+				if (configuration.Options.IndexOf("connectTimeout=") > 0)
+				{
+					connectTimeout = configuration.Options.Substring(configuration.Options.IndexOf("connectTimeout="));
+					connectTimeout = connectTimeout.Substring(connectTimeout.IndexOf("=") + 1);
+					if (connectTimeout.IndexOf(",") > 0)
+						connectTimeout = connectTimeout.Remove(connectTimeout.IndexOf(","));
+				}
+				Redis.ConnectionTimeout = Int32.TryParse(connectTimeout, out var timeout) ? timeout : 5000;
 				var logger = (loggerFactory ?? Enyim.Caching.Logger.GetLoggerFactory()).CreateLogger<Redis>();
 				if (Redis._Connection == null)
 				{

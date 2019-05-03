@@ -44,7 +44,7 @@ namespace net.vieapps.Components.Caching
 			// register the region
 			Task.Run(async () =>
 			{
-				await Task.Delay(2345).ConfigureAwait(false);
+				await Task.Delay(Memcached.ConnectionTimeout > 0 ? Memcached.ConnectionTimeout + 123 : 5432).ConfigureAwait(false);
 				await Memcached.RegisterRegionAsync(this.Name).ConfigureAwait(false);
 			}).ConfigureAwait(false);
 		}
@@ -60,9 +60,14 @@ namespace net.vieapps.Components.Caching
 
 		#region Get client (singleton)
 		static MemcachedClient _Client { get; set; } = null;
+		static int ConnectionTimeout { get; set; }
 
 		internal static MemcachedClient GetClient(IMemcachedClientConfiguration configuration, ILoggerFactory loggerFactory = null)
-			=> Memcached._Client ?? (Memcached._Client = new MemcachedClient(loggerFactory, configuration));
+		{
+			Memcached.ConnectionTimeout = (int)configuration.SocketPool.ConnectionTimeout.TotalMilliseconds;
+			return Memcached._Client ?? (Memcached._Client = new MemcachedClient(loggerFactory, configuration)); ;
+		}
+			
 
 		/// <summary>
 		/// Gets the instance of the Memcached client
@@ -74,9 +79,9 @@ namespace net.vieapps.Components.Caching
 				if (Memcached._Client == null)
 				{
 					var logger = Logger.GetLoggerFactory().CreateLogger<Memcached>();
-					if (ConfigurationManager.GetSection("memcached") is MemcachedClientConfigurationSectionHandler memcachedConfigurationSection)
+					if (ConfigurationManager.GetSection("memcached") is CacheConfigurationSectionHandler memcachedConfigurationSection)
 					{
-						Memcached._Client = new MemcachedClient(memcachedConfigurationSection, Logger.GetLoggerFactory());
+						Memcached.GetClient(new CacheConfiguration(memcachedConfigurationSection).GetMemcachedConfiguration(Logger.GetLoggerFactory()), Logger.GetLoggerFactory());
 						if (logger.IsEnabled(LogLevel.Debug))
 							logger.LogDebug("The Memcached's instance was created with stand-alone configuration (app.config/web.config) at the section named 'memcached'");
 					}
