@@ -779,9 +779,9 @@ namespace net.vieapps.Components.Caching
 		#region Clear
 		void _Clear()
 		{
+			this._lock.Wait();
 			try
 			{
-				this._lock.Wait();
 				this._Remove(this._GetKeys());
 				Redis.Client.Remove(this._RegionKey);
 			}
@@ -797,9 +797,9 @@ namespace net.vieapps.Components.Caching
 
 		async Task _ClearAsync(CancellationToken cancellationToken = default(CancellationToken))
 		{
+			await this._lock.WaitAsync(cancellationToken).ConfigureAwait(false);
 			try
 			{
-				await this._lock.WaitAsync(cancellationToken).ConfigureAwait(false);
 				var keys = await this._GetKeysAsync(cancellationToken).ConfigureAwait(false);
 				await Task.WhenAll(
 					this._RemoveAsync(keys, null, cancellationToken),

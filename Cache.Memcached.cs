@@ -114,9 +114,9 @@ namespace net.vieapps.Components.Caching
 				return;
 
 			this._isUpdatingKeys = true;
+			await this._lock.WaitAsync(cancellationToken).ConfigureAwait(false);
 			try
 			{
-				await this._lock.WaitAsync(cancellationToken).ConfigureAwait(false);
 				if (this._addedKeys.Count > 0 || this._removedKeys.Count > 0)
 					try
 					{
@@ -660,9 +660,9 @@ namespace net.vieapps.Components.Caching
 		async Task _ClearAsync(CancellationToken cancellationToken = default(CancellationToken))
 		{
 			var flag = $"{this._RegionKey}-Cleaning";
+			await this._lock.WaitAsync(cancellationToken).ConfigureAwait(false);
 			try
 			{
-				await this._lock.WaitAsync(cancellationToken).ConfigureAwait(false);
 				await Memcached.Client.StoreAsync(StoreMode.Set, flag, "v", cancellationToken).ConfigureAwait(false);
 				var keys = await this._GetKeysAsync(cancellationToken).ConfigureAwait(false);
 				await Task.WhenAll(keys.Select(key => Memcached.Client.RemoveAsync(this._GetKey(key), cancellationToken))).ConfigureAwait(false);
