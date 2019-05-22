@@ -12,19 +12,16 @@ using System.Threading.Tasks;
 using System.Dynamic;
 using System.Diagnostics;
 using System.Configuration;
-
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
-using Newtonsoft.Json.Bson;
-
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
-
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using Newtonsoft.Json.Bson;
 using Enyim.Reflection;
 using Enyim.Caching.Configuration;
 using Enyim.Caching.Memcached;
-
+using CacheUtils;
 using net.vieapps.Components.Caching;
 #endregion
 
@@ -162,13 +159,7 @@ namespace net.vieapps.Components.Caching
 					using (var writer = new BsonDataWriter(stream))
 					{
 						new JsonSerializer().Serialize(writer, value);
-						if (stream.TryGetBuffer(out ArraySegment<byte> buffer))
-						{
-							data = new byte[buffer.Count];
-							Buffer.BlockCopy(buffer.Array, buffer.Offset, data, 0, buffer.Count);
-						}
-						else
-							data = stream.ToArray();
+						data = stream.GetArray();
 					}
 				}
 			}

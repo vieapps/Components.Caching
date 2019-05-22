@@ -84,6 +84,14 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		/// <param name="key">The string that presents key of item</param>
 		/// <param name="value">The object that is to be cached</param>
+		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
+		Task<bool> SetAsync(string key, object value, CancellationToken cancellationToken);
+
+		/// <summary>
+		/// Adds an item into cache with a specified key (if the key is already existed, then old cached item will be overriden)
+		/// </summary>
+		/// <param name="key">The string that presents key of item</param>
+		/// <param name="value">The object that is to be cached</param>
 		/// <param name="validFor">The time when the item is invalidated in the cache</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
 		Task<bool> SetAsync(string key, object value, TimeSpan validFor, CancellationToken cancellationToken = default(CancellationToken));
@@ -127,11 +135,24 @@ namespace net.vieapps.Components.Caching
 		/// <summary>
 		/// Adds a collection of items into cache
 		/// </summary>
+		/// <param name="items">The collection of items to add</param>
+		Task SetAsync(IDictionary<string, object> items, CancellationToken cancellationToken);
+
+		/// <summary>
+		/// Adds a collection of items into cache
+		/// </summary>
 		/// <typeparam name="T">The type for casting the cached item</typeparam>
 		/// <param name="items">The collection of items to add</param>
 		/// <param name="keyPrefix">The string that presents prefix of all keys</param>
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
 		Task SetAsync<T>(IDictionary<string, T> items, string keyPrefix = null, int expirationTime = 0, CancellationToken cancellationToken = default(CancellationToken));
+
+		/// <summary>
+		/// Adds a collection of items into cache
+		/// </summary>
+		/// <typeparam name="T">The type for casting the cached item</typeparam>
+		/// <param name="items">The collection of items to add</param>
+		Task SetAsync<T>(IDictionary<string, T> items, CancellationToken cancellationToken);
 		#endregion
 
 		#region Set (Fragment)
@@ -154,6 +175,14 @@ namespace net.vieapps.Components.Caching
 		Task<bool> SetFragmentsAsync(string key, List<byte[]> fragments, int expirationTime = 0, CancellationToken cancellationToken = default(CancellationToken));
 
 		/// <summary>
+		/// Adds an item (as fragments) into cache with a specified key (if the key is already existed, then old cached item will be overriden)
+		/// </summary>
+		/// <param name="key">The string that presents key of item</param>
+		/// <param name="fragments">The collection that contains all fragments (object that serialized as binary - array bytes)</param>
+		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
+		Task<bool> SetFragmentsAsync(string key, List<byte[]> fragments, CancellationToken cancellationToken);
+
+		/// <summary>
 		/// Serializes object into array of bytes, splits into one or more fragments and updates into cache with a specified key (if the key is already existed, then old cached item will be overriden)
 		/// </summary>
 		/// <param name="key">The string that presents key of item</param>
@@ -170,6 +199,14 @@ namespace net.vieapps.Components.Caching
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
 		Task<bool> SetAsFragmentsAsync(string key, object value, int expirationTime = 0, CancellationToken cancellationToken = default(CancellationToken));
+
+		/// <summary>
+		/// Serializes object into array of bytes, splits into one or more fragments and updates into cache with a specified key (if the key is already existed, then old cached item will be overriden)
+		/// </summary>
+		/// <param name="key">The string that presents key of item</param>
+		/// <param name="value">The object that is to be cached</param>
+		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
+		Task<bool> SetAsFragmentsAsync(string key, object value, CancellationToken cancellationToken);
 		#endregion
 
 		#region Add
@@ -208,6 +245,14 @@ namespace net.vieapps.Components.Caching
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
 		Task<bool> AddAsync(string key, object value, int expirationTime = 0, CancellationToken cancellationToken = default(CancellationToken));
+
+		/// <summary>
+		/// Adds an item into cache with a specified key when the the key is not existed
+		/// </summary>
+		/// <param name="key">The string that presents key of item</param>
+		/// <param name="value">The object that is to be cached</param>
+		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
+		Task<bool> AddAsync(string key, object value, CancellationToken cancellationToken);
 
 		/// <summary>
 		/// Adds an item into cache with a specified key when the the key is not existed
@@ -270,6 +315,14 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		/// <param name="key">The string that presents key of item</param>
 		/// <param name="value">The object that is to be cached</param>
+		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
+		Task<bool> ReplaceAsync(string key, object value, CancellationToken cancellationToken);
+
+		/// <summary>
+		/// Adds an item into cache with a specified key when the the key is existed (means update existed item)
+		/// </summary>
+		/// <param name="key">The string that presents key of item</param>
+		/// <param name="value">The object that is to be cached</param>
 		/// <param name="validFor">The time when the item is invalidated in the cache</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
 		Task<bool> ReplaceAsync(string key, object value, TimeSpan validFor, CancellationToken cancellationToken = default(CancellationToken));
@@ -282,6 +335,22 @@ namespace net.vieapps.Components.Caching
 		/// <param name="expiresAt">The time when the item is invalidated in the cache</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
 		Task<bool> ReplaceAsync(string key, object value, DateTime expiresAt, CancellationToken cancellationToken = default(CancellationToken));
+		#endregion
+
+		#region Refresh
+		/// <summary>
+		/// Refreshs an existed item
+		/// </summary>
+		/// <param name="key">The string that presents key of item</param>
+		/// <returns>Returns a boolean value indicating if the item is refreshed or not</returns>
+		bool Refresh(string key);
+
+		/// <summary>
+		/// Refreshs an existed item
+		/// </summary>
+		/// <param name="key">The string that presents key of item</param>
+		/// <returns>Returns a boolean value indicating if the item is refreshed or not</returns>
+		Task<bool> RefreshAsync(string key, CancellationToken cancellationToken = default(CancellationToken));
 		#endregion
 
 		#region Get
@@ -424,6 +493,12 @@ namespace net.vieapps.Components.Caching
 		/// <param name="keys">The collection that presents key of cached items need to remove</param>
 		/// <param name="keyPrefix">The string that presents prefix of all keys</param>
 		Task RemoveAsync(IEnumerable<string> keys, string keyPrefix = null, CancellationToken cancellationToken = default(CancellationToken));
+
+		/// <summary>
+		/// Removes a collection of cached items
+		/// </summary>
+		/// <param name="keys">The collection that presents key of cached items need to remove</param>
+		Task RemoveAsync(IEnumerable<string> keys, CancellationToken cancellationToken);
 		#endregion
 
 		#region Remove (Fragment)
