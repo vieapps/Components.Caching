@@ -159,7 +159,7 @@ namespace net.vieapps.Components.Caching
 					using (var writer = new BsonDataWriter(stream))
 					{
 						new JsonSerializer().Serialize(writer, value);
-						data = stream.GetArray();
+						data = stream.ToBytes();
 					}
 				}
 			}
