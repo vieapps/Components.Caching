@@ -74,8 +74,8 @@ namespace net.vieapps.Components.Caching
 		public Cache(string name, int expirationTime, bool storeKeys, string provider, ILoggerFactory loggerFactory = null)
 		{
 			this._cache = (string.IsNullOrWhiteSpace(provider) ? Cache.Configuration?.Provider ?? "Redis" : provider).Trim().ToLower().Equals("memcached")
-				? new Memcached(name, expirationTime, storeKeys, loggerFactory) as ICache
-				: new Redis(name, expirationTime, storeKeys, loggerFactory) as ICache;
+				? new Memcached(name, expirationTime, storeKeys) as ICache
+				: new Redis(name, expirationTime, storeKeys) as ICache;
 
 			Helper.Logger = (loggerFactory ?? Enyim.Caching.Logger.GetLoggerFactory()).CreateLogger<Cache>();
 			if (Helper.Logger.IsEnabled(LogLevel.Debug))
@@ -522,7 +522,7 @@ namespace net.vieapps.Components.Caching
 			=> this._cache.ReplaceAsync(key, value, expiresAt, cancellationToken);
 		#endregion
 
-		#region [Public] Refresh
+		#region Refresh
 		/// <summary>
 		/// Refreshs an existed item
 		/// </summary>

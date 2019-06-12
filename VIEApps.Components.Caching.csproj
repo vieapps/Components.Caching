@@ -10,14 +10,14 @@
 		<AssemblyTitle>VIEApps NGX Caching</AssemblyTitle>
 		<SignAssembly>false</SignAssembly>
 		<AssemblyOriginatorKeyFile>../VIEApps.Components.snk</AssemblyOriginatorKeyFile>
-		<AssemblyVersion>10.2.1906.1</AssemblyVersion>
-		<FileVersion>10.2.1906.1</FileVersion>
-		<InformationalVersion>v10.2.netstandard-2+rev:2019.05.30-stream.array.segments</InformationalVersion>
+		<AssemblyVersion>10.2.1906.2</AssemblyVersion>
+		<FileVersion>10.2.1906.2</FileVersion>
+		<InformationalVersion>v10.2.netstandard-2+rev:2019.06.12-refresh</InformationalVersion>
 		<Product>VIEApps NGX</Product>
 		<Company>VIEApps.net</Company>
 		<GeneratePackageOnBuild>false</GeneratePackageOnBuild>
 		<PackageId>VIEApps.Components.Caching</PackageId>
-		<Version>10.2.1906.1</Version>
+		<Version>10.2.1906.2</Version>
 		<Title>VIEApps NGX Caching</Title>
 		<Description>Distributed cache (Redis &amp; Memcached) on .NET Standard 2.0</Description>
 		<Authors>VIEApps.net</Authors>
@@ -43,7 +43,7 @@
 		<PackageReference Include="Newtonsoft.Json" Version="12.0.2" />
 		<PackageReference Include="Newtonsoft.Json.Bson" Version="1.0.2" />
 		<PackageReference Include="StackExchange.Redis" Version="2.0.601" />
-		<PackageReference Include="VIEApps.Enyim.Caching" Version="1.6.1906.1" />
+		<PackageReference Include="VIEApps.Enyim.Caching" Version="1.6.1906.2" />
 	</ItemGroup>
 
 </Project>

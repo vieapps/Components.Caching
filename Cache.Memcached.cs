@@ -29,8 +29,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="name">The string that presents name of isolated region of the cache</param>
 		/// <param name="expirationTime">The number that presents times (in minutes) for caching an item</param>
 		/// <param name="storeKeys">true to active store keys of the region (to clear or using with other purposes)</param>
-		/// <param name="loggerFactory">The logger factory for working with logs</param>
-		public Memcached(string name, int expirationTime, bool storeKeys, ILoggerFactory loggerFactory = null)
+		public Memcached(string name, int expirationTime, bool storeKeys)
 		{
 			// region name
 			this.Name = Helper.GetRegionName(name);

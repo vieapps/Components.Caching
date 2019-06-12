@@ -146,9 +146,8 @@ namespace net.vieapps.Components.Caching
 		/// <returns></returns>
 		public static byte[] Serialize(object value, bool addFlags = true)
 		{
-			var typeFlag = 0;
 			var data = new byte[0];
-
+			int typeFlag;
 			if (value != null && (value is JToken || value is ExpandoObject))
 			{
 				typeFlag = value is JToken
