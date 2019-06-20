@@ -10,14 +10,14 @@
 		<AssemblyTitle>VIEApps NGX Caching</AssemblyTitle>
 		<SignAssembly>false</SignAssembly>
 		<AssemblyOriginatorKeyFile>../VIEApps.Components.snk</AssemblyOriginatorKeyFile>
-		<AssemblyVersion>10.3.1906.3</AssemblyVersion>
-		<FileVersion>10.3.1906.3</FileVersion>
-		<InformationalVersion>v10.3.netstandard-2.x+rev:2019.06.18-multiple.targets.preview</InformationalVersion>
+		<AssemblyVersion>10.3.1906.4</AssemblyVersion>
+		<FileVersion>10.3.1906.4</FileVersion>
+		<InformationalVersion>v10.3+rev:2019.06.20-multiple.targets</InformationalVersion>
 		<Product>VIEApps NGX</Product>
 		<Company>VIEApps.net</Company>
-		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+		<GeneratePackageOnBuild>false</GeneratePackageOnBuild>
 		<PackageId>VIEApps.Components.Caching</PackageId>
-		<Version>10.3.1906.3-preview</Version>
+		<Version>10.3.1906.4-preview</Version>
 		<Title>VIEApps NGX Caching</Title>
 		<Description>Distributed cache (Redis &amp; Memcached) on .NET Standard 2.x</Description>
 		<Authors>VIEApps.net</Authors>
@@ -43,7 +43,14 @@
 		<PackageReference Include="Newtonsoft.Json" Version="12.0.2" />
 		<PackageReference Include="Newtonsoft.Json.Bson" Version="1.0.2" />
 		<PackageReference Include="StackExchange.Redis" Version="2.0.601" />
-		<PackageReference Include="VIEApps.Enyim.Caching" Version="1.7.1906.3-preview" />
+	</ItemGroup>
+
+	<ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
+		<PackageReference Include="VIEApps.Enyim.Caching" Version="1.6.1906.2" />
+	</ItemGroup>
+
+	<ItemGroup Condition="'$(TargetFramework)' != 'netstandard2.0'">
+		<PackageReference Include="VIEApps.Enyim.Caching" Version="1.7.1906.4-preview" />
 	</ItemGroup>
 
 </Project>
