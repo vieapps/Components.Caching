@@ -1,8 +1,8 @@
 # VIEApps.Components.Caching
 
-A .NET Standard 2.0 wrapper library for working with distributed cache
+A .NET Standard 2.x wrapper library for working with distributed cache
 
-- Ready with .NET Core 2.0 and .NET Framework 4.6.1 (and higher)
+- Ready with .NET Core 2.x - 3.0/.NET Framework 4.6.1 and higher
 - Supported: Redis & Memcached
 
 ## NuGet
@@ -24,8 +24,8 @@ Add the configuration settings into your app.config/web.config file
 <?xml version="1.0" encoding="utf-8"?>
 <configuration>
 	<configSections>
-		<section name="memcached" type="Enyim.Caching.Configuration.MemcachedClientConfigurationSectionHandler, Enyim.Caching" />
-		<section name="redis" type="net.vieapps.Components.Caching.RedisClientConfigurationSectionHandler, VIEApps.Components.Caching" />
+		<section name="memcached" type="Enyim.Caching.Configuration.MemcachedClientConfigurationSectionHandler,Enyim.Caching" />
+		<section name="redis" type="net.vieapps.Components.Caching.RedisClientConfigurationSectionHandler,VIEApps.Components.Caching" />
 	</configSections>
 	<memcached>
 		<servers>
@@ -50,7 +50,7 @@ Add the configuration settings into your app.config/web.config file
 <?xml version="1.0" encoding="utf-8"?>
 <configuration>
 	<configSections>
-		<section name="cache" type="net.vieapps.Components.Caching.CacheConfigurationSectionHandler, VIEApps.Components.Caching" />
+		<section name="cache" type="net.vieapps.Components.Caching.CacheConfigurationSectionHandler,VIEApps.Components.Caching" />
 	</configSections>
 	<cache provider="Redis" expirationTime="30">
 		<servers>
@@ -165,7 +165,3 @@ Task ClearAsync();
 HashSet<string> GetKeys();
 Task<HashSet<string>> GetKeysAsync();
 ```
-
-## Session State Providers (for ASP.NET)
-
-- See [VIEApps.Components.Caching.AspNet](https://github.com/vieapps/Components.Caching.AspNet)
