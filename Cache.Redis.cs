@@ -64,44 +64,64 @@ namespace net.vieapps.Components.Caching
 
 		#region Get client (singleton)
 		static ConnectionMultiplexer _Connection { get; set; } = null;
-		static IDatabase _Client { get; set; } = null;
+
 		static int ConnectionTimeout { get; set; }
+
+		static IDatabase _Client { get; set; } = null;
+
+		static SemaphoreSlim _ClientLock { get; } = new SemaphoreSlim(1, 1);
 
 		internal static IDatabase GetClient(RedisClientConfiguration configuration, ILoggerFactory loggerFactory = null)
 		{
 			if (Redis._Client == null)
 			{
-				var connectTimeout = "5000";
-				if (configuration.Options.IndexOf("connectTimeout=") > 0)
+				Redis._ClientLock.Wait();
+				try
 				{
-					connectTimeout = configuration.Options.Substring(configuration.Options.IndexOf("connectTimeout="));
-					connectTimeout = connectTimeout.Substring(connectTimeout.IndexOf("=") + 1);
-					if (connectTimeout.IndexOf(",") > 0)
-						connectTimeout = connectTimeout.Remove(connectTimeout.IndexOf(","));
-				}
-				Redis.ConnectionTimeout = Int32.TryParse(connectTimeout, out var timeout) ? timeout : 5000;
-				var logger = (loggerFactory ?? Enyim.Caching.Logger.GetLoggerFactory()).CreateLogger<Redis>();
-				if (Redis._Connection == null)
-				{
-					var connectionString = "";
-					configuration.Servers.ForEach(server => connectionString += (connectionString != "" ? "," : "") + $"{server.Address}:{server.Port}");
-					connectionString += string.IsNullOrWhiteSpace(configuration.Options) ? "" : (connectionString != "" ? "," : "") + configuration.Options;
-					try
+					if (Redis._Client == null)
 					{
-						Redis._Connection = string.IsNullOrWhiteSpace(connectionString) ? null : ConnectionMultiplexer.Connect(connectionString);
+						var connectTimeout = "5000";
+						var connectTimeoutIndex = configuration.Options.IndexOf("connectTimeout=");
+						if (connectTimeoutIndex > 0)
+						{
+							connectTimeout = configuration.Options.Substring(connectTimeoutIndex);
+							connectTimeout = connectTimeout.Substring(connectTimeout.IndexOf("=") + 1);
+							if (connectTimeout.IndexOf(",") > 0)
+								connectTimeout = connectTimeout.Remove(connectTimeout.IndexOf(","));
+						}
+						Redis.ConnectionTimeout = Int32.TryParse(connectTimeout, out var timeout) ? timeout : 5000;
+						var logger = (loggerFactory ?? Enyim.Caching.Logger.GetLoggerFactory()).CreateLogger<Redis>();
+						if (Redis._Connection == null)
+						{
+							var connectionString = "";
+							configuration.Servers.ForEach(server => connectionString += (connectionString != "" ? "," : "") + $"{server.Address}:{server.Port}");
+							connectionString += string.IsNullOrWhiteSpace(configuration.Options) ? "" : (connectionString != "" ? "," : "") + configuration.Options;
+							try
+							{
+								Redis._Connection = string.IsNullOrWhiteSpace(connectionString) ? null : ConnectionMultiplexer.Connect(connectionString);
+								if (logger.IsEnabled(LogLevel.Debug))
+									logger.LogDebug($"The Redis's connection was established => {connectionString}");
+							}
+							catch (Exception ex)
+							{
+								var exception = new ConfigurationErrorsException($"Error occurred while creating the Redis's connection [{connectionString}] => {ex.Message}", ex);
+								logger.LogError(exception, $"Cannot create new Redis's connection");
+								throw exception;
+							}
+						}
+						Redis._Client = Redis._Connection.GetDatabase();
 						if (logger.IsEnabled(LogLevel.Debug))
-							logger.LogDebug($"The redis's connection was established => {connectionString}");
-					}
-					catch (Exception ex)
-					{
-						var exception = new ConfigurationErrorsException($"Error occurred while creating the redis's connection [{connectionString}] => {ex.Message}", ex);
-						logger.LogError(exception, $"Cannot create new redis's connection");
-						throw exception;
+							logger.LogDebug($"The Redis's instance was created");
 					}
 				}
-				Redis._Client = Redis._Connection.GetDatabase();
-				if (logger.IsEnabled(LogLevel.Debug))
-					logger.LogDebug($"The redis's instance was created");
+				catch (Exception)
+				{
+					throw;
+				}
+				finally
+				{
+					Redis._ClientLock.Release();
+				}
 			}
 			return Redis._Client;
 		}

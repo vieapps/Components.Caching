@@ -14,7 +14,7 @@
 		<AssemblyVersion>10.3$(ReleaseVersion)</AssemblyVersion>
 		<FileVersion>10.3$(ReleaseVersion)</FileVersion>
 		<InformationalVersion>10.3-$(TargetFramework)-$(ReleaseRevision)</InformationalVersion>
-		<Version>10.3$(ReleaseVersion)$(ReleaseSurfix)</Version>
+		<Version>10.3$(ReleaseVersion)$(ReleaseSuffix)</Version>
 		<Product>VIEApps NGX</Product>
 		<Title>VIEApps NGX Caching</Title>
 		<Description>Distributed cache (Redis &amp; Memcached) on .NET Standard 2.x</Description>
@@ -22,8 +22,9 @@
 		<Authors>VIEApps.net</Authors>
 		<Company>VIEApps.net</Company>
 		<GeneratePackageOnBuild>$(GeneratePackage)</GeneratePackageOnBuild>
-		<PackageId>VIEApps.Components.Caching$(PackageSurfix)</PackageId>
-		<PackageLicense>LICENSE.md</PackageLicense>
+		<PackageId>VIEApps.Components.Caching$(PackageSuffix)</PackageId>
+		<PackageLicenseFile>LICENSE.md</PackageLicenseFile>
+		<PackageIcon>Icon.png</PackageIcon>
 		<PackageOutputPath>..\</PackageOutputPath>
 		<PackageTags>cache;caching;distributed;distributed-cache;distributed-caching;memcached;redis;vieapps;vieapps.components</PackageTags>
 		<PackageReleaseNotes>Support .NET Standard 2.1</PackageReleaseNotes>
@@ -36,15 +37,16 @@
 		<None Remove=".DS_Store" />
 		<None Remove=".gitattributes" />
 		<None Remove=".gitignore" />
-		<None Remove="LICENSE.md" />
 		<None Remove="README.md" />
+		<None Visible="false" Include="LICENSE.md" Pack="true" PackagePath="\" />
+		<None Visible="false" Include="Icon.png" Pack="true" PackagePath="\" />
 	</ItemGroup>
 
 	<ItemGroup>
 		<PackageReference Include="Newtonsoft.Json" Version="12.0.2" />
 		<PackageReference Include="Newtonsoft.Json.Bson" Version="1.0.2" />
 		<PackageReference Include="StackExchange.Redis" Version="2.0.601" />
-		<PackageReference Include="VIEApps.Enyim.Caching$(PackageSurfix)" Version="1.7.1907.1-preview" />
+		<PackageReference Include="VIEApps.Enyim.Caching$(PackageSuffix)" Version="1.7.1910.1" />
 	</ItemGroup>
 
 </Project>
