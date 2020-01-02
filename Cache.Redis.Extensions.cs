@@ -312,7 +312,7 @@ namespace net.vieapps.Components.Caching
 				: null;
 			return value != null
 				? Helper.Deserialize<T>(value)
-				: default(T);
+				: default;
 		}
 
 		/// <summary>
@@ -329,7 +329,7 @@ namespace net.vieapps.Components.Caching
 				: null;
 			return value != null
 				? Helper.Deserialize<T>(value)
-				: default(T);
+				: default;
 		}
 
 		internal static IDictionary<string, object> Get(this IDatabase redis, IEnumerable<string> keys, bool doDeserialize)
@@ -403,7 +403,7 @@ namespace net.vieapps.Components.Caching
 
 				for (var index = 0; index < redisKeys.Length; index++)
 					objects[redisKeys[index]] = redisValues[index].IsNull
-						? default(T)
+						? default
 						: Helper.Deserialize<T>(redisValues[index]);
 			}
 			return objects;
@@ -426,7 +426,7 @@ namespace net.vieapps.Components.Caching
 
 				for (var index = 0; index < redisKeys.Length; index++)
 					objects[redisKeys[index]] = redisValues[index].IsNull
-						? default(T)
+						? default
 						: Helper.Deserialize<T>(redisValues[index]);
 			}
 			return objects;

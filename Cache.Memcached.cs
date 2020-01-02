@@ -140,10 +140,10 @@ namespace net.vieapps.Components.Caching
 						var addedKeys = new List<string>();
 
 						while (this._removedKeys.Count > 0)
-							if (this._removedKeys.TryDequeue(out string key))
+							if (this._removedKeys.TryDequeue(out var key))
 								removedKeys.Add(key);
 						while (this._addedKeys.Count > 0)
-							if (this._addedKeys.TryDequeue(out string key))
+							if (this._addedKeys.TryDequeue(out var key))
 								addedKeys.Add(key);
 
 						var flag = $"{this._RegionKey}-Updating";
@@ -208,9 +208,9 @@ namespace net.vieapps.Components.Caching
 			try
 			{
 				while (this._addedKeys.Count > 0)
-					this._addedKeys.TryDequeue(out string key);
+					this._addedKeys.TryDequeue(out var key);
 				while (this._removedKeys.Count > 0)
-					this._removedKeys.TryDequeue(out string key);
+					this._removedKeys.TryDequeue(out var key);
 			}
 			catch (Exception ex)
 			{
@@ -508,7 +508,7 @@ namespace net.vieapps.Components.Caching
 		}
 
 		IDictionary<string, T> _Get<T>(IEnumerable<string> keys)
-			=> this._Get(keys)?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value is T ? (T)kvp.Value : default(T));
+			=> this._Get(keys)?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value is T ? (T)kvp.Value : default);
 
 		async Task<IDictionary<string, object>> _GetAsync(IEnumerable<string> keys, CancellationToken cancellationToken = default)
 		{
@@ -1256,7 +1256,7 @@ namespace net.vieapps.Components.Caching
 			var @object = this.Get(key);
 			return @object != null && @object is T
 				? (T)@object
-				: default(T);
+				: default;
 		}
 
 		/// <summary>
@@ -1278,7 +1278,7 @@ namespace net.vieapps.Components.Caching
 			var @object = await this.GetAsync(key, cancellationToken).ConfigureAwait(false);
 			return @object != null && @object is T
 				? (T)@object
-				: default(T);
+				: default;
 		}
 		#endregion
 

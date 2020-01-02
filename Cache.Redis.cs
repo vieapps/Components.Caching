@@ -1280,7 +1280,7 @@ namespace net.vieapps.Components.Caching
 			var @object = this.Get(key);
 			return @object != null && @object is T
 				? (T)@object
-				: default(T);
+				: default;
 		}
 
 		/// <summary>
@@ -1302,7 +1302,7 @@ namespace net.vieapps.Components.Caching
 			var @object = await this.GetAsync(key, cancellationToken).ConfigureAwait(false);
 			return @object != null && @object is T
 				? (T)@object
-				: default(T);
+				: default;
 		}
 		#endregion
 
