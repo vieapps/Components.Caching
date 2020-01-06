@@ -18,7 +18,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json.Bson;
-using Enyim.Reflection;
 using Enyim.Caching.Configuration;
 using Enyim.Caching.Memcached;
 using CacheUtils;
@@ -373,10 +372,10 @@ namespace net.vieapps.Components.Caching
 				configuration.Authentication.Parameters[kvp.Key] = kvp.Value;
 
 			if (!string.IsNullOrWhiteSpace(cacheConfiguration.KeyTransformer))
-				configuration.KeyTransformer = FastActivator.Create(cacheConfiguration.KeyTransformer) as IKeyTransformer;
+				configuration.KeyTransformer = Enyim.Caching.FastActivator.Create(cacheConfiguration.KeyTransformer) as IKeyTransformer;
 
 			if (!string.IsNullOrWhiteSpace(cacheConfiguration.Transcoder))
-				configuration.Transcoder = FastActivator.Create(cacheConfiguration.Transcoder) as ITranscoder;
+				configuration.Transcoder = Enyim.Caching.FastActivator.Create(cacheConfiguration.Transcoder) as ITranscoder;
 
 			if (!string.IsNullOrWhiteSpace(cacheConfiguration.NodeLocator))
 				configuration.NodeLocator = Type.GetType(cacheConfiguration.NodeLocator);

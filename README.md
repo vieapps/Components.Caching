@@ -1,8 +1,8 @@
 # VIEApps.Components.Caching
 
-A .NET Standard 2.x wrapper library for working with distributed cache
+A wrapper library for working with distributed cache
 
-- Ready with .NET Core 2.x - 3.0/.NET Framework 4.6.1 and higher
+- Ready with .NET Core 2.0+/.NET Framework 4.6.1+
 - Supported: Redis & Memcached
 
 ## NuGet
@@ -101,11 +101,11 @@ public class CreativeService
 }
 ```
 
-## Configuration (ASP.NET Core 2.0 apps)
+## Configuration (ASP.NET Core 2.0+ apps)
 
 TBD
 
-## Example of usage (ASP.NET Core 2.0 apps)
+## Example of usage (ASP.NET Core 2.0+ apps)
 
 TBD
 
