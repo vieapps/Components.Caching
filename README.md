@@ -1,6 +1,6 @@
 # VIEApps.Components.Caching
 
-A wrapper library for working with distributed cache
+A wrapper component for working with distributed cache
 
 - Ready with .NET Core 2.0+/.NET Framework 4.6.1+
 - Supported: Redis & Memcached
