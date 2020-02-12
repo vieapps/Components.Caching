@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFrameworks>netstandard2.0;netstandard2.1;netcoreapp2.0;netcoreapp2.1;netcoreapp2.2;netcoreapp3.0;netcoreapp3.1</TargetFrameworks>
+		<TargetFrameworks>netstandard2.0;netstandard2.1;netcoreapp2.1;netcoreapp3.1</TargetFrameworks>
 		<WarningLevel>3</WarningLevel>
 		<NoWarn>1701;1702;1705;1066;0067</NoWarn>
 		<DocumentationFile>bin/$(Configuration)/$(TargetFramework)/VIEApps.Components.Caching.xml</DocumentationFile>
@@ -32,7 +32,7 @@
 		<PackageIcon>Icon.png</PackageIcon>
 		<PackageOutputPath>../</PackageOutputPath>
 		<PackageTags>cache;caching;distributed;distributed-cache;distributed-caching;memcached;redis;vieapps;vieapps.components</PackageTags>
-		<PackageReleaseNotes>Upgrade to latest components and do some little code refactoring</PackageReleaseNotes>
+		<PackageReleaseNotes>Restructure: only support LTS targets</PackageReleaseNotes>
 		<PackageProjectUrl>https://vieapps.net/</PackageProjectUrl>
 		<RepositoryUrl>https://github.com/vieapps/Components.Caching</RepositoryUrl>
 		<RepositoryType>git</RepositoryType>
@@ -54,7 +54,7 @@
 	</ItemGroup>
 
 	<ItemGroup Condition="'$(GeneratePackage)'!='true'">
-		<PackageReference Include="VIEApps.Enyim.Caching" Version="1.7.2002.2" />
+		<PackageReference Include="VIEApps.Enyim.Caching" Version="1.7.2002.3" />
 	</ItemGroup>
 
 	<ItemGroup Condition="'$(GeneratePackage)'=='true'">
