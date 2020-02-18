@@ -389,7 +389,7 @@ namespace net.vieapps.Components.Caching
 
 namespace Microsoft.Extensions.DependencyInjection
 {
-	public static partial class ServiceCollectionExtensions
+	public static partial class CachingServiceCollectionExtensions
 	{
 		/// <summary>
 		/// Adds the <see cref="ICache">VIEApps NGX Caching</see> service into the collection of services for using with dependency injection
@@ -416,7 +416,7 @@ namespace Microsoft.Extensions.DependencyInjection
 
 namespace Microsoft.AspNetCore.Builder
 {
-	public static partial class ApplicationBuilderExtensions
+	public static partial class CachingApplicationBuilderExtensions
 	{
 		/// <summary>
 		/// Calls to use the <see cref="ICache">VIEApps NGX Caching</see> service

@@ -11,7 +11,7 @@ using CacheUtils;
 
 namespace net.vieapps.Components.Caching
 {
-	public static class RedisExtensions
+	public static class RedisCachingExtensions
 	{
 		internal static bool Set(this IDatabase redis, string key, byte[] value, TimeSpan validFor)
 			=> string.IsNullOrWhiteSpace(key)
