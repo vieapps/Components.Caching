@@ -58,7 +58,7 @@ namespace net.vieapps.Components.Caching
 		}
 
 		#region Get client (singleton)
-		static MemcachedClient _Client { get; set; } = null;
+		static MemcachedClient _Client { get; set; }
 
 		static SemaphoreSlim _ClientLock { get; } = new SemaphoreSlim(1, 1);
 
@@ -84,21 +84,22 @@ namespace net.vieapps.Components.Caching
 					{
 						if (Memcached._Client == null)
 						{
-							var logger = Logger.GetLoggerFactory().CreateLogger<Memcached>();
-							if (ConfigurationManager.GetSection("memcached") is CacheConfigurationSectionHandler memcachedConfigurationSection)
+							if (!(ConfigurationManager.GetSection("net.vieapps.cache") is CacheConfigurationSectionHandler config))
 							{
-								Memcached.GetClient(new CacheConfiguration(memcachedConfigurationSection).GetMemcachedConfiguration(Logger.GetLoggerFactory()), Logger.GetLoggerFactory());
-								if (logger.IsEnabled(LogLevel.Debug))
-									logger.LogDebug("The Memcached's instance was created with stand-alone configuration (app.config/web.config) at the section named 'memcached'");
+								config = ConfigurationManager.GetSection("cache") as CacheConfigurationSectionHandler;
+								if (config == null)
+									config = ConfigurationManager.GetSection("memcached") as CacheConfigurationSectionHandler;
 							}
-							else if (ConfigurationManager.GetSection("cache") is CacheConfigurationSectionHandler cacheConfigurationSection)
-							{
-								Memcached.GetClient(new CacheConfiguration(cacheConfigurationSection).GetMemcachedConfiguration(Logger.GetLoggerFactory()), Logger.GetLoggerFactory());
-								if (logger.IsEnabled(LogLevel.Debug))
-									logger.LogDebug("The Memcached's instance was created with stand-alone configuration (app.config/web.config) at the section named 'cache'");
-							}
-							else
-								throw new ConfigurationErrorsException("No configuration section is found, the configuration file (app.config/web.config) must have a section named 'memcached' or 'cache'.");
+
+							if (config == null)
+								throw new ConfigurationErrorsException("No configuration section is found, the configuration file (app.config/web.config) must have a section named 'net.vieapps.cache' or 'cache' or 'memcached'.");
+
+							var loggerFactory = Logger.GetLoggerFactory();
+							Memcached.GetClient(new CacheConfiguration(config).GetMemcachedConfiguration(loggerFactory), loggerFactory);
+
+							var logger = loggerFactory.CreateLogger<Memcached>();
+							if (logger.IsEnabled(LogLevel.Debug))
+								logger.LogDebug("The Memcached's instance was created with stand-alone configuration (app.config/web.config)");
 						}
 					}
 					catch (Exception)

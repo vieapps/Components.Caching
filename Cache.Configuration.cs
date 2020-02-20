@@ -107,14 +107,14 @@ namespace net.vieapps.Components.Caching
 
 			this.Provider = configuration.Section.Attributes["provider"]?.Value ?? "Redis";
 			this.RegionName = configuration.Section.Attributes["region"]?.Value ?? "VIEApps-NGX-Cache";
-			if (Int32.TryParse(configuration.Section.Attributes["expirationTime"]?.Value ?? "30", out int intValue))
+			if (Int32.TryParse(configuration.Section.Attributes["expirationTime"]?.Value ?? "30", out var intValue))
 				this.ExpirationTime = intValue;
 
 			if (configuration.Section.SelectNodes("servers/add") is XmlNodeList servers)
 				foreach (XmlNode server in servers)
 				{
 					var type = server.Attributes["type"]?.Value ?? "Redis";
-					this.Servers.Add(new CacheServer(server.Attributes["address"]?.Value ?? "localhost", Int32.TryParse(server.Attributes["port"]?.Value ?? (type.ToLower().Equals("redis") ? "6379" : "11211"), out int port) ? port : type.ToLower().Equals("redis") ? 6379 : 11211, type));
+					this.Servers.Add(new CacheServer(server.Attributes["address"]?.Value ?? "localhost", Int32.TryParse(server.Attributes["port"]?.Value ?? (type.ToLower().Equals("redis") ? "6379" : "11211"), out var port) ? port : type.ToLower().Equals("redis") ? 6379 : 11211, type));
 				}
 
 			if (configuration.Section.SelectSingleNode("options") is XmlNode options)
@@ -131,7 +131,7 @@ namespace net.vieapps.Components.Caching
 					this.SocketPool.MaxPoolSize = intValue;
 				if (Int32.TryParse(socketpool.Attributes["minPoolSize"]?.Value, out intValue))
 					this.SocketPool.MinPoolSize = intValue;
-				if (TimeSpan.TryParse(socketpool.Attributes["connectionTimeout"]?.Value, out TimeSpan timespanValue))
+				if (TimeSpan.TryParse(socketpool.Attributes["connectionTimeout"]?.Value, out var timespanValue))
 					this.SocketPool.ConnectionTimeout = timespanValue;
 				if (TimeSpan.TryParse(socketpool.Attributes["deadTimeout"]?.Value, out timespanValue))
 					this.SocketPool.DeadTimeout = timespanValue;
@@ -139,7 +139,7 @@ namespace net.vieapps.Components.Caching
 					this.SocketPool.QueueTimeout = timespanValue;
 				if (TimeSpan.TryParse(socketpool.Attributes["receiveTimeout"]?.Value, out timespanValue))
 					this.SocketPool.ReceiveTimeout = timespanValue;
-				if (Boolean.TryParse(socketpool.Attributes["noDelay"]?.Value, out bool boolValue))
+				if (Boolean.TryParse(socketpool.Attributes["noDelay"]?.Value, out var boolValue))
 					this.SocketPool.NoDelay = boolValue;
 
 				if ("throttling" == socketpool.Attributes["failurePolicy"]?.Value)
@@ -268,9 +268,4 @@ namespace net.vieapps.Components.Caching
 	/// Configuration section handler of the caching component
 	/// </summary>
 	public class CacheConfigurationSectionHandler : MemcachedClientConfigurationSectionHandler { }
-
-	/// <summary>
-	/// Configuration section handler of the Redis caching component
-	/// </summary>
-	public class RedisClientConfigurationSectionHandler : CacheConfigurationSectionHandler { }
 }

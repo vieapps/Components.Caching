@@ -63,11 +63,11 @@ namespace net.vieapps.Components.Caching
 		}
 
 		#region Get client (singleton)
-		static ConnectionMultiplexer _Connection { get; set; } = null;
+		static ConnectionMultiplexer _Connection { get; set; }
 
 		static int ConnectionTimeout { get; set; }
 
-		static IDatabase _Client { get; set; } = null;
+		static IDatabase _Client { get; set; }
 
 		static SemaphoreSlim _ClientLock { get; } = new SemaphoreSlim(1, 1);
 
@@ -135,21 +135,22 @@ namespace net.vieapps.Components.Caching
 			{
 				if (Redis._Client == null)
 				{
-					var logger = Enyim.Caching.Logger.GetLoggerFactory().CreateLogger<Redis>();
-					if (ConfigurationManager.GetSection("redis") is RedisClientConfigurationSectionHandler redisConfigurationSection)
+					if (!(ConfigurationManager.GetSection("net.vieapps.cache") is CacheConfigurationSectionHandler config))
 					{
-						Redis.GetClient(redisConfigurationSection.GetRedisConfiguration(), Enyim.Caching.Logger.GetLoggerFactory());
-						if (logger.IsEnabled(LogLevel.Debug))
-							logger.LogDebug("The Redis's instance was created with stand-alone configuration (app.config/web.config) at the section named 'redis'");
+						config = ConfigurationManager.GetSection("cache") as CacheConfigurationSectionHandler;
+						if (config == null)
+							config = ConfigurationManager.GetSection("redis") as CacheConfigurationSectionHandler;
 					}
-					else if (ConfigurationManager.GetSection("cache") is CacheConfigurationSectionHandler cacheConfigurationSection)
-					{
-						Redis.GetClient(cacheConfigurationSection.GetRedisConfiguration(), Enyim.Caching.Logger.GetLoggerFactory());
-						if (logger.IsEnabled(LogLevel.Debug))
-							logger.LogDebug("The Redis's instance was created with stand-alone configuration (app.config/web.config) at the section named 'cache'");
-					}
-					else
-						throw new ConfigurationErrorsException("No configuration section is found, the configuration file (app.config/web.config) must have a section named 'redis' or 'cache'.");
+
+					if (config == null)
+						throw new ConfigurationErrorsException("No configuration section is found, the configuration file (app.config/web.config) must have a section named 'net.vieapps.cache' or 'cache' or 'redis'.");
+
+					var loggerFactory = Enyim.Caching.Logger.GetLoggerFactory();
+					Redis.GetClient(config.GetRedisConfiguration(), loggerFactory);
+
+					var logger = loggerFactory.CreateLogger<Redis>();
+					if (logger.IsEnabled(LogLevel.Debug))
+						logger.LogDebug("The Redis's instance was created with stand-alone configuration (app.config/web.config)");
 				}
 				return Redis._Client;
 			}

@@ -85,17 +85,14 @@ namespace net.vieapps.Components.Caching
 		}
 
 		#region Get singleton instance
-		internal static Cache _Instance { get; set; } = null;
+		internal static Cache _Instance { get; set; }
 
-		static ICacheConfiguration _Configuration { get; set; } = null;
+		static ICacheConfiguration _Configuration { get; set; }
 
 		/// <summary>
 		/// Gets the global settings of the caching component
 		/// </summary>
-		public static ICacheConfiguration Configuration
-		{
-			get => Cache._Configuration ?? (Cache._Configuration = new CacheConfiguration(ConfigurationManager.GetSection("cache") is CacheConfigurationSectionHandler configSection ? configSection : null));
-		}
+		public static ICacheConfiguration Configuration => Cache._Configuration ?? (Cache._Configuration = new CacheConfiguration(ConfigurationManager.GetSection("net.vieapps.cache") is CacheConfigurationSectionHandler config ? config : ConfigurationManager.GetSection("cache") as CacheConfigurationSectionHandler));
 
 		/// <summary>
 		/// Gets the instance of caching component
