@@ -54,7 +54,7 @@
 	</ItemGroup>
 
 	<ItemGroup Condition="'$(GeneratePackage)'!='true'">
-		<PackageReference Include="VIEApps.Enyim.Caching" Version="1.7.2002.5" />
+		<PackageReference Include="VIEApps.Enyim.Caching" Version="1.7.2003.2" />
 	</ItemGroup>
 
 	<ItemGroup Condition="'$(GeneratePackage)'=='true'">
