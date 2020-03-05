@@ -60,57 +60,6 @@ namespace net.vieapps.Components.Caching
 		}
 		#endregion
 
-		#region Split & Combine
-		/// <summary>
-		/// Combines the collection of array of bytes
-		/// </summary>
-		/// <param name="bytes"></param>
-		/// <param name="arrays"></param>
-		/// <returns></returns>
-		public static byte[] Combine(this byte[] bytes, IEnumerable<byte[]> arrays)
-		{
-			if (arrays == null || arrays.Count() < 1)
-				return bytes;
-			var data = arrays.Where(a => a != null).ToList();
-			var combined = new byte[bytes.Length + data.Sum(a => a.Length)];
-			var offset = bytes.Length;
-			Buffer.BlockCopy(bytes, 0, combined, 0, offset);
-			data.ForEach(a =>
-			{
-				Buffer.BlockCopy(a, 0, combined, offset, a.Length);
-				offset += a.Length;
-			});
-			return combined;
-		}
-
-		/// <summary>
-		/// Splits to the collection of array of bytes
-		/// </summary>
-		/// <param name="data"></param>
-		/// <param name="size"></param>
-		/// <returns></returns>
-		public static List<byte[]> Split(this byte[] data, int size = 0)
-		{
-			var blocks = new List<byte[]>();
-			if (data != null && data.Length > 0)
-			{
-				size = size > 0 ? size : Helper.FragmentSize;
-				var offset = 0;
-				var length = data.Length;
-				while (offset < data.Length)
-				{
-					var count = size > length ? length : size;
-					var block = new byte[count];
-					Buffer.BlockCopy(data, offset, block, 0, count);
-					blocks.Add(block);
-					offset += count;
-					length -= count;
-				}
-			}
-			return blocks;
-		}
-		#endregion
-
 		#region Serialize & Deserialize
 		/// <summary>
 		/// Gets the flags
@@ -169,7 +118,7 @@ namespace net.vieapps.Components.Caching
 			}
 
 			return addFlags
-				? CacheUtils.Helper.Combine(BitConverter.GetBytes(typeFlag), data)
+				? CacheUtils.Helper.Concat(new[] { BitConverter.GetBytes(typeFlag), data })
 				: data;
 		}
 
@@ -245,7 +194,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="fragments"></param>
 		/// <returns></returns>
 		public static byte[] GetFirstFragment(this List<byte[]> fragments)
-			=> CacheUtils.Helper.Combine(BitConverter.GetBytes(Helper.FlagOfFirstFragmentBlock), BitConverter.GetBytes(fragments.Where(f => f != null).Sum(f => f.Length)), fragments[0]);
+			=> CacheUtils.Helper.Concat(new[] { BitConverter.GetBytes(Helper.FlagOfFirstFragmentBlock), BitConverter.GetBytes(fragments.Where(f => f != null).Sum(f => f.Length)), fragments[0] });
 
 		/// <summary>
 		/// Gets information of fragments

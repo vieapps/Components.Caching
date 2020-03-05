@@ -409,12 +409,12 @@ namespace net.vieapps.Components.Caching
 		bool _SetAsFragments(string key, object value, int expirationTime = 0, StoreMode mode = StoreMode.Set)
 			=> string.IsNullOrWhiteSpace(key) || value == null
 				? false
-				: this._SetFragments(key, Helper.Serialize(value).Split(), expirationTime, mode);
+				: this._SetFragments(key, CacheUtils.Helper.Split(Helper.Serialize(value), Helper.FragmentSize).ToList(), expirationTime, mode);
 
 		Task<bool> _SetAsFragmentsAsync(string key, object value, int expirationTime = 0, StoreMode mode = StoreMode.Set, CancellationToken cancellationToken = default)
 			=> string.IsNullOrWhiteSpace(key) || value == null
 				? Task.FromResult(false)
-				: this._SetFragmentsAsync(key, Helper.Serialize(value).Split(), expirationTime, mode, cancellationToken);
+				: this._SetFragmentsAsync(key, CacheUtils.Helper.Split(Helper.Serialize(value), Helper.FragmentSize).ToList(), expirationTime, mode, cancellationToken);
 		#endregion
 
 		#region Get
@@ -582,7 +582,7 @@ namespace net.vieapps.Components.Caching
 			try
 			{
 				var info = firstBlock.GetFragmentsInfo();
-				return firstBlock.Combine(info.Item1 > 1 ? this._GetAsFragments(key, Enumerable.Range(1, info.Item1 - 1).ToList()) : new List<byte[]>()).DeserializeFromFragments();
+				return CacheUtils.Helper.Concat(new[] { firstBlock }.Concat(info.Item1 > 1 ? this._GetAsFragments(key, Enumerable.Range(1, info.Item1 - 1).ToList()) : new List<byte[]>())).DeserializeFromFragments();
 			}
 			catch (Exception ex)
 			{
@@ -596,7 +596,7 @@ namespace net.vieapps.Components.Caching
 			try
 			{
 				var info = firstBlock.GetFragmentsInfo();
-				return firstBlock.Combine(info.Item1 > 1 ? await this._GetAsFragmentsAsync(key, Enumerable.Range(1, info.Item1 - 1).ToList(), cancellationToken).ConfigureAwait(false) : new List<byte[]>()).DeserializeFromFragments();
+				return CacheUtils.Helper.Concat(new[] { firstBlock }.Concat(info.Item1 > 1 ? await this._GetAsFragmentsAsync(key, Enumerable.Range(1, info.Item1 - 1).ToList(), cancellationToken).ConfigureAwait(false) : new List<byte[]>())).DeserializeFromFragments();
 			}
 			catch (OperationCanceledException)
 			{
@@ -719,8 +719,8 @@ namespace net.vieapps.Components.Caching
 		#region [Static]
 		internal static async Task<bool> SetKeysAsync(string key, HashSet<string> keys, CancellationToken cancellationToken = default)
 		{
-			var fragments = Helper.Serialize(keys, false).Split();
-			var success = await Memcached.Client.StoreAsync(StoreMode.Set, key, new ArraySegment<byte>(CacheUtils.Helper.Combine(BitConverter.GetBytes(fragments.Count), fragments[0])), cancellationToken).ConfigureAwait(false);
+			var fragments = CacheUtils.Helper.Split(Helper.Serialize(keys, false), Helper.FragmentSize).ToList();
+			var success = await Memcached.Client.StoreAsync(StoreMode.Set, key, new ArraySegment<byte>(CacheUtils.Helper.Concat(new[] { BitConverter.GetBytes(fragments.Count), fragments[0] })), cancellationToken).ConfigureAwait(false);
 			if (success && fragments.Count > 1)
 			{
 				var tasks = new List<Task>();
@@ -755,7 +755,7 @@ namespace net.vieapps.Components.Caching
 			tmp = new byte[data.Length - 4];
 			Buffer.BlockCopy(data, 4, tmp, 0, data.Length - 4);
 			fragments[0] = tmp;
-			data = new byte[0].Combine(fragments);
+			data = CacheUtils.Helper.Concat(fragments);
 			try
 			{
 				return Helper.Deserialize(data, 0, data.Length) as HashSet<string>;
@@ -790,7 +790,7 @@ namespace net.vieapps.Components.Caching
 			tmp = new byte[data.Length - 4];
 			Buffer.BlockCopy(data, 4, tmp, 0, data.Length - 4);
 			fragments[0] = tmp;
-			data = new byte[0].Combine(fragments);
+			data = CacheUtils.Helper.Concat(fragments);
 			try
 			{
 				return Helper.Deserialize(data, 0, data.Length) as HashSet<string>;

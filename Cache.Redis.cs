@@ -342,12 +342,12 @@ namespace net.vieapps.Components.Caching
 		bool _SetAsFragments(string key, object value, int expirationTime = 0)
 			=> string.IsNullOrWhiteSpace(key) || value == null
 				? false
-				: this._SetFragments(key, Helper.Serialize(value).Split(), expirationTime);
+				: this._SetFragments(key, CacheUtils.Helper.Split(Helper.Serialize(value), Helper.FragmentSize).ToList(), expirationTime);
 
 		Task<bool> _SetAsFragmentsAsync(string key, object value, int expirationTime = 0, CancellationToken cancellationToken = default)
 			=> string.IsNullOrWhiteSpace(key) || value == null
 				? Task.FromResult(false)
-				: this._SetFragmentsAsync(key, Helper.Serialize(value).Split(), expirationTime, cancellationToken);
+				: this._SetFragmentsAsync(key, CacheUtils.Helper.Split(Helper.Serialize(value), Helper.FragmentSize).ToList(), expirationTime, cancellationToken);
 		#endregion
 
 		#region Add
@@ -708,7 +708,7 @@ namespace net.vieapps.Components.Caching
 			try
 			{
 				var info = firstBlock.GetFragmentsInfo();
-				return firstBlock.Combine(info.Item1 > 1 ? this._GetAsFragments(key, Enumerable.Range(1, info.Item1 - 1).ToList()) : new List<byte[]>()).DeserializeFromFragments();
+				return CacheUtils.Helper.Concat(new[] { firstBlock }.Concat(info.Item1 > 1 ? this._GetAsFragments(key, Enumerable.Range(1, info.Item1 - 1).ToList()) : new List<byte[]>())).DeserializeFromFragments();
 			}
 			catch (Exception ex)
 			{
@@ -722,7 +722,7 @@ namespace net.vieapps.Components.Caching
 			try
 			{
 				var info = firstBlock.GetFragmentsInfo();
-				return firstBlock.Combine(info.Item1 > 1 ? await this._GetAsFragmentsAsync(key, Enumerable.Range(1, info.Item1 - 1).ToList(), cancellationToken).ConfigureAwait(false) : new List<byte[]>()).DeserializeFromFragments();
+				return CacheUtils.Helper.Concat(new[] { firstBlock }.Concat(info.Item1 > 1 ? await this._GetAsFragmentsAsync(key, Enumerable.Range(1, info.Item1 - 1).ToList(), cancellationToken).ConfigureAwait(false) : new List<byte[]>())).DeserializeFromFragments();
 			}
 			catch (OperationCanceledException)
 			{
