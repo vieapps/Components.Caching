@@ -23,7 +23,7 @@ namespace net.vieapps.Components.Caching
 	/// Manipulates cached objects in isolated regions with Redis
 	/// </summary>
 	[DebuggerDisplay("Redis: {Name} ({ExpirationTime} minutes)")]
-	public sealed class Redis : ICache, IDisposable
+	public sealed class Redis : ICache
 	{
 		readonly SemaphoreSlim _lock = new SemaphoreSlim(1, 1);
 		readonly bool _storeKeys;
@@ -54,13 +54,13 @@ namespace net.vieapps.Components.Caching
 		}
 
 		public void Dispose()
-			=> this._lock.Dispose();
+		{
+			GC.SuppressFinalize(this);
+			this._lock.Dispose();
+		}
 
 		~Redis()
-		{
-			this.Dispose();
-			GC.SuppressFinalize(this);
-		}
+			=> this.Dispose();
 
 		#region Get client (singleton)
 		static ConnectionMultiplexer _Connection { get; set; }

@@ -10,7 +10,7 @@ namespace net.vieapps.Components.Caching
 	/// <summary>
 	/// Presents a caching provider for manipulating objects in isolated regions with distributed cache servers (Redis &amp; Memcached)
 	/// </summary>
-	public interface ICache
+	public interface ICache : IDisposable
 	{
 
 		#region Properties

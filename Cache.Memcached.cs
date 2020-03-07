@@ -21,7 +21,7 @@ namespace net.vieapps.Components.Caching
 	/// Manipulates cached objects in isolated regions with Memcached
 	/// </summary>
 	[DebuggerDisplay("Memcached: {Name} ({ExpirationTime} minutes)")]
-	public sealed class Memcached : ICache, IDisposable
+	public sealed class Memcached : ICache
 	{
 		/// <summary>
 		/// Create new instance of Memcached
@@ -49,13 +49,13 @@ namespace net.vieapps.Components.Caching
 		}
 
 		public void Dispose()
-			=> this._lock.Dispose();
+		{
+			GC.SuppressFinalize(this);
+			this._lock.Dispose();
+		}
 
 		~Memcached()
-		{
-			this.Dispose();
-			GC.SuppressFinalize(this);
-		}
+			=> this.Dispose();
 
 		#region Get client (singleton)
 		static MemcachedClient _Client { get; set; }

@@ -177,7 +177,7 @@ namespace net.vieapps.Components.Caching
 		public static T Deserialize<T>(byte[] data)
 		{
 			var value = data != null ? Helper.Deserialize(data) : null;
-			return value != null && value is T ? (T)value : default(T);
+			return value != null && value is T ? (T)value : default;
 		}
 
 		internal static object DeserializeFromFragments(this byte[] data)
@@ -258,7 +258,7 @@ namespace net.vieapps.Components.Caching
 						var address = server.Attributes["address"]?.Value ?? "localhost";
 						var endpoint = (address.IndexOf(".") > 0 && address.IndexOf(":") > 0) || (address.IndexOf(":") > 0 && address.IndexOf("]:") > 0)
 							? ConfigurationHelper.ResolveToEndPoint(address)
-							: ConfigurationHelper.ResolveToEndPoint(address, Int32.TryParse(server.Attributes["port"]?.Value ?? "6379", out int port) ? port : 6379);
+							: ConfigurationHelper.ResolveToEndPoint(address, Int32.TryParse(server.Attributes["port"]?.Value ?? "6379", out var port) ? port : 6379);
 						configuration.Servers.Add(endpoint as IPEndPoint);
 					}
 
@@ -380,7 +380,7 @@ namespace Microsoft.AspNetCore.Builder
 			}
 			catch (Exception ex)
 			{
-				appBuilder.ApplicationServices.GetService<ILogger<ICache>>().LogError(ex, $"Error occurred while collecting information of the service of VIEApps NGX Caching => {ex.Message}");
+				appBuilder.ApplicationServices.GetService<ILogger<ICache>>().LogError(ex, $"Error occurred while collecting information of VIEApps NGX Caching => {ex.Message}");
 			}
 			return appBuilder;
 		}

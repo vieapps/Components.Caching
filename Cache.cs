@@ -84,6 +84,15 @@ namespace net.vieapps.Components.Caching
 				Helper.Logger.LogDebug($"The VIEApps NGX Caching's instance was created - {this._cache.GetType().ToString().Split('.').Last()}: {this._cache.Name} ({this._cache.ExpirationTime} minutes)");
 		}
 
+		public void Dispose()
+		{
+			GC.SuppressFinalize(this);
+			this._cache.Dispose();
+		}
+
+		~Cache()
+			=> this.Dispose();
+
 		#region Get singleton instance
 		internal static Cache _Instance { get; set; }
 
