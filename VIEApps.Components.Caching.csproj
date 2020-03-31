@@ -32,7 +32,7 @@
 		<PackageIcon>Icon.png</PackageIcon>
 		<PackageOutputPath>../</PackageOutputPath>
 		<PackageTags>cache;caching;distributed;distributed-cache;distributed-caching;memcached;redis;vieapps;vieapps.components</PackageTags>
-		<PackageReleaseNotes>Improvement: upgrade to latest components, refactor the concat/split</PackageReleaseNotes>
+		<PackageReleaseNotes>Improvement: upgrade to latest components</PackageReleaseNotes>
 		<PackageProjectUrl>https://vieapps.net/</PackageProjectUrl>
 		<RepositoryUrl>https://github.com/vieapps/Components.Caching</RepositoryUrl>
 		<RepositoryType>git</RepositoryType>
@@ -50,15 +50,12 @@
 	<ItemGroup>
 		<PackageReference Include="Newtonsoft.Json" Version="12.0.3" />
 		<PackageReference Include="Newtonsoft.Json.Bson" Version="1.0.2" />
-		<PackageReference Include="StackExchange.Redis" Version="2.0.601" />
+		<PackageReference Include="StackExchange.Redis" Version="2.1.28" />
 	</ItemGroup>
 
-	<ItemGroup Condition="'$(GeneratePackage)' != 'true'">
-		<PackageReference Include="VIEApps.Enyim.Caching" Version="1.7.2003.4" />
-	</ItemGroup>
-
-	<ItemGroup Condition="'$(GeneratePackage)' == 'true'">
-		<PackageReference Include="VIEApps.Enyim.Caching$(PackageSuffix)" Version="1.7$(ReleaseVersion)" />
+	<ItemGroup>
+		<PackageReference Include="VIEApps.Enyim.Caching" Version="1.7.2004.1" Condition="'$(GeneratePackage)' != 'true'" />
+		<PackageReference Include="VIEApps.Enyim.Caching$(PackageSuffix)" Version="1.7$(ReleaseVersion)" Condition="'$(GeneratePackage)' == 'true'" />
 	</ItemGroup>
 
 </Project>
