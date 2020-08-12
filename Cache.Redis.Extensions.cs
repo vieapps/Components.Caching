@@ -475,8 +475,15 @@ namespace net.vieapps.Components.Caching
 			=> string.IsNullOrWhiteSpace(key)
 				? Task.FromResult(false)
 				: redis.KeyDeleteAsync(key).WithCancellationToken(cancellationToken);
-
-		internal static bool UpdateSetMembers(this IDatabase redis, string key, string[] values)
+				
+		/// <summary>
+		/// Updates the 'Set' member
+		/// </summary>
+		/// <param name="redis"></param>
+		/// <param name="key"></param>
+		/// <param name="values"></param>
+		/// <returns></returns>
+		public static bool UpdateSetMembers(this IDatabase redis, string key, string[] values)
 		{
 			if (!string.IsNullOrWhiteSpace(key) && values != null && values.Length > 0)
 				try
@@ -503,10 +510,25 @@ namespace net.vieapps.Components.Caching
 			return false;
 		}
 
-		internal static bool UpdateSetMembers(this IDatabase redis, string key, string value)
+		/// <summary>
+		/// Updates the 'Set' member
+		/// </summary>
+		/// <param name="redis"></param>
+		/// <param name="key"></param>
+		/// <param name="value"></param>
+		/// <returns></returns>
+		public static bool UpdateSetMembers(this IDatabase redis, string key, string value)
 			=> redis.UpdateSetMembers(key, new[] { value });
 
-		internal static async Task<bool> UpdateSetMembersAsync(this IDatabase redis, string key, string[] values, CancellationToken cancellationToken = default)
+		/// <summary>
+		/// Updates the 'Set' member
+		/// </summary>
+		/// <param name="redis"></param>
+		/// <param name="key"></param>
+		/// <param name="values"></param>
+		/// <param name="cancellationToken"></param>
+		/// <returns></returns>
+		public static async Task<bool> UpdateSetMembersAsync(this IDatabase redis, string key, string[] values, CancellationToken cancellationToken = default)
 		{
 			if (!string.IsNullOrWhiteSpace(key) && values != null && values.Length > 0)
 				try
@@ -533,10 +555,25 @@ namespace net.vieapps.Components.Caching
 			return false;
 		}
 
-		internal static Task<bool> UpdateSetMembersAsync(this IDatabase redis, string key, string value, CancellationToken cancellationToken = default)
+		/// <summary>
+		/// Updates the 'Set' member
+		/// </summary>
+		/// <param name="redis"></param>
+		/// <param name="key"></param>
+		/// <param name="value"></param>
+		/// <param name="cancellationToken"></param>
+		/// <returns></returns>
+		public static Task<bool> UpdateSetMembersAsync(this IDatabase redis, string key, string value, CancellationToken cancellationToken = default)
 			=> redis.UpdateSetMembersAsync(key, new[] { value }, cancellationToken);
 
-		internal static bool RemoveSetMembers(this IDatabase redis, string key, string value)
+		/// <summary>
+		/// Removes the 'Set' member
+		/// </summary>
+		/// <param name="redis"></param>
+		/// <param name="key"></param>
+		/// <param name="value"></param>
+		/// <returns></returns>
+		public static bool RemoveSetMembers(this IDatabase redis, string key, string value)
 		{
 			try
 			{
@@ -550,7 +587,15 @@ namespace net.vieapps.Components.Caching
 			}
 		}
 
-		internal static async Task<bool> RemoveSetMembersAsync(this IDatabase redis, string key, string value, CancellationToken cancellationToken = default)
+		/// <summary>
+		/// Removes the 'Set' member
+		/// </summary>
+		/// <param name="redis"></param>
+		/// <param name="key"></param>
+		/// <param name="value"></param>
+		/// <param name="cancellationToken"></param>
+		/// <returns></returns>
+		public static async Task<bool> RemoveSetMembersAsync(this IDatabase redis, string key, string value, CancellationToken cancellationToken = default)
 		{
 			try
 			{
@@ -564,7 +609,13 @@ namespace net.vieapps.Components.Caching
 			}
 		}
 
-		internal static HashSet<string> GetSetMembers(this IDatabase redis, string key)
+		/// <summary>
+		/// Gets the 'Set' member
+		/// </summary>
+		/// <param name="redis"></param>
+		/// <param name="key"></param>
+		/// <returns></returns>
+		public static HashSet<string> GetSetMembers(this IDatabase redis, string key)
 		{
 			try
 			{
@@ -579,7 +630,14 @@ namespace net.vieapps.Components.Caching
 			}
 		}
 
-		internal static async Task<HashSet<string>> GetSetMembersAsync(this IDatabase redis, string key, CancellationToken cancellationToken = default)
+		/// <summary>
+		/// Gets the 'Set' member
+		/// </summary>
+		/// <param name="redis"></param>
+		/// <param name="key"></param>
+		/// <param name="cancellationToken"></param>
+		/// <returns></returns>
+		public static async Task<HashSet<string>> GetSetMembersAsync(this IDatabase redis, string key, CancellationToken cancellationToken = default)
 		{
 			try
 			{
