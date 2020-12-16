@@ -14,9 +14,7 @@ namespace net.vieapps.Components.Caching
 	public static class RedisCachingExtensions
 	{
 		internal static bool Set(this IDatabase redis, string key, byte[] value, TimeSpan validFor)
-			=> string.IsNullOrWhiteSpace(key)
-				? false
-				: redis.StringSet(key, value, validFor);
+			=> !string.IsNullOrWhiteSpace(key) && redis.StringSet(key, value, validFor);
 
 		/// <summary>
 		/// Adds an item into cache with a specified key (if the key is already existed, then old cached item will be overriden)
@@ -27,9 +25,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="validFor"></param>
 		/// <returns></returns>
 		public static bool Set(this IDatabase redis, string key, object value, TimeSpan validFor)
-			=> string.IsNullOrWhiteSpace(key)
-				? false
-				: redis.Set(key, Helper.Serialize(value), validFor);
+			=> !string.IsNullOrWhiteSpace(key) && redis.Set(key, Helper.Serialize(value), validFor);
 
 		/// <summary>
 		/// Adds an item into cache with a specified key (if the key is already existed, then old cached item will be overriden)
@@ -129,9 +125,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="validFor"></param>
 		/// <returns></returns>
 		public static bool Add(this IDatabase redis, string key, object value, TimeSpan validFor)
-			=> string.IsNullOrWhiteSpace(key) || redis.Exists(key)
-				? false
-				: redis.Set(key, value, validFor);
+			=> !string.IsNullOrWhiteSpace(key) && !redis.Exists(key) && redis.Set(key, value, validFor);
 
 		/// <summary>
 		/// Adds an item into cache with a specified key when the the key is not existed
@@ -164,9 +158,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="validFor"></param>
 		/// <returns></returns>
 		public static async Task<bool> AddAsync(this IDatabase redis, string key, object value, TimeSpan validFor, CancellationToken cancellationToken = default)
-			=> string.IsNullOrWhiteSpace(key) || await redis.ExistsAsync(key, cancellationToken).ConfigureAwait(false)
-				? false
-				: await redis.SetAsync(key, value, validFor, cancellationToken).ConfigureAwait(false);
+			=> !string.IsNullOrWhiteSpace(key) && !await redis.ExistsAsync(key, cancellationToken).ConfigureAwait(false) && await redis.SetAsync(key, value, validFor, cancellationToken).ConfigureAwait(false);
 
 		/// <summary>
 		/// Adds an item into cache with a specified key when the the key is not existed
@@ -199,9 +191,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="validFor"></param>
 		/// <returns></returns>
 		public static bool Replace(this IDatabase redis, string key, object value, TimeSpan validFor)
-			=> string.IsNullOrWhiteSpace(key) || !redis.Exists(key)
-				? false
-				: redis.Set(key, value, validFor);
+			=> !string.IsNullOrWhiteSpace(key) && redis.Exists(key) && redis.Set(key, value, validFor);
 
 		/// <summary>
 		/// Adds an item into cache with a specified key when the the key is existed (means update existed item)
@@ -234,9 +224,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="validFor"></param>
 		/// <returns></returns>
 		public static async Task<bool> ReplaceAsync(this IDatabase redis, string key, object value, TimeSpan validFor, CancellationToken cancellationToken = default)
-			=> string.IsNullOrWhiteSpace(key) || !await redis.ExistsAsync(key, cancellationToken).ConfigureAwait(false)
-				? false
-				: await redis.SetAsync(key, value, validFor, cancellationToken).ConfigureAwait(false);
+			=> !string.IsNullOrWhiteSpace(key) && await redis.ExistsAsync(key, cancellationToken).ConfigureAwait(false) && await redis.SetAsync(key, value, validFor, cancellationToken).ConfigureAwait(false);
 
 		/// <summary>
 		/// Adds an item into cache with a specified key when the the key is existed (means update existed item)
@@ -339,7 +327,6 @@ namespace net.vieapps.Components.Caching
 			{
 				var redisKeys = keys.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => (RedisKey)key).ToArray();
 				var redisValues = redis.StringGet(redisKeys);
-
 				for (var index = 0; index < redisKeys.Length; index++)
 					objects[redisKeys[index]] = redisValues[index].IsNull
 						? null
@@ -366,7 +353,6 @@ namespace net.vieapps.Components.Caching
 			{
 				var redisKeys = keys.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => (RedisKey)key).ToArray();
 				var redisValues = await redis.StringGetAsync(redisKeys).WithCancellationToken(cancellationToken).ConfigureAwait(false);
-
 				for (var index = 0; index < redisKeys.Length; index++)
 					objects[redisKeys[index]] = redisValues[index].IsNull
 						? null
@@ -400,7 +386,6 @@ namespace net.vieapps.Components.Caching
 			{
 				var redisKeys = keys.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => (RedisKey)key).ToArray();
 				var redisValues = redis.StringGet(redisKeys);
-
 				for (var index = 0; index < redisKeys.Length; index++)
 					objects[redisKeys[index]] = redisValues[index].IsNull
 						? default
@@ -423,7 +408,6 @@ namespace net.vieapps.Components.Caching
 			{
 				var redisKeys = keys.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => (RedisKey)key).ToArray();
 				var redisValues = await redis.StringGetAsync(redisKeys).WithCancellationToken(cancellationToken).ConfigureAwait(false);
-
 				for (var index = 0; index < redisKeys.Length; index++)
 					objects[redisKeys[index]] = redisValues[index].IsNull
 						? default
@@ -439,9 +423,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="key"></param>
 		/// <returns></returns>
 		public static bool Exists(this IDatabase redis, string key)
-			=> string.IsNullOrWhiteSpace(key)
-				? false
-				: redis.KeyExists(key);
+			=> !string.IsNullOrWhiteSpace(key) && redis.KeyExists(key);
 
 		/// <summary>
 		/// Determines whether an item exists in the cache
@@ -461,9 +443,15 @@ namespace net.vieapps.Components.Caching
 		/// <param name="key"></param>
 		/// <returns></returns>
 		public static bool Remove(this IDatabase redis, string key)
-			=> string.IsNullOrWhiteSpace(key)
-				? false
-				: redis.KeyDelete(key);
+			=> !string.IsNullOrWhiteSpace(key) && redis.KeyDelete(key);
+
+		/// <summary>
+		/// Removes a collection of cached items
+		/// </summary>
+		/// <param name="redis"></param>
+		/// <param name="keys"></param>
+		public static void Remove(this IDatabase redis, IEnumerable<string> keys)
+			=> redis.KeyDelete(keys?.Select(key => (RedisKey)key).ToArray());
 
 		/// <summary>
 		/// Removes a cached item
@@ -475,40 +463,14 @@ namespace net.vieapps.Components.Caching
 			=> string.IsNullOrWhiteSpace(key)
 				? Task.FromResult(false)
 				: redis.KeyDeleteAsync(key).WithCancellationToken(cancellationToken);
-				
+
 		/// <summary>
-		/// Updates the 'Set' member
+		/// Removes a collection of cached items
 		/// </summary>
 		/// <param name="redis"></param>
-		/// <param name="key"></param>
-		/// <param name="values"></param>
-		/// <returns></returns>
-		public static bool UpdateSetMembers(this IDatabase redis, string key, string[] values)
-		{
-			if (!string.IsNullOrWhiteSpace(key) && values != null && values.Length > 0)
-				try
-				{
-					return redis.SetAdd(key, values.Where(v => !string.IsNullOrWhiteSpace(v)).Select(v => (RedisValue)v).ToArray()) > 0;
-				}
-				catch (RedisServerException ex)
-				{
-					if (ex.Message.Contains("WRONGTYPE"))
-					{
-						redis.KeyDelete(key);
-						return redis.SetAdd(key, values.Where(v => !string.IsNullOrWhiteSpace(v)).Select(v => (RedisValue)v).ToArray()) > 0;
-					}
-					if (Helper.Logger.IsEnabled(LogLevel.Debug))
-						Helper.Logger.LogError(ex, $"Error occurred while updating region keys into Redis server => {ex.Message}");
-					throw ex;
-				}
-				catch (Exception ex)
-				{
-					if (Helper.Logger.IsEnabled(LogLevel.Debug))
-						Helper.Logger.LogError(ex, $"Error occurred while updating region keys into Redis server => {ex.Message}");
-					throw ex;
-				}
-			return false;
-		}
+		/// <param name="keys"></param>
+		public static Task RemoveAsync(this IDatabase redis, IEnumerable<string> keys, CancellationToken cancellationToken = default)
+			=> redis.KeyDeleteAsync(keys?.Select(key => (RedisKey)key).ToArray()).WithCancellationToken(cancellationToken);
 
 		/// <summary>
 		/// Updates the 'Set' member
@@ -526,31 +488,31 @@ namespace net.vieapps.Components.Caching
 		/// <param name="redis"></param>
 		/// <param name="key"></param>
 		/// <param name="values"></param>
-		/// <param name="cancellationToken"></param>
 		/// <returns></returns>
-		public static async Task<bool> UpdateSetMembersAsync(this IDatabase redis, string key, string[] values, CancellationToken cancellationToken = default)
+		public static bool UpdateSetMembers(this IDatabase redis, string key, IEnumerable<string> values)
 		{
-			if (!string.IsNullOrWhiteSpace(key) && values != null && values.Length > 0)
+			var redisValues = values?.Select(value => (RedisValue)value).ToArray();
+			if (!string.IsNullOrWhiteSpace(key) && values != null && values.Count() > 0)
 				try
 				{
-					return await redis.SetAddAsync(key, values.Where(v => !string.IsNullOrWhiteSpace(v)).Select(v => (RedisValue)v).ToArray()).WithCancellationToken(cancellationToken).ConfigureAwait(false) > 0;
+					return redis.SetAdd(key, redisValues) > 0;
 				}
 				catch (RedisServerException ex)
 				{
 					if (ex.Message.Contains("WRONGTYPE"))
 					{
-						await redis.KeyDeleteAsync(key).WithCancellationToken(cancellationToken).ConfigureAwait(false);
-						return await redis.SetAddAsync(key, values.Where(v => !string.IsNullOrWhiteSpace(v)).Select(v => (RedisValue)v).ToArray()).WithCancellationToken(cancellationToken).ConfigureAwait(false) > 0;
+						redis.KeyDelete(key);
+						return redis.SetAdd(key, redisValues) > 0;
 					}
 					if (Helper.Logger.IsEnabled(LogLevel.Debug))
-						Helper.Logger.LogError(ex, $"Error occurred while updating region keys into Redis server => {ex.Message}");
-					throw ex;
+						Helper.Logger.LogError(ex, $"Error occurred while updating a set into Redis server => {ex.Message}");
+					throw;
 				}
 				catch (Exception ex)
 				{
 					if (Helper.Logger.IsEnabled(LogLevel.Debug))
-						Helper.Logger.LogError(ex, $"Error occurred while updating region keys into Redis server => {ex.Message}");
-					throw ex;
+						Helper.Logger.LogError(ex, $"Error occurred while updating a set into Redis server => {ex.Message}");
+					throw;
 				}
 			return false;
 		}
@@ -567,22 +529,68 @@ namespace net.vieapps.Components.Caching
 			=> redis.UpdateSetMembersAsync(key, new[] { value }, cancellationToken);
 
 		/// <summary>
+		/// Updates the 'Set' member
+		/// </summary>
+		/// <param name="redis"></param>
+		/// <param name="key"></param>
+		/// <param name="values"></param>
+		/// <param name="cancellationToken"></param>
+		/// <returns></returns>
+		public static async Task<bool> UpdateSetMembersAsync(this IDatabase redis, string key, IEnumerable<string> values, CancellationToken cancellationToken = default)
+		{
+			var redisValues = values?.Select(value => (RedisValue)value).ToArray();
+			if (!string.IsNullOrWhiteSpace(key) && values != null && values.Count() > 0)
+				try
+				{
+					return await redis.SetAddAsync(key, redisValues).WithCancellationToken(cancellationToken).ConfigureAwait(false) > 0;
+				}
+				catch (RedisServerException ex)
+				{
+					if (ex.Message.Contains("WRONGTYPE"))
+					{
+						await redis.KeyDeleteAsync(key).WithCancellationToken(cancellationToken).ConfigureAwait(false);
+						return await redis.SetAddAsync(key, redisValues).WithCancellationToken(cancellationToken).ConfigureAwait(false) > 0;
+					}
+					if (Helper.Logger.IsEnabled(LogLevel.Debug))
+						Helper.Logger.LogError(ex, $"Error occurred while updating a set into Redis server => {ex.Message}");
+					throw;
+				}
+				catch (Exception ex)
+				{
+					if (Helper.Logger.IsEnabled(LogLevel.Debug))
+						Helper.Logger.LogError(ex, $"Error occurred while updating a set into Redis server => {ex.Message}");
+					throw;
+				}
+			return false;
+		}
+
+		/// <summary>
 		/// Removes the 'Set' member
 		/// </summary>
 		/// <param name="redis"></param>
 		/// <param name="key"></param>
 		/// <param name="value"></param>
 		/// <returns></returns>
-		public static bool RemoveSetMembers(this IDatabase redis, string key, string value)
+		public static bool DeleteSetMembers(this IDatabase redis, string key, string value)
+			=> redis.DeleteSetMembers(key, new[] { value });
+
+		/// <summary>
+		/// Removes the 'Set' members
+		/// </summary>
+		/// <param name="redis"></param>
+		/// <param name="key"></param>
+		/// <param name="values"></param>
+		/// <returns></returns>
+		public static bool DeleteSetMembers(this IDatabase redis, string key, IEnumerable<string> values, CancellationToken cancellationToken = default)
 		{
 			try
 			{
-				return redis.SetRemove(key, value);
+				return redis.SetRemove(key, values?.Select(value => (RedisValue)value).ToArray()) > 0;
 			}
 			catch (Exception ex)
 			{
 				if (Helper.Logger.IsEnabled(LogLevel.Debug))
-					Helper.Logger.LogError(ex, $"Error occurred while removing region keys from Redis server => {ex.Message}");
+					Helper.Logger.LogError(ex, $"Error occurred while updating a set from Redis server => {ex.Message}");
 				return false;
 			}
 		}
@@ -595,16 +603,27 @@ namespace net.vieapps.Components.Caching
 		/// <param name="value"></param>
 		/// <param name="cancellationToken"></param>
 		/// <returns></returns>
-		public static async Task<bool> RemoveSetMembersAsync(this IDatabase redis, string key, string value, CancellationToken cancellationToken = default)
+		public static Task<bool> DeleteSetMembersAsync(this IDatabase redis, string key, string value, CancellationToken cancellationToken = default)
+			=> redis.DeleteSetMembersAsync(key, new[] { value }, cancellationToken);
+
+		/// <summary>
+		/// Removes the 'Set' members
+		/// </summary>
+		/// <param name="redis"></param>
+		/// <param name="key"></param>
+		/// <param name="values"></param>
+		/// <param name="cancellationToken"></param>
+		/// <returns></returns>
+		public static async Task<bool> DeleteSetMembersAsync(this IDatabase redis, string key, IEnumerable<string> values, CancellationToken cancellationToken = default)
 		{
 			try
 			{
-				return await redis.SetRemoveAsync(key, value).WithCancellationToken(cancellationToken).ConfigureAwait(false);
+				return await redis.SetRemoveAsync(key, values?.Select(value => (RedisValue)value).ToArray()).WithCancellationToken(cancellationToken).ConfigureAwait(false) > 0;
 			}
 			catch (Exception ex)
 			{
 				if (Helper.Logger.IsEnabled(LogLevel.Debug))
-					Helper.Logger.LogError(ex, $"Error occurred while removing region keys from Redis server => {ex.Message}");
+					Helper.Logger.LogError(ex, $"Error occurred while updating a set from Redis server => {ex.Message}");
 				return false;
 			}
 		}
@@ -615,17 +634,17 @@ namespace net.vieapps.Components.Caching
 		/// <param name="redis"></param>
 		/// <param name="key"></param>
 		/// <returns></returns>
-		public static HashSet<string> GetSetMembers(this IDatabase redis, string key)
+		public static HashSet<string> FetchSetMembers(this IDatabase redis, string key)
 		{
 			try
 			{
-				var keys = redis.SetMembers(key);
-				return new HashSet<string>(keys?.Where(k => !k.IsNull).Select(k => k.ToString()) ?? new string[] { });
+				var values = redis.SetMembers(key);
+				return new HashSet<string>(values?.Where(value => !value.IsNull).Select(value => value.ToString()) ?? new string[] { });
 			}
 			catch (Exception ex)
 			{
 				if (Helper.Logger.IsEnabled(LogLevel.Debug))
-					Helper.Logger.LogError(ex, $"Error occurred while getting region keys from Redis server => {ex.Message}");
+					Helper.Logger.LogError(ex, $"Error occurred while getting set keys from Redis server => {ex.Message}");
 				return new HashSet<string>();
 			}
 		}
@@ -637,17 +656,17 @@ namespace net.vieapps.Components.Caching
 		/// <param name="key"></param>
 		/// <param name="cancellationToken"></param>
 		/// <returns></returns>
-		public static async Task<HashSet<string>> GetSetMembersAsync(this IDatabase redis, string key, CancellationToken cancellationToken = default)
+		public static async Task<HashSet<string>> FetchSetMembersAsync(this IDatabase redis, string key, CancellationToken cancellationToken = default)
 		{
 			try
 			{
-				var keys = await redis.SetMembersAsync(key).WithCancellationToken(cancellationToken).ConfigureAwait(false);
-				return new HashSet<string>(keys?.Where(k => !k.IsNull).Select(k => k.ToString()) ?? new string[] { });
+				var values = await redis.SetMembersAsync(key).WithCancellationToken(cancellationToken).ConfigureAwait(false);
+				return new HashSet<string>(values?.Where(value => !value.IsNull).Select(value => value.ToString()) ?? new string[] { });
 			}
 			catch (Exception ex)
 			{
 				if (Helper.Logger.IsEnabled(LogLevel.Debug))
-					Helper.Logger.LogError(ex, $"Error occurred while getting region keys from Redis server => {ex.Message}");
+					Helper.Logger.LogError(ex, $"Error occurred while getting a set from Redis server => {ex.Message}");
 				return new HashSet<string>();
 			}
 		}
