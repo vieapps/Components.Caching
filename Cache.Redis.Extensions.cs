@@ -479,8 +479,8 @@ namespace net.vieapps.Components.Caching
 		/// <param name="key"></param>
 		/// <param name="value"></param>
 		/// <returns></returns>
-		public static bool UpdateSetMembers(this IDatabase redis, string key, string value)
-			=> redis.UpdateSetMembers(key, new[] { value });
+		public static bool UpdateSetMember(this IDatabase redis, string key, string value)
+			=> redis.UpdateSetMember(key, new[] { value });
 
 		/// <summary>
 		/// Updates the 'Set' member
@@ -489,10 +489,10 @@ namespace net.vieapps.Components.Caching
 		/// <param name="key"></param>
 		/// <param name="values"></param>
 		/// <returns></returns>
-		public static bool UpdateSetMembers(this IDatabase redis, string key, IEnumerable<string> values)
+		public static bool UpdateSetMember(this IDatabase redis, string key, IEnumerable<string> values)
 		{
 			var redisValues = values?.Select(value => (RedisValue)value).ToArray();
-			if (!string.IsNullOrWhiteSpace(key) && values != null && values.Count() > 0)
+			if (!string.IsNullOrWhiteSpace(key) && values != null && values.Any())
 				try
 				{
 					return redis.SetAdd(key, redisValues) > 0;
@@ -505,13 +505,13 @@ namespace net.vieapps.Components.Caching
 						return redis.SetAdd(key, redisValues) > 0;
 					}
 					if (Helper.Logger.IsEnabled(LogLevel.Debug))
-						Helper.Logger.LogError(ex, $"Error occurred while updating a set into Redis server => {ex.Message}");
+						Helper.Logger.LogError(ex, $"Error occurred while updating a set into Redis => {ex.Message}");
 					throw;
 				}
 				catch (Exception ex)
 				{
 					if (Helper.Logger.IsEnabled(LogLevel.Debug))
-						Helper.Logger.LogError(ex, $"Error occurred while updating a set into Redis server => {ex.Message}");
+						Helper.Logger.LogError(ex, $"Error occurred while updating a set into Redis => {ex.Message}");
 					throw;
 				}
 			return false;
@@ -525,7 +525,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="value"></param>
 		/// <param name="cancellationToken"></param>
 		/// <returns></returns>
-		public static Task<bool> UpdateSetMembersAsync(this IDatabase redis, string key, string value, CancellationToken cancellationToken = default)
+		public static Task<bool> UpdateSetMemberAsync(this IDatabase redis, string key, string value, CancellationToken cancellationToken = default)
 			=> redis.UpdateSetMembersAsync(key, new[] { value }, cancellationToken);
 
 		/// <summary>
@@ -539,7 +539,7 @@ namespace net.vieapps.Components.Caching
 		public static async Task<bool> UpdateSetMembersAsync(this IDatabase redis, string key, IEnumerable<string> values, CancellationToken cancellationToken = default)
 		{
 			var redisValues = values?.Select(value => (RedisValue)value).ToArray();
-			if (!string.IsNullOrWhiteSpace(key) && values != null && values.Count() > 0)
+			if (!string.IsNullOrWhiteSpace(key) && values != null && values.Any())
 				try
 				{
 					return await redis.SetAddAsync(key, redisValues).WithCancellationToken(cancellationToken).ConfigureAwait(false) > 0;
@@ -552,13 +552,13 @@ namespace net.vieapps.Components.Caching
 						return await redis.SetAddAsync(key, redisValues).WithCancellationToken(cancellationToken).ConfigureAwait(false) > 0;
 					}
 					if (Helper.Logger.IsEnabled(LogLevel.Debug))
-						Helper.Logger.LogError(ex, $"Error occurred while updating a set into Redis server => {ex.Message}");
+						Helper.Logger.LogError(ex, $"Error occurred while updating a set into Redis => {ex.Message}");
 					throw;
 				}
 				catch (Exception ex)
 				{
 					if (Helper.Logger.IsEnabled(LogLevel.Debug))
-						Helper.Logger.LogError(ex, $"Error occurred while updating a set into Redis server => {ex.Message}");
+						Helper.Logger.LogError(ex, $"Error occurred while updating a set into Redis => {ex.Message}");
 					throw;
 				}
 			return false;
@@ -571,7 +571,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="key"></param>
 		/// <param name="value"></param>
 		/// <returns></returns>
-		public static bool DeleteSetMembers(this IDatabase redis, string key, string value)
+		public static bool DeleteSetMember(this IDatabase redis, string key, string value)
 			=> redis.DeleteSetMembers(key, new[] { value });
 
 		/// <summary>
@@ -590,7 +590,7 @@ namespace net.vieapps.Components.Caching
 			catch (Exception ex)
 			{
 				if (Helper.Logger.IsEnabled(LogLevel.Debug))
-					Helper.Logger.LogError(ex, $"Error occurred while updating a set from Redis server => {ex.Message}");
+					Helper.Logger.LogError(ex, $"Error occurred while updating a set from Redis => {ex.Message}");
 				return false;
 			}
 		}
@@ -603,7 +603,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="value"></param>
 		/// <param name="cancellationToken"></param>
 		/// <returns></returns>
-		public static Task<bool> DeleteSetMembersAsync(this IDatabase redis, string key, string value, CancellationToken cancellationToken = default)
+		public static Task<bool> DeleteSetMemberAsync(this IDatabase redis, string key, string value, CancellationToken cancellationToken = default)
 			=> redis.DeleteSetMembersAsync(key, new[] { value }, cancellationToken);
 
 		/// <summary>
@@ -623,7 +623,7 @@ namespace net.vieapps.Components.Caching
 			catch (Exception ex)
 			{
 				if (Helper.Logger.IsEnabled(LogLevel.Debug))
-					Helper.Logger.LogError(ex, $"Error occurred while updating a set from Redis server => {ex.Message}");
+					Helper.Logger.LogError(ex, $"Error occurred while updating a set from Redis => {ex.Message}");
 				return false;
 			}
 		}
@@ -644,7 +644,7 @@ namespace net.vieapps.Components.Caching
 			catch (Exception ex)
 			{
 				if (Helper.Logger.IsEnabled(LogLevel.Debug))
-					Helper.Logger.LogError(ex, $"Error occurred while getting set keys from Redis server => {ex.Message}");
+					Helper.Logger.LogError(ex, $"Error occurred while getting set keys from Redis => {ex.Message}");
 				return new HashSet<string>();
 			}
 		}
@@ -666,7 +666,7 @@ namespace net.vieapps.Components.Caching
 			catch (Exception ex)
 			{
 				if (Helper.Logger.IsEnabled(LogLevel.Debug))
-					Helper.Logger.LogError(ex, $"Error occurred while getting a set from Redis server => {ex.Message}");
+					Helper.Logger.LogError(ex, $"Error occurred while getting a set from Redis => {ex.Message}");
 				return new HashSet<string>();
 			}
 		}

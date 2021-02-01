@@ -6,11 +6,9 @@ using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Configuration;
-
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
-
 using CacheUtils;
 #endregion
 
@@ -825,8 +823,8 @@ namespace net.vieapps.Components.Caching
 		/// <param name="key"></param>
 		/// <param name="value"></param>
 		/// <returns></returns>
-		public bool RemoveSetMembers(string key, string value)
-			=> this._cache.RemoveSetMembers(key, value);
+		public bool RemoveSetMember(string key, string value)
+			=> this._cache.RemoveSetMember(key, value);
 
 		/// <summary>
 		/// Removes the values from a set
@@ -844,8 +842,8 @@ namespace net.vieapps.Components.Caching
 		/// <param name="value"></param>
 		/// <param name="cancellationToken"></param>
 		/// <returns></returns>
-		public Task<bool> RemoveSetMembersAsync(string key, string value, CancellationToken cancellationToken = default)
-			=> this._cache.RemoveSetMembersAsync(key, value, cancellationToken);
+		public Task<bool> RemoveSetMemberAsync(string key, string value, CancellationToken cancellationToken = default)
+			=> this._cache.RemoveSetMemberAsync(key, value, cancellationToken);
 
 		/// <summary>
 		/// Removes the values from a set

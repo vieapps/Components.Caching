@@ -7,11 +7,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Configuration;
 using System.Diagnostics;
-
 using Enyim.Caching;
 using Enyim.Caching.Memcached;
 using Enyim.Caching.Configuration;
-
 using Microsoft.Extensions.Logging;
 #endregion
 
@@ -248,7 +246,7 @@ namespace net.vieapps.Components.Caching
 				}
 				catch (Exception ex)
 				{
-					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
+					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType()}@{key}]", ex);
 				}
 
 			if (success)
@@ -274,7 +272,7 @@ namespace net.vieapps.Components.Caching
 				}
 				catch (Exception ex)
 				{
-					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
+					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType()}@{key}]", ex);
 				}
 
 			if (success)
@@ -301,7 +299,7 @@ namespace net.vieapps.Components.Caching
 				}
 				catch (Exception ex)
 				{
-					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
+					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType()}@{key}]", ex);
 				}
 
 			if (success)
@@ -331,7 +329,7 @@ namespace net.vieapps.Components.Caching
 				}
 				catch (Exception ex)
 				{
-					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
+					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType()}@{key}]", ex);
 				}
 
 			if (success)
@@ -505,7 +503,7 @@ namespace net.vieapps.Components.Caching
 		}
 
 		IDictionary<string, T> _Get<T>(IEnumerable<string> keys)
-			=> this._Get(keys)?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value is T ? (T)kvp.Value : default);
+			=> this._Get(keys)?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value is T value ? value : default);
 
 		async Task<IDictionary<string, object>> _GetAsync(IEnumerable<string> keys, CancellationToken cancellationToken = default)
 		{
@@ -533,7 +531,7 @@ namespace net.vieapps.Components.Caching
 		}
 
 		async Task<IDictionary<string, T>> _GetAsync<T>(IEnumerable<string> keys, CancellationToken cancellationToken = default)
-			=> (await this._GetAsync(keys, cancellationToken).ConfigureAwait(false))?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value is T ? (T)kvp.Value : default);
+			=> (await this._GetAsync(keys, cancellationToken).ConfigureAwait(false))?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value is T value ? value : default);
 		#endregion
 
 		#region Get (Fragment)
@@ -781,7 +779,7 @@ namespace net.vieapps.Components.Caching
 			}
 		}
 
-		bool _RemoveSetMembers(string key, string value)
+		bool _RemoveSetMember(string key, string value)
 			=> this._RemoveSetMembers(key, new[] { value });
 
 		bool _RemoveSetMembers(string key, IEnumerable<string> values)
@@ -791,7 +789,7 @@ namespace net.vieapps.Components.Caching
 			return this._SetAsFragments(key, set, 0, StoreMode.Set);
 		}
 
-		Task<bool> _RemoveSetMembersAsync(string key, string value, CancellationToken cancellationToken = default)
+		Task<bool> _RemoveSetMemberAsync(string key, string value, CancellationToken cancellationToken = default)
 			=> this._RemoveSetMembersAsync(key, new[] { value }, cancellationToken);
 
 		async Task<bool> _RemoveSetMembersAsync(string key, IEnumerable<string> values, CancellationToken cancellationToken = default)
@@ -1626,8 +1624,8 @@ namespace net.vieapps.Components.Caching
 		/// <param name="key"></param>
 		/// <param name="value"></param>
 		/// <returns></returns>
-		public bool RemoveSetMembers(string key, string value)
-			=> this._RemoveSetMembers(key, value);
+		public bool RemoveSetMember(string key, string value)
+			=> this._RemoveSetMember(key, value);
 
 		/// <summary>
 		/// Removes the values from a set
@@ -1645,8 +1643,8 @@ namespace net.vieapps.Components.Caching
 		/// <param name="value"></param>
 		/// <param name="cancellationToken"></param>
 		/// <returns></returns>
-		public Task<bool> RemoveSetMembersAsync(string key, string value, CancellationToken cancellationToken = default)
-			=> this._RemoveSetMembersAsync(key, value, cancellationToken);
+		public Task<bool> RemoveSetMemberAsync(string key, string value, CancellationToken cancellationToken = default)
+			=> this._RemoveSetMemberAsync(key, value, cancellationToken);
 
 		/// <summary>
 		/// Removes the values from a set

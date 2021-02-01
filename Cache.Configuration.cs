@@ -1,20 +1,11 @@
 #region Related components
 using System;
-using System.Linq;
 using System.Xml;
 using System.Net;
 using System.Collections.Generic;
-using System.Threading.Tasks;
-using System.Configuration;
-using System.Diagnostics;
-
 using Enyim.Caching.Configuration;
 using Enyim.Caching.Memcached;
-
-using StackExchange.Redis;
-
 using Microsoft.Extensions.Options;
-using Microsoft.Extensions.Logging;
 #endregion
 
 namespace net.vieapps.Components.Caching

@@ -15,9 +15,6 @@ using System.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
-using Newtonsoft.Json.Bson;
 using Enyim.Caching.Configuration;
 using Enyim.Caching.Memcached;
 using CacheUtils;
@@ -30,9 +27,6 @@ namespace net.vieapps.Components.Caching
 	{
 
 		#region Data
-		public const int FlagOfJsonObject = 0xfb52;
-		public const int FlagOfJsonArray = 0xfc52;
-		public const int FlagOfExpandoObject = 0xfd52;
 		public const int FlagOfFirstFragmentBlock = 0xfe52;
 		public static readonly int FragmentSize = (1024 * 1024) - 256;
 		internal static readonly string RegionsKey = "VIEApps-NGX-Regions";
@@ -94,32 +88,10 @@ namespace net.vieapps.Components.Caching
 		/// <returns></returns>
 		public static byte[] Serialize(object value, bool addFlags = true)
 		{
-			var data = new byte[0];
-			int typeFlag;
-			if (value != null && (value is JToken || value is ExpandoObject))
-			{
-				typeFlag = value is JToken
-					? value is JArray ? Helper.FlagOfJsonArray : Helper.FlagOfJsonObject
-					: Helper.FlagOfExpandoObject;
-				using (var stream = CacheUtils.Helper.CreateMemoryStream())
-				{
-					using (var writer = new BsonDataWriter(stream))
-					{
-						new JsonSerializer().Serialize(writer, value);
-						data = stream.ToBytes();
-					}
-				}
-			}
-			else
-			{
-				var info = CacheUtils.Helper.Serialize(value);
-				typeFlag = info.Item1;
-				data = info.Item2;
-			}
-
+			var data = CacheUtils.Helper.Serialize(value);
 			return addFlags
-				? CacheUtils.Helper.Concat(new[] { BitConverter.GetBytes(typeFlag), data })
-				: data;
+				? CacheUtils.Helper.Concat(new[] { BitConverter.GetBytes(data.Item1), data.Item2 })
+				: data.Item2;
 		}
 
 		/// <summary>
@@ -131,22 +103,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="count"></param>
 		/// <returns></returns>
 		public static object Deserialize(byte[] data, int typeFlag, int start, int count)
-		{
-			if (typeFlag.Equals(Helper.FlagOfJsonObject) || typeFlag.Equals(Helper.FlagOfJsonArray) || typeFlag.Equals(Helper.FlagOfExpandoObject))
-				using (var stream = CacheUtils.Helper.CreateMemoryStream(data, start, count))
-				{
-					using (var reader = new BsonDataReader(stream))
-					{
-						if (typeFlag.Equals(Helper.FlagOfJsonArray))
-							reader.ReadRootValueAsArray = true;
-						return typeFlag.Equals(Helper.FlagOfExpandoObject)
-							? new JsonSerializer().Deserialize<ExpandoObject>(reader)
-							: new JsonSerializer().Deserialize(reader);
-					}
-				}
-			else
-				return CacheUtils.Helper.Deserialize(data, typeFlag, start, count);
-		}
+			=> CacheUtils.Helper.Deserialize(data, typeFlag, start, count);
 
 		/// <summary>
 		/// Deserializes an object from the array of bytes
@@ -177,7 +134,7 @@ namespace net.vieapps.Components.Caching
 		public static T Deserialize<T>(byte[] data)
 		{
 			var value = data != null ? Helper.Deserialize(data) : null;
-			return value != null && value is T ? (T)value : default;
+			return value != null && value is T val ? val : default;
 		}
 
 		internal static object DeserializeFromFragments(this byte[] data)
@@ -217,6 +174,31 @@ namespace net.vieapps.Components.Caching
 			}
 			return new Tuple<int, int>(blocks, length);
 		}
+
+		/// <summary>
+		/// Serializes an object to array of bytes using Json.NET BSON Serializer
+		/// </summary>
+		/// <param name="value"></param>
+		/// <returns></returns>
+		public static byte[] SerializeBson(object value)
+			=> CacheUtils.Helper.SerializeByBson(value);
+
+		/// <summary>
+		/// Deserializes an object from an array of bytes using Json.NET BSON Deserializer
+		/// </summary>
+		/// <param name="value"></param>
+		/// <returns></returns>
+		public static object DeserializeBson(byte[] value)
+			=> CacheUtils.Helper.SerializeByBson(value);
+
+		/// <summary>
+		/// Deserializes an object from an array of bytes using Json.NET BSON Deserializer
+		/// </summary>
+		/// <typeparam name="T"></typeparam>
+		/// <param name="value"></param>
+		/// <returns></returns>
+		public static T DeserializeBson<T>(byte[] value)
+			=> CacheUtils.Helper.DeserializeByBson<T>(value);
 		#endregion
 
 		#region Working with logs

@@ -599,7 +599,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="key"></param>
 		/// <param name="value"></param>
 		/// <returns></returns>
-		bool RemoveSetMembers(string key, string value);
+		bool RemoveSetMember(string key, string value);
 
 		/// <summary>
 		/// Removes the values from a set
@@ -616,7 +616,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="value"></param>
 		/// <param name="cancellationToken"></param>
 		/// <returns></returns>
-		Task<bool> RemoveSetMembersAsync(string key, string value, CancellationToken cancellationToken = default);
+		Task<bool> RemoveSetMemberAsync(string key, string value, CancellationToken cancellationToken = default);
 
 		/// <summary>
 		/// Removes the values from a set

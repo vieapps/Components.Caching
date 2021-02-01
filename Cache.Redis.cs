@@ -1,19 +1,13 @@
 #region Related components
 using System;
 using System.Linq;
-using System.Xml;
-using System.Net;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Configuration;
 using System.Diagnostics;
-
 using StackExchange.Redis;
-
-using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
-
 using CacheUtils;
 #endregion
 
@@ -161,18 +155,18 @@ namespace net.vieapps.Components.Caching
 		void _UpdateKey(string key)
 		{
 			if (this._storeKeys)
-				Redis.Client.UpdateSetMembers(this._RegionKey, key);
+				Redis.Client.UpdateSetMember(this._RegionKey, key);
 		}
 
 		Task _UpdateKeyAsync(string key, CancellationToken cancellationToken = default)
 			=> this._storeKeys
-				? Redis.Client.UpdateSetMembersAsync(this._RegionKey, key, cancellationToken)
+				? Redis.Client.UpdateSetMemberAsync(this._RegionKey, key, cancellationToken)
 				: Task.CompletedTask;
 
 		void _UpdateKeys(IEnumerable<string> keys, string keyPrefix = null)
 		{
 			if (this._storeKeys && keys != null && keys.Count() > 0)
-				Redis.Client.UpdateSetMembers(this._RegionKey, keys.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => (string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + key).ToArray());
+				Redis.Client.UpdateSetMember(this._RegionKey, keys.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => (string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + key).ToArray());
 		}
 
 		Task _UpdateKeysAsync(IEnumerable<string> keys, string keyPrefix = null, CancellationToken cancellationToken = default)
@@ -183,12 +177,12 @@ namespace net.vieapps.Components.Caching
 		void _RemoveKey(string key)
 		{
 			if (this._storeKeys)
-				Redis.Client.DeleteSetMembers(this._RegionKey, key);
+				Redis.Client.DeleteSetMember(this._RegionKey, key);
 		}
 
 		Task _RemoveKeyAsync(string key, CancellationToken cancellationToken = default)
 			=> this._storeKeys
-				? Redis.Client.DeleteSetMembersAsync(this._RegionKey, key, cancellationToken)
+				? Redis.Client.DeleteSetMemberAsync(this._RegionKey, key, cancellationToken)
 				: Task.CompletedTask;
 
 		HashSet<string> _GetKeys()
@@ -213,7 +207,7 @@ namespace net.vieapps.Components.Caching
 				}
 				catch (Exception ex)
 				{
-					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
+					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType()}@{key}]", ex);
 				}
 
 			if (success)
@@ -246,7 +240,7 @@ namespace net.vieapps.Components.Caching
 				}
 				catch (Exception ex)
 				{
-					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
+					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType()}@{key}]", ex);
 				}
 
 			if (success)
@@ -365,7 +359,7 @@ namespace net.vieapps.Components.Caching
 				}
 				catch (Exception ex)
 				{
-					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
+					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType()}@{key}]", ex);
 				}
 
 			if (success)
@@ -398,7 +392,7 @@ namespace net.vieapps.Components.Caching
 				}
 				catch (Exception ex)
 				{
-					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
+					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType()}@{key}]", ex);
 				}
 
 			if (success)
@@ -429,7 +423,7 @@ namespace net.vieapps.Components.Caching
 				}
 				catch (Exception ex)
 				{
-					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
+					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType()}@{key}]", ex);
 				}
 
 			if (success)
@@ -462,7 +456,7 @@ namespace net.vieapps.Components.Caching
 				}
 				catch (Exception ex)
 				{
-					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType().ToString()}#{key}]", ex);
+					Helper.WriteLogs(this.Name, $"Error occurred while updating an object into cache [{value.GetType()}@{key}]", ex);
 				}
 
 			if (success)
@@ -659,7 +653,7 @@ namespace net.vieapps.Components.Caching
 				Helper.WriteLogs(this.Name, "Error occurred while fetch a collection of objects from cache storage", ex);
 			}
 
-			var objects = items?.ToDictionary(kvp => kvp.Key.Substring(this.Name.Length), kvp => kvp.Value);
+			var objects = items?.ToDictionary(kvp => kvp.Key.Substring(this.Name.Length + 1), kvp => kvp.Value);
 			return objects != null && objects.Count > 0
 				? objects
 				: null;
@@ -884,7 +878,7 @@ namespace net.vieapps.Components.Caching
 		{
 			try
 			{
-				await Redis.Client.UpdateSetMembersAsync(Helper.RegionsKey, name, cancellationToken).ConfigureAwait(false);
+				await Redis.Client.UpdateSetMemberAsync(Helper.RegionsKey, name, cancellationToken).ConfigureAwait(false);
 			}
 			catch { }
 		}
@@ -1529,7 +1523,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="value"></param>
 		/// <returns></returns>
 		public bool AddSetMember(string key, string value)
-			=> Redis.Client.UpdateSetMembers(this._GetKey(key), value);
+			=> Redis.Client.UpdateSetMember(this._GetKey(key), value);
 
 		/// <summary>
 		/// Adds the values into a set
@@ -1538,7 +1532,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="values"></param>
 		/// <returns></returns>
 		public bool AddSetMembers(string key, IEnumerable<string> values)
-			=> Redis.Client.UpdateSetMembers(this._GetKey(key), values);
+			=> Redis.Client.UpdateSetMember(this._GetKey(key), values);
 
 		/// <summary>
 		/// Adds a value into a set
@@ -1548,7 +1542,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="cancellationToken"></param>
 		/// <returns></returns>
 		public Task<bool> AddSetMemberAsync(string key, string value, CancellationToken cancellationToken = default)
-			=> Redis.Client.UpdateSetMembersAsync(this._GetKey(key), value, cancellationToken);
+			=> Redis.Client.UpdateSetMemberAsync(this._GetKey(key), value, cancellationToken);
 
 		/// <summary>
 		/// Adds the values into a set
@@ -1566,8 +1560,8 @@ namespace net.vieapps.Components.Caching
 		/// <param name="key"></param>
 		/// <param name="value"></param>
 		/// <returns></returns>
-		public bool RemoveSetMembers(string key, string value)
-			=> Redis.Client.DeleteSetMembers(this._GetKey(key), value);
+		public bool RemoveSetMember(string key, string value)
+			=> Redis.Client.DeleteSetMember(this._GetKey(key), value);
 
 		/// <summary>
 		/// Removes the values from a set
@@ -1585,8 +1579,8 @@ namespace net.vieapps.Components.Caching
 		/// <param name="value"></param>
 		/// <param name="cancellationToken"></param>
 		/// <returns></returns>
-		public Task<bool> RemoveSetMembersAsync(string key, string value, CancellationToken cancellationToken = default)
-			=> Redis.Client.DeleteSetMembersAsync(this._GetKey(key), value, cancellationToken);
+		public Task<bool> RemoveSetMemberAsync(string key, string value, CancellationToken cancellationToken = default)
+			=> Redis.Client.DeleteSetMemberAsync(this._GetKey(key), value, cancellationToken);
 
 		/// <summary>
 		/// Removes the values from a set
