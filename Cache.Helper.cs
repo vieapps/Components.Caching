@@ -1,23 +1,15 @@
 #region Related components
 using System;
-using System.IO;
 using System.Linq;
-using System.Text;
 using System.Net;
 using System.Xml;
 using System.Text.RegularExpressions;
 using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
-using System.Dynamic;
-using System.Diagnostics;
-using System.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
 using Enyim.Caching.Configuration;
 using Enyim.Caching.Memcached;
-using CacheUtils;
 using net.vieapps.Components.Caching;
 #endregion
 
