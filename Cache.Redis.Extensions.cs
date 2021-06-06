@@ -639,7 +639,7 @@ namespace net.vieapps.Components.Caching
 			try
 			{
 				var values = redis.SetMembers(key);
-				return new HashSet<string>(values?.Where(value => !value.IsNull).Select(value => value.ToString()) ?? new string[] { });
+				return new HashSet<string>(values?.Where(value => !value.IsNull).Select(value => value.ToString()) ?? Array.Empty<string>());
 			}
 			catch (Exception ex)
 			{
@@ -661,7 +661,7 @@ namespace net.vieapps.Components.Caching
 			try
 			{
 				var values = await redis.SetMembersAsync(key).WithCancellationToken(cancellationToken).ConfigureAwait(false);
-				return new HashSet<string>(values?.Where(value => !value.IsNull).Select(value => value.ToString()) ?? new string[] { });
+				return new HashSet<string>(values?.Where(value => !value.IsNull).Select(value => value.ToString()) ?? Array.Empty<string>());
 			}
 			catch (Exception ex)
 			{

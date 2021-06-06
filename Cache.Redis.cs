@@ -40,11 +40,7 @@ namespace net.vieapps.Components.Caching
 			this._storeKeys = storeKeys;
 
 			// register the region
-			Task.Run(async () =>
-			{
-				await Task.Delay(Redis.ConnectionTimeout > 0 ? Redis.ConnectionTimeout + 123 : 5432).ConfigureAwait(false);
-				await Redis.RegisterRegionAsync(this.Name).ConfigureAwait(false);
-			}).ConfigureAwait(false);
+			Task.Run(async () => await Redis.RegisterRegionAsync(this.Name).ConfigureAwait(false)).ConfigureAwait(false);
 		}
 
 		public void Dispose()
@@ -878,6 +874,8 @@ namespace net.vieapps.Components.Caching
 		{
 			try
 			{
+				while (Redis._Client == null)
+					await Task.Delay(456, cancellationToken).ConfigureAwait(false);
 				await Redis.Client.UpdateSetMemberAsync(Helper.RegionsKey, name, cancellationToken).ConfigureAwait(false);
 			}
 			catch { }

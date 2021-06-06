@@ -120,9 +120,9 @@ namespace net.vieapps.Components.Caching
 				}
 
 				Cache._Configuration = configuration;
-				if (configuration.Servers.Where(s => s.Type.ToLower().Equals("redis")).Count() > 0)
+				if (configuration.Servers.Where(s => s.Type.ToLower().Equals("redis")).Any())
 					Redis.GetClient(configuration.GetRedisConfiguration(), loggerFactory);
-				if (configuration.Servers.Where(s => s.Type.ToLower().Equals("memcached")).Count() > 0)
+				if (configuration.Servers.Where(s => s.Type.ToLower().Equals("memcached")).Any())
 					Memcached.GetClient(configuration.GetMemcachedConfiguration(loggerFactory), loggerFactory);
 				Cache._Instance = new Cache(configuration.RegionName, configuration.ExpirationTime, false, configuration.Provider, loggerFactory);
 			}
