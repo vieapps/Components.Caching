@@ -125,23 +125,23 @@ namespace net.vieapps.Components.Caching
 		#region Keys
 		async Task _PushKeysAsync(CancellationToken cancellationToken = default)
 		{
-			if (!this._storeKeys || this._isUpdatingKeys || (this._addedKeys.Count < 1 && this._removedKeys.Count < 1))
+			if (!this._storeKeys || this._isUpdatingKeys || (this._addedKeys.IsEmpty && this._removedKeys.IsEmpty))
 				return;
 
 			this._isUpdatingKeys = true;
 			await this._lock.WaitAsync(cancellationToken).ConfigureAwait(false);
 			try
 			{
-				if (this._addedKeys.Count > 0 || this._removedKeys.Count > 0)
+				if (!this._addedKeys.IsEmpty || !this._removedKeys.IsEmpty)
 					try
 					{
 						var removedKeys = new List<string>();
 						var addedKeys = new List<string>();
 
-						while (this._removedKeys.Count > 0)
+						while (!this._removedKeys.IsEmpty)
 							if (this._removedKeys.TryDequeue(out var key))
 								removedKeys.Add(key);
-						while (this._addedKeys.Count > 0)
+						while (!this._addedKeys.IsEmpty)
 							if (this._addedKeys.TryDequeue(out var key))
 								addedKeys.Add(key);
 
@@ -169,13 +169,13 @@ namespace net.vieapps.Components.Caching
 					{
 						var next = Task.Run(async () =>
 						{
-							await Memcached.Client.RemoveAsync($"{this._RegionKey}-Updating").ConfigureAwait(false);
-							if (this._addedKeys.Count > 0 || this._removedKeys.Count > 0)
+							await Memcached.Client.RemoveAsync($"{this._RegionKey}-Updating", cancellationToken).ConfigureAwait(false);
+							if (!this._addedKeys.IsEmpty || !this._removedKeys.IsEmpty)
 							{
-								await Task.Delay(1234).ConfigureAwait(false);
+								await Task.Delay(1234, cancellationToken).ConfigureAwait(false);
 								this._PushKeys();
 							}
-						}).ConfigureAwait(false);
+						}, cancellationToken).ConfigureAwait(false);
 					}
 			}
 			catch (OperationCanceledException)
@@ -409,6 +409,112 @@ namespace net.vieapps.Components.Caching
 			=> string.IsNullOrWhiteSpace(key) || value == null
 				? Task.FromResult(false)
 				: this._SetFragmentsAsync(key, CacheUtils.Helper.Split(Helper.Serialize(value), Helper.FragmentSize).ToList(), expirationTime, mode, cancellationToken);
+		#endregion
+
+		#region Set Members
+		HashSet<string> _GetSetMembers(string key)
+		{
+			try
+			{
+				var firstBlock = Memcached.Client.Get<byte[]>(this._GetKey(key));
+				return firstBlock != null && firstBlock.Length > 8 && Helper.GetFlags(firstBlock).Item1.Equals(Helper.FlagOfFirstFragmentBlock)
+					? this._GetFromFragments(key, firstBlock) as HashSet<string> ?? new HashSet<string>()
+					: new HashSet<string>();
+			}
+			catch (OperationCanceledException)
+			{
+				throw;
+			}
+			catch (Exception ex)
+			{
+				Helper.WriteLogs(this.Name, $"Error occurred while getting a set object [{key}]", ex);
+				return new HashSet<string>();
+			}
+		}
+
+		async Task<HashSet<string>> _GetSetMembersAsync(string key, CancellationToken cancellationToken = default)
+		{
+			try
+			{
+				var firstBlock = await Memcached.Client.GetAsync<byte[]>(this._GetKey(key), cancellationToken).ConfigureAwait(false);
+				return firstBlock != null && firstBlock.Length > 8 && Helper.GetFlags(firstBlock).Item1.Equals(Helper.FlagOfFirstFragmentBlock)
+					? await this._GetFromFragmentsAsync(key, firstBlock, cancellationToken).ConfigureAwait(false) as HashSet<string> ?? new HashSet<string>()
+					: new HashSet<string>();
+			}
+			catch (OperationCanceledException)
+			{
+				throw;
+			}
+			catch (Exception ex)
+			{
+				Helper.WriteLogs(this.Name, $"Error occurred while getting a set object [{key}]", ex);
+				return new HashSet<string>();
+			}
+		}
+
+		bool _AddSetMember(string key, string value, int expirationTime = 0, StoreMode mode = StoreMode.Set)
+			=> this._AddSetMembers(key, new[] { value }, expirationTime, mode);
+
+		bool _AddSetMembers(string key, IEnumerable<string> values, int expirationTime = 0, StoreMode mode = StoreMode.Set)
+		{
+			try
+			{
+				var set = this._GetSetMembers(key);
+				values?.ToList().ForEach(value => set.Add(value));
+				return this._SetAsFragments(key, set, expirationTime, mode);
+			}
+			catch (OperationCanceledException)
+			{
+				throw;
+			}
+			catch (Exception ex)
+			{
+				Helper.WriteLogs(this.Name, $"Error occurred while updating a set object [{key}]", ex);
+				return false;
+			}
+		}
+
+		Task<bool> _AddSetMemberAsync(string key, string value, int expirationTime = 0, StoreMode mode = StoreMode.Set, CancellationToken cancellationToken = default)
+			=> this._AddSetMembersAsync(key, new[] { value }, expirationTime, mode, cancellationToken);
+
+		async Task<bool> _AddSetMembersAsync(string key, IEnumerable<string> values, int expirationTime = 0, StoreMode mode = StoreMode.Set, CancellationToken cancellationToken = default)
+		{
+			try
+			{
+				var set = await this._GetSetMembersAsync(key, cancellationToken).ConfigureAwait(false);
+				values?.ToList().ForEach(value => set.Add(value));
+				return await this._SetAsFragmentsAsync(key, set, expirationTime, mode, cancellationToken).ConfigureAwait(false);
+			}
+			catch (OperationCanceledException)
+			{
+				throw;
+			}
+			catch (Exception ex)
+			{
+				Helper.WriteLogs(this.Name, $"Error occurred while updating a set object [{key}]", ex);
+				return false;
+			}
+		}
+
+		bool _RemoveSetMember(string key, string value)
+			=> this._RemoveSetMembers(key, new[] { value });
+
+		bool _RemoveSetMembers(string key, IEnumerable<string> values)
+		{
+			var set = this._GetSetMembers(key);
+			values?.ToList().ForEach(value => set.Remove(value));
+			return this._SetAsFragments(key, set, 0, StoreMode.Set);
+		}
+
+		Task<bool> _RemoveSetMemberAsync(string key, string value, CancellationToken cancellationToken = default)
+			=> this._RemoveSetMembersAsync(key, new[] { value }, cancellationToken);
+
+		async Task<bool> _RemoveSetMembersAsync(string key, IEnumerable<string> values, CancellationToken cancellationToken = default)
+		{
+			var set = await this._GetSetMembersAsync(key, cancellationToken).ConfigureAwait(false);
+			values?.ToList().ForEach(value => set.Remove(value));
+			return await this._SetAsFragmentsAsync(key, set, 0, StoreMode.Set, cancellationToken).ConfigureAwait(false);
+		}
 		#endregion
 
 		#region Get
@@ -691,112 +797,6 @@ namespace net.vieapps.Components.Caching
 				this._lock.Release();
 				await Memcached.Client.RemoveAsync(flag, cancellationToken).ConfigureAwait(false);
 			}
-		}
-		#endregion
-
-		#region Set Members
-		HashSet<string> _GetSetMembers(string key)
-		{
-			try
-			{
-				var firstBlock = Memcached.Client.Get<byte[]>(this._GetKey(key));
-				return firstBlock != null && firstBlock.Length > 8 && Helper.GetFlags(firstBlock).Item1.Equals(Helper.FlagOfFirstFragmentBlock)
-					? this._GetFromFragments(key, firstBlock) as HashSet<string> ?? new HashSet<string>()
-					: new HashSet<string>();
-			}
-			catch (OperationCanceledException)
-			{
-				throw;
-			}
-			catch (Exception ex)
-			{
-				Helper.WriteLogs(this.Name, $"Error occurred while getting a set object [{key}]", ex);
-				return new HashSet<string>();
-			}
-		}
-
-		async Task<HashSet<string>> _GetSetMembersAsync(string key, CancellationToken cancellationToken = default)
-		{
-			try
-			{
-				var firstBlock = await Memcached.Client.GetAsync<byte[]>(this._GetKey(key), cancellationToken).ConfigureAwait(false);
-				return firstBlock != null && firstBlock.Length > 8 && Helper.GetFlags(firstBlock).Item1.Equals(Helper.FlagOfFirstFragmentBlock)
-					? await this._GetFromFragmentsAsync(key, firstBlock, cancellationToken).ConfigureAwait(false) as HashSet<string> ?? new HashSet<string>()
-					: new HashSet<string>();
-			}
-			catch (OperationCanceledException)
-			{
-				throw;
-			}
-			catch (Exception ex)
-			{
-				Helper.WriteLogs(this.Name, $"Error occurred while getting a set object [{key}]", ex);
-				return new HashSet<string>();
-			}
-		}
-
-		bool _AddSetMember(string key, string value, int expirationTime = 0, StoreMode mode = StoreMode.Set)
-			=> this._AddSetMembers(key, new[] { value }, expirationTime, mode);
-
-		bool _AddSetMembers(string key, IEnumerable<string> values, int expirationTime = 0, StoreMode mode = StoreMode.Set)
-		{
-			try
-			{
-				var set = this._GetSetMembers(key);
-				values?.ToList().ForEach(value => set.Add(value));
-				return this._SetAsFragments(key, set, expirationTime, mode);
-			}
-			catch (OperationCanceledException)
-			{
-				throw;
-			}
-			catch (Exception ex)
-			{
-				Helper.WriteLogs(this.Name, $"Error occurred while updating a set object [{key}]", ex);
-				return false;
-			}
-		}
-
-		Task<bool> _AddSetMemberAsync(string key, string value, int expirationTime = 0, StoreMode mode = StoreMode.Set, CancellationToken cancellationToken = default)
-			=> this._AddSetMembersAsync(key, new[] { value }, expirationTime, mode, cancellationToken);
-
-		async Task<bool> _AddSetMembersAsync(string key, IEnumerable<string> values, int expirationTime = 0, StoreMode mode = StoreMode.Set, CancellationToken cancellationToken = default)
-		{
-			try
-			{
-				var set = await this._GetSetMembersAsync(key, cancellationToken).ConfigureAwait(false);
-				values?.ToList().ForEach(value => set.Add(value));
-				return await this._SetAsFragmentsAsync(key, set, expirationTime, mode, cancellationToken).ConfigureAwait(false);
-			}
-			catch (OperationCanceledException)
-			{
-				throw;
-			}
-			catch (Exception ex)
-			{
-				Helper.WriteLogs(this.Name, $"Error occurred while updating a set object [{key}]", ex);
-				return false;
-			}
-		}
-
-		bool _RemoveSetMember(string key, string value)
-			=> this._RemoveSetMembers(key, new[] { value });
-
-		bool _RemoveSetMembers(string key, IEnumerable<string> values)
-		{
-			var set = this._GetSetMembers(key);
-			values?.ToList().ForEach(value => set.Remove(value));
-			return this._SetAsFragments(key, set, 0, StoreMode.Set);
-		}
-
-		Task<bool> _RemoveSetMemberAsync(string key, string value, CancellationToken cancellationToken = default)
-			=> this._RemoveSetMembersAsync(key, new[] { value }, cancellationToken);
-
-		async Task<bool> _RemoveSetMembersAsync(string key, IEnumerable<string> values, CancellationToken cancellationToken = default)
-		{
-			var set = await this._GetSetMembersAsync(key, cancellationToken).ConfigureAwait(false);
-			values?.ToList().ForEach(value => set.Remove(value));
-			return await this._SetAsFragmentsAsync(key, set, 0, StoreMode.Set, cancellationToken).ConfigureAwait(false);
 		}
 		#endregion
 
@@ -1165,6 +1165,101 @@ namespace net.vieapps.Components.Caching
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
 		public Task<bool> SetAsFragmentsAsync(string key, object value, CancellationToken cancellationToken)
 			=> this.SetAsFragmentsAsync(key, value, 0, cancellationToken);
+		#endregion
+
+		#region [Public] Set Members
+		/// <summary>
+		/// Gets a set
+		/// </summary>
+		/// <param name="key"></param>
+		/// <returns></returns>
+		public HashSet<string> GetSetMembers(string key)
+			=> this._GetSetMembers(key);
+
+		/// <summary>
+		/// Gets a set
+		/// </summary>
+		/// <param name="key"></param>
+		/// <param name="cancellationToken"></param>
+		/// <returns></returns>
+		public Task<HashSet<string>> GetSetMembersAsync(string key, CancellationToken cancellationToken = default)
+			=> this._GetSetMembersAsync(key, cancellationToken);
+
+		/// <summary>
+		/// Adds a value into a set
+		/// </summary>
+		/// <param name="key"></param>
+		/// <param name="value"></param>
+		/// <returns></returns>
+		public bool AddSetMember(string key, string value)
+			=> this._AddSetMember(key, value, 0, StoreMode.Set);
+
+		/// <summary>
+		/// Adds the values into a set
+		/// </summary>
+		/// <param name="key"></param>
+		/// <param name="values"></param>
+		/// <returns></returns>
+		public bool AddSetMembers(string key, IEnumerable<string> values)
+			=> this._AddSetMembers(key, values, 0, StoreMode.Set);
+
+		/// <summary>
+		/// Adds a value into a set
+		/// </summary>
+		/// <param name="key"></param>
+		/// <param name="value"></param>
+		/// <param name="cancellationToken"></param>
+		/// <returns></returns>
+		public Task<bool> AddSetMemberAsync(string key, string value, CancellationToken cancellationToken = default)
+			=> this._AddSetMemberAsync(key, value, 0, StoreMode.Set, cancellationToken);
+
+		/// <summary>
+		/// Adds the values into a set
+		/// </summary>
+		/// <param name="key"></param>
+		/// <param name="values"></param>
+		/// <param name="cancellationToken"></param>
+		/// <returns></returns>
+		public Task<bool> AddSetMembersAsync(string key, IEnumerable<string> values, CancellationToken cancellationToken = default)
+			=> this._AddSetMembersAsync(key, values, 0, StoreMode.Set, cancellationToken);
+
+		/// <summary>
+		/// Removes a value from a set
+		/// </summary>
+		/// <param name="key"></param>
+		/// <param name="value"></param>
+		/// <returns></returns>
+		public bool RemoveSetMember(string key, string value)
+			=> this._RemoveSetMember(key, value);
+
+		/// <summary>
+		/// Removes the values from a set
+		/// </summary>
+		/// <param name="key"></param>
+		/// <param name="values"></param>
+		/// <returns></returns>
+		public bool RemoveSetMembers(string key, IEnumerable<string> values)
+			=> this._RemoveSetMembers(key, values);
+
+		/// <summary>
+		/// Removes a value from a set
+		/// </summary>
+		/// <param name="key"></param>
+		/// <param name="value"></param>
+		/// <param name="cancellationToken"></param>
+		/// <returns></returns>
+		public Task<bool> RemoveSetMemberAsync(string key, string value, CancellationToken cancellationToken = default)
+			=> this._RemoveSetMemberAsync(key, value, cancellationToken);
+
+		/// <summary>
+		/// Removes the values from a set
+		/// </summary>
+		/// <param name="key"></param>
+		/// <param name="values"></param>
+		/// <param name="cancellationToken"></param>
+		/// <returns></returns>
+		public Task<bool> RemoveSetMembersAsync(string key, IEnumerable<string> values, CancellationToken cancellationToken = default)
+			=> this._RemoveSetMembersAsync(key, values, cancellationToken);
 		#endregion
 
 		#region [Public] Add
@@ -1562,99 +1657,18 @@ namespace net.vieapps.Components.Caching
 			=> this._ClearAsync(cancellationToken);
 		#endregion
 
-		#region [Public] Set Members
+		#region [Public] Flush
 		/// <summary>
-		/// Gets a set
+		/// Removes all data from the cache
 		/// </summary>
-		/// <param name="key"></param>
-		/// <returns></returns>
-		public HashSet<string> GetSetMembers(string key)
-			=> this._GetSetMembers(key);
+		public void FlushAll()
+			=> Memcached.Client.FlushAll();
 
 		/// <summary>
-		/// Gets a set
+		/// Removes all data from the cache
 		/// </summary>
-		/// <param name="key"></param>
-		/// <param name="cancellationToken"></param>
-		/// <returns></returns>
-		public Task<HashSet<string>> GetSetMembersAsync(string key, CancellationToken cancellationToken = default)
-			=> this._GetSetMembersAsync(key, cancellationToken);
-
-		/// <summary>
-		/// Adds a value into a set
-		/// </summary>
-		/// <param name="key"></param>
-		/// <param name="value"></param>
-		/// <returns></returns>
-		public bool AddSetMember(string key, string value)
-			=> this._AddSetMember(key, value, 0, StoreMode.Set);
-
-		/// <summary>
-		/// Adds the values into a set
-		/// </summary>
-		/// <param name="key"></param>
-		/// <param name="values"></param>
-		/// <returns></returns>
-		public bool AddSetMembers(string key, IEnumerable<string> values)
-			=> this._AddSetMembers(key, values, 0, StoreMode.Set);
-
-		/// <summary>
-		/// Adds a value into a set
-		/// </summary>
-		/// <param name="key"></param>
-		/// <param name="value"></param>
-		/// <param name="cancellationToken"></param>
-		/// <returns></returns>
-		public Task<bool> AddSetMemberAsync(string key, string value, CancellationToken cancellationToken = default)
-			=> this._AddSetMemberAsync(key, value, 0, StoreMode.Set, cancellationToken);
-
-		/// <summary>
-		/// Adds the values into a set
-		/// </summary>
-		/// <param name="key"></param>
-		/// <param name="values"></param>
-		/// <param name="cancellationToken"></param>
-		/// <returns></returns>
-		public Task<bool> AddSetMembersAsync(string key, IEnumerable<string> values, CancellationToken cancellationToken = default)
-			=> this._AddSetMembersAsync(key, values, 0, StoreMode.Set, cancellationToken);
-
-		/// <summary>
-		/// Removes a value from a set
-		/// </summary>
-		/// <param name="key"></param>
-		/// <param name="value"></param>
-		/// <returns></returns>
-		public bool RemoveSetMember(string key, string value)
-			=> this._RemoveSetMember(key, value);
-
-		/// <summary>
-		/// Removes the values from a set
-		/// </summary>
-		/// <param name="key"></param>
-		/// <param name="values"></param>
-		/// <returns></returns>
-		public bool RemoveSetMembers(string key, IEnumerable<string> values)
-			=> this._RemoveSetMembers(key, values);
-
-		/// <summary>
-		/// Removes a value from a set
-		/// </summary>
-		/// <param name="key"></param>
-		/// <param name="value"></param>
-		/// <param name="cancellationToken"></param>
-		/// <returns></returns>
-		public Task<bool> RemoveSetMemberAsync(string key, string value, CancellationToken cancellationToken = default)
-			=> this._RemoveSetMemberAsync(key, value, cancellationToken);
-
-		/// <summary>
-		/// Removes the values from a set
-		/// </summary>
-		/// <param name="key"></param>
-		/// <param name="values"></param>
-		/// <param name="cancellationToken"></param>
-		/// <returns></returns>
-		public Task<bool> RemoveSetMembersAsync(string key, IEnumerable<string> values, CancellationToken cancellationToken = default)
-			=> this._RemoveSetMembersAsync(key, values, cancellationToken);
+		public Task FlushAllAsync(CancellationToken cancellationToken = default)
+			=> Memcached.Client.FlushAllAsync(cancellationToken);
 		#endregion
 
 	}

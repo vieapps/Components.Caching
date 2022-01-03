@@ -1,8 +1,8 @@
 #region Related components
 using System;
-using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 #endregion
 
 namespace net.vieapps.Components.Caching
@@ -531,19 +531,7 @@ namespace net.vieapps.Components.Caching
 		Task<bool> ExistsAsync(string key, CancellationToken cancellationToken = default);
 		#endregion
 
-		#region Clear
-		/// <summary>
-		/// Clears the cache storage of this isolated region
-		/// </summary>
-		void Clear();
-
-		/// <summary>
-		/// Clears the cache storage of this isolated region
-		/// </summary>
-		Task ClearAsync(CancellationToken cancellationToken = default);
-		#endregion
-
-		#region [Public] Set Members
+		#region Set Members
 		/// <summary>
 		/// Gets a set
 		/// </summary>
@@ -626,6 +614,30 @@ namespace net.vieapps.Components.Caching
 		/// <param name="cancellationToken"></param>
 		/// <returns></returns>
 		Task<bool> RemoveSetMembersAsync(string key, IEnumerable<string> values, CancellationToken cancellationToken = default);
+		#endregion
+
+		#region Clear
+		/// <summary>
+		/// Clears the cache storage of this isolated region
+		/// </summary>
+		void Clear();
+
+		/// <summary>
+		/// Clears the cache storage of this isolated region
+		/// </summary>
+		Task ClearAsync(CancellationToken cancellationToken = default);
+		#endregion
+
+		#region Flush
+		/// <summary>
+		/// Removes all data from the cache
+		/// </summary>
+		void FlushAll();
+
+		/// <summary>
+		/// Removes all data from the cache
+		/// </summary>
+		Task FlushAllAsync(CancellationToken cancellationToken = default);
 		#endregion
 
 	}

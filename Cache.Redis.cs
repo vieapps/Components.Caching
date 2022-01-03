@@ -55,7 +55,7 @@ namespace net.vieapps.Components.Caching
 		#region Get client (singleton)
 		static ConnectionMultiplexer _Connection { get; set; }
 
-		static int ConnectionTimeout { get; set; }
+		static List<IServer> _Servers { get; } = new List<IServer>();
 
 		static IDatabase _Client { get; set; }
 
@@ -79,7 +79,6 @@ namespace net.vieapps.Components.Caching
 							if (connectTimeout.IndexOf(",") > 0)
 								connectTimeout = connectTimeout.Remove(connectTimeout.IndexOf(","));
 						}
-						Redis.ConnectionTimeout = Int32.TryParse(connectTimeout, out var timeout) ? timeout : 5000;
 						var logger = (loggerFactory ?? Enyim.Caching.Logger.GetLoggerFactory()).CreateLogger<Redis>();
 						if (Redis._Connection == null)
 						{
@@ -89,6 +88,12 @@ namespace net.vieapps.Components.Caching
 							try
 							{
 								Redis._Connection = string.IsNullOrWhiteSpace(connectionString) ? null : ConnectionMultiplexer.Connect(connectionString);
+								configuration.Servers.ForEach(server =>
+                                {
+									var redisSRV = Redis._Connection.GetServer($"{server.Address}:{server.Port}");
+									if (redisSRV != null)
+										Redis._Servers.Add(redisSRV);
+								});
 								if (logger.IsEnabled(LogLevel.Debug))
 									logger.LogDebug($"The Redis's connection was established => {connectionString}");
 							}
@@ -1101,6 +1106,101 @@ namespace net.vieapps.Components.Caching
 			=> this.SetAsFragmentsAsync(key, value, 0, cancellationToken);
 		#endregion
 
+		#region [Public] Set Members
+		/// <summary>
+		/// Gets a set
+		/// </summary>
+		/// <param name="key"></param>
+		/// <returns></returns>
+		public HashSet<string> GetSetMembers(string key)
+			=> Redis.Client.FetchSetMembers(this._GetKey(key));
+
+		/// <summary>
+		/// Gets a set
+		/// </summary>
+		/// <param name="key"></param>
+		/// <param name="cancellationToken"></param>
+		/// <returns></returns>
+		public Task<HashSet<string>> GetSetMembersAsync(string key, CancellationToken cancellationToken = default)
+			=> Redis.Client.FetchSetMembersAsync(this._GetKey(key), cancellationToken);
+
+		/// <summary>
+		/// Adds a value into a set
+		/// </summary>
+		/// <param name="key"></param>
+		/// <param name="value"></param>
+		/// <returns></returns>
+		public bool AddSetMember(string key, string value)
+			=> Redis.Client.UpdateSetMember(this._GetKey(key), value);
+
+		/// <summary>
+		/// Adds the values into a set
+		/// </summary>
+		/// <param name="key"></param>
+		/// <param name="values"></param>
+		/// <returns></returns>
+		public bool AddSetMembers(string key, IEnumerable<string> values)
+			=> Redis.Client.UpdateSetMember(this._GetKey(key), values);
+
+		/// <summary>
+		/// Adds a value into a set
+		/// </summary>
+		/// <param name="key"></param>
+		/// <param name="value"></param>
+		/// <param name="cancellationToken"></param>
+		/// <returns></returns>
+		public Task<bool> AddSetMemberAsync(string key, string value, CancellationToken cancellationToken = default)
+			=> Redis.Client.UpdateSetMemberAsync(this._GetKey(key), value, cancellationToken);
+
+		/// <summary>
+		/// Adds the values into a set
+		/// </summary>
+		/// <param name="key"></param>
+		/// <param name="values"></param>
+		/// <param name="cancellationToken"></param>
+		/// <returns></returns>
+		public Task<bool> AddSetMembersAsync(string key, IEnumerable<string> values, CancellationToken cancellationToken = default)
+			=> Redis.Client.UpdateSetMembersAsync(this._GetKey(key), values, cancellationToken);
+
+		/// <summary>
+		/// Removes a value from a set
+		/// </summary>
+		/// <param name="key"></param>
+		/// <param name="value"></param>
+		/// <returns></returns>
+		public bool RemoveSetMember(string key, string value)
+			=> Redis.Client.DeleteSetMember(this._GetKey(key), value);
+
+		/// <summary>
+		/// Removes the values from a set
+		/// </summary>
+		/// <param name="key"></param>
+		/// <param name="values"></param>
+		/// <returns></returns>
+		public bool RemoveSetMembers(string key, IEnumerable<string> values)
+			=> Redis.Client.DeleteSetMembers(this._GetKey(key), values);
+
+		/// <summary>
+		/// Removes a value from a set
+		/// </summary>
+		/// <param name="key"></param>
+		/// <param name="value"></param>
+		/// <param name="cancellationToken"></param>
+		/// <returns></returns>
+		public Task<bool> RemoveSetMemberAsync(string key, string value, CancellationToken cancellationToken = default)
+			=> Redis.Client.DeleteSetMemberAsync(this._GetKey(key), value, cancellationToken);
+
+		/// <summary>
+		/// Removes the values from a set
+		/// </summary>
+		/// <param name="key"></param>
+		/// <param name="values"></param>
+		/// <param name="cancellationToken"></param>
+		/// <returns></returns>
+		public Task<bool> RemoveSetMembersAsync(string key, IEnumerable<string> values, CancellationToken cancellationToken = default)
+			=> Redis.Client.DeleteSetMembersAsync(this._GetKey(key), values, cancellationToken);
+		#endregion
+
 		#region [Public] Add
 		/// <summary>
 		/// Adds an item into cache with a specified key when the the key is not existed
@@ -1494,101 +1594,34 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		public Task ClearAsync(CancellationToken cancellationToken = default)
 			=> this._ClearAsync(cancellationToken);
-		#endregion
+        #endregion
 
-		#region [Public] Set Members
-		/// <summary>
-		/// Gets a set
-		/// </summary>
-		/// <param name="key"></param>
-		/// <returns></returns>
-		public HashSet<string> GetSetMembers(string key)
-			=> Redis.Client.FetchSetMembers(this._GetKey(key));
+        #region [Public] Flush
+        /// <summary>
+        /// Removes all data from the cache
+        /// </summary>
+        public void FlushAll()
+			=> Redis._Servers.ForEach(server =>
+            {
+                try
+                {
+                    server.FlushDatabase();
+                }
+                catch { }
+            });
 
-		/// <summary>
-		/// Gets a set
-		/// </summary>
-		/// <param name="key"></param>
-		/// <param name="cancellationToken"></param>
-		/// <returns></returns>
-		public Task<HashSet<string>> GetSetMembersAsync(string key, CancellationToken cancellationToken = default)
-			=> Redis.Client.FetchSetMembersAsync(this._GetKey(key), cancellationToken);
-
-		/// <summary>
-		/// Adds a value into a set
-		/// </summary>
-		/// <param name="key"></param>
-		/// <param name="value"></param>
-		/// <returns></returns>
-		public bool AddSetMember(string key, string value)
-			=> Redis.Client.UpdateSetMember(this._GetKey(key), value);
-
-		/// <summary>
-		/// Adds the values into a set
-		/// </summary>
-		/// <param name="key"></param>
-		/// <param name="values"></param>
-		/// <returns></returns>
-		public bool AddSetMembers(string key, IEnumerable<string> values)
-			=> Redis.Client.UpdateSetMember(this._GetKey(key), values);
-
-		/// <summary>
-		/// Adds a value into a set
-		/// </summary>
-		/// <param name="key"></param>
-		/// <param name="value"></param>
-		/// <param name="cancellationToken"></param>
-		/// <returns></returns>
-		public Task<bool> AddSetMemberAsync(string key, string value, CancellationToken cancellationToken = default)
-			=> Redis.Client.UpdateSetMemberAsync(this._GetKey(key), value, cancellationToken);
-
-		/// <summary>
-		/// Adds the values into a set
-		/// </summary>
-		/// <param name="key"></param>
-		/// <param name="values"></param>
-		/// <param name="cancellationToken"></param>
-		/// <returns></returns>
-		public Task<bool> AddSetMembersAsync(string key, IEnumerable<string> values, CancellationToken cancellationToken = default)
-			=> Redis.Client.UpdateSetMembersAsync(this._GetKey(key), values, cancellationToken);
-
-		/// <summary>
-		/// Removes a value from a set
-		/// </summary>
-		/// <param name="key"></param>
-		/// <param name="value"></param>
-		/// <returns></returns>
-		public bool RemoveSetMember(string key, string value)
-			=> Redis.Client.DeleteSetMember(this._GetKey(key), value);
-
-		/// <summary>
-		/// Removes the values from a set
-		/// </summary>
-		/// <param name="key"></param>
-		/// <param name="values"></param>
-		/// <returns></returns>
-		public bool RemoveSetMembers(string key, IEnumerable<string> values)
-			=> Redis.Client.DeleteSetMembers(this._GetKey(key), values);
-
-		/// <summary>
-		/// Removes a value from a set
-		/// </summary>
-		/// <param name="key"></param>
-		/// <param name="value"></param>
-		/// <param name="cancellationToken"></param>
-		/// <returns></returns>
-		public Task<bool> RemoveSetMemberAsync(string key, string value, CancellationToken cancellationToken = default)
-			=> Redis.Client.DeleteSetMemberAsync(this._GetKey(key), value, cancellationToken);
-
-		/// <summary>
-		/// Removes the values from a set
-		/// </summary>
-		/// <param name="key"></param>
-		/// <param name="values"></param>
-		/// <param name="cancellationToken"></param>
-		/// <returns></returns>
-		public Task<bool> RemoveSetMembersAsync(string key, IEnumerable<string> values, CancellationToken cancellationToken = default)
-			=> Redis.Client.DeleteSetMembersAsync(this._GetKey(key), values, cancellationToken);
+        /// <summary>
+        /// Removes all data from the cache
+        /// </summary>
+        public Task FlushAllAsync(CancellationToken cancellationToken = default)
+			=> Task.WhenAll(Redis._Servers.Select(async server =>
+			{
+				try
+				{
+					await server.FlushDatabaseAsync().WithCancellationToken(cancellationToken).ConfigureAwait(false);
+				}
+				catch { }
+			}));
 		#endregion
 
 	}

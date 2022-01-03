@@ -581,7 +581,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="key"></param>
 		/// <param name="values"></param>
 		/// <returns></returns>
-		public static bool DeleteSetMembers(this IDatabase redis, string key, IEnumerable<string> values, CancellationToken cancellationToken = default)
+		public static bool DeleteSetMembers(this IDatabase redis, string key, IEnumerable<string> values)
 		{
 			try
 			{

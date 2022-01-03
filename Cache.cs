@@ -386,6 +386,101 @@ namespace net.vieapps.Components.Caching
 			=> this._cache.SetAsFragmentsAsync(key, value, cancellationToken);
 		#endregion
 
+		#region Set (Members)
+		/// <summary>
+		/// Gets a set
+		/// </summary>
+		/// <param name="key"></param>
+		/// <returns></returns>
+		public HashSet<string> GetSetMembers(string key)
+			=> this._cache.GetSetMembers(key);
+
+		/// <summary>
+		/// Gets a set
+		/// </summary>
+		/// <param name="key"></param>
+		/// <param name="cancellationToken"></param>
+		/// <returns></returns>
+		public Task<HashSet<string>> GetSetMembersAsync(string key, CancellationToken cancellationToken = default)
+			=> this._cache.GetSetMembersAsync(key, cancellationToken);
+
+		/// <summary>
+		/// Adds a value into a set
+		/// </summary>
+		/// <param name="key"></param>
+		/// <param name="value"></param>
+		/// <returns></returns>
+		public bool AddSetMember(string key, string value)
+			=> this._cache.AddSetMember(key, value);
+
+		/// <summary>
+		/// Adds the values into a set
+		/// </summary>
+		/// <param name="key"></param>
+		/// <param name="values"></param>
+		/// <returns></returns>
+		public bool AddSetMembers(string key, IEnumerable<string> values)
+			=> this._cache.AddSetMembers(key, values);
+
+		/// <summary>
+		/// Adds a value into a set
+		/// </summary>
+		/// <param name="key"></param>
+		/// <param name="value"></param>
+		/// <param name="cancellationToken"></param>
+		/// <returns></returns>
+		public Task<bool> AddSetMemberAsync(string key, string value, CancellationToken cancellationToken = default)
+			=> this._cache.AddSetMemberAsync(key, value, cancellationToken);
+
+		/// <summary>
+		/// Adds the values into a set
+		/// </summary>
+		/// <param name="key"></param>
+		/// <param name="values"></param>
+		/// <param name="cancellationToken"></param>
+		/// <returns></returns>
+		public Task<bool> AddSetMembersAsync(string key, IEnumerable<string> values, CancellationToken cancellationToken = default)
+			=> this._cache.AddSetMembersAsync(key, values, cancellationToken);
+
+		/// <summary>
+		/// Removes a value from a set
+		/// </summary>
+		/// <param name="key"></param>
+		/// <param name="value"></param>
+		/// <returns></returns>
+		public bool RemoveSetMember(string key, string value)
+			=> this._cache.RemoveSetMember(key, value);
+
+		/// <summary>
+		/// Removes the values from a set
+		/// </summary>
+		/// <param name="key"></param>
+		/// <param name="values"></param>
+		/// <returns></returns>
+		public bool RemoveSetMembers(string key, IEnumerable<string> values)
+			=> this._cache.RemoveSetMembers(key, values);
+
+		/// <summary>
+		/// Removes a value from a set
+		/// </summary>
+		/// <param name="key"></param>
+		/// <param name="value"></param>
+		/// <param name="cancellationToken"></param>
+		/// <returns></returns>
+		public Task<bool> RemoveSetMemberAsync(string key, string value, CancellationToken cancellationToken = default)
+			=> this._cache.RemoveSetMemberAsync(key, value, cancellationToken);
+
+		/// <summary>
+		/// Removes the values from a set
+		/// </summary>
+		/// <param name="key"></param>
+		/// <param name="values"></param>
+		/// <param name="cancellationToken"></param>
+		/// <returns></returns>
+		public Task<bool> RemoveSetMembersAsync(string key, IEnumerable<string> values, CancellationToken cancellationToken = default)
+			=> this._cache.RemoveSetMembersAsync(key, values, cancellationToken);
+		#endregion
+
 		#region Add
 		/// <summary>
 		/// Adds an item into cache with a specified key when the the key is not existed
@@ -761,99 +856,18 @@ namespace net.vieapps.Components.Caching
 			=> this._cache.ClearAsync(cancellationToken);
 		#endregion
 
-		#region Set Members
+		#region Flush
 		/// <summary>
-		/// Gets a set
+		/// Removes all data from the cache
 		/// </summary>
-		/// <param name="key"></param>
-		/// <returns></returns>
-		public HashSet<string> GetSetMembers(string key)
-			=> this._cache.GetSetMembers(key);
+		public void FlushAll()
+			=> this._cache.FlushAll();
 
 		/// <summary>
-		/// Gets a set
+		/// Removes all data from the cache
 		/// </summary>
-		/// <param name="key"></param>
-		/// <param name="cancellationToken"></param>
-		/// <returns></returns>
-		public Task<HashSet<string>> GetSetMembersAsync(string key, CancellationToken cancellationToken = default)
-			=> this._cache.GetSetMembersAsync(key, cancellationToken);
-
-		/// <summary>
-		/// Adds a value into a set
-		/// </summary>
-		/// <param name="key"></param>
-		/// <param name="value"></param>
-		/// <returns></returns>
-		public bool AddSetMember(string key, string value)
-			=> this._cache.AddSetMember(key, value);
-
-		/// <summary>
-		/// Adds the values into a set
-		/// </summary>
-		/// <param name="key"></param>
-		/// <param name="values"></param>
-		/// <returns></returns>
-		public bool AddSetMembers(string key, IEnumerable<string> values)
-			=> this._cache.AddSetMembers(key, values);
-
-		/// <summary>
-		/// Adds a value into a set
-		/// </summary>
-		/// <param name="key"></param>
-		/// <param name="value"></param>
-		/// <param name="cancellationToken"></param>
-		/// <returns></returns>
-		public Task<bool> AddSetMemberAsync(string key, string value, CancellationToken cancellationToken = default)
-			=> this._cache.AddSetMemberAsync(key, value, cancellationToken);
-
-		/// <summary>
-		/// Adds the values into a set
-		/// </summary>
-		/// <param name="key"></param>
-		/// <param name="values"></param>
-		/// <param name="cancellationToken"></param>
-		/// <returns></returns>
-		public Task<bool> AddSetMembersAsync(string key, IEnumerable<string> values, CancellationToken cancellationToken = default)
-			=> this._cache.AddSetMembersAsync(key, values, cancellationToken);
-
-		/// <summary>
-		/// Removes a value from a set
-		/// </summary>
-		/// <param name="key"></param>
-		/// <param name="value"></param>
-		/// <returns></returns>
-		public bool RemoveSetMember(string key, string value)
-			=> this._cache.RemoveSetMember(key, value);
-
-		/// <summary>
-		/// Removes the values from a set
-		/// </summary>
-		/// <param name="key"></param>
-		/// <param name="values"></param>
-		/// <returns></returns>
-		public bool RemoveSetMembers(string key, IEnumerable<string> values)
-			=> this._cache.RemoveSetMembers(key, values);
-
-		/// <summary>
-		/// Removes a value from a set
-		/// </summary>
-		/// <param name="key"></param>
-		/// <param name="value"></param>
-		/// <param name="cancellationToken"></param>
-		/// <returns></returns>
-		public Task<bool> RemoveSetMemberAsync(string key, string value, CancellationToken cancellationToken = default)
-			=> this._cache.RemoveSetMemberAsync(key, value, cancellationToken);
-
-		/// <summary>
-		/// Removes the values from a set
-		/// </summary>
-		/// <param name="key"></param>
-		/// <param name="values"></param>
-		/// <param name="cancellationToken"></param>
-		/// <returns></returns>
-		public Task<bool> RemoveSetMembersAsync(string key, IEnumerable<string> values, CancellationToken cancellationToken = default)
-			=> this._cache.RemoveSetMembersAsync(key, values, cancellationToken);
+		public Task FlushAllAsync(CancellationToken cancellationToken = default)
+			=> this._cache.FlushAllAsync(cancellationToken);
 		#endregion
 
 		#region Implements of IDistributedCache
