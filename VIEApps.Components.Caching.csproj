@@ -32,7 +32,7 @@
 		<PackageIcon>Icon.png</PackageIcon>
 		<PackageOutputPath>../</PackageOutputPath>
 		<PackageTags>cache;caching;distributed;distributed-cache;distributed-caching;memcached;redis;vieapps;vieapps.components</PackageTags>
-		<PackageReleaseNotes>.NET 6.0</PackageReleaseNotes>
+		<PackageReleaseNotes>Latest components</PackageReleaseNotes>
 		<PackageProjectUrl>https://vieapps.net/</PackageProjectUrl>
 		<RepositoryUrl>https://github.com/vieapps/Components.Caching</RepositoryUrl>
 		<RepositoryType>git</RepositoryType>
@@ -48,8 +48,8 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="StackExchange.Redis" Version="2.2.88" />
-		<PackageReference Include="VIEApps.Enyim.Caching" Version="5.0.2201.1" Condition="'$(GeneratePackage)' != 'true'" />
+		<PackageReference Include="StackExchange.Redis" Version="2.5.43" />
+		<PackageReference Include="VIEApps.Enyim.Caching" Version="5.0.2203.4" Condition="'$(GeneratePackage)' != 'true'" />
 		<PackageReference Include="VIEApps.Enyim.Caching$(PackageSuffix)" Version="5.0$(ReleaseVersion)" Condition="'$(GeneratePackage)' == 'true'" />
 	</ItemGroup>
 
