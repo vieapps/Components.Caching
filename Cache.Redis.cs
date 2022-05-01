@@ -89,11 +89,11 @@ namespace net.vieapps.Components.Caching
 							{
 								Redis._Connection = string.IsNullOrWhiteSpace(connectionString) ? null : ConnectionMultiplexer.Connect(connectionString);
 								configuration.Servers.ForEach(server =>
-                                {
-									var redisSRV = Redis._Connection.GetServer($"{server.Address}:{server.Port}");
-									if (redisSRV != null)
-										Redis._Servers.Add(redisSRV);
-								});
+																{
+																	var redisSRV = Redis._Connection.GetServer($"{server.Address}:{server.Port}");
+																	if (redisSRV != null)
+																		Redis._Servers.Add(redisSRV);
+																});
 								if (logger.IsEnabled(LogLevel.Debug))
 									logger.LogDebug($"The Redis's connection was established => {connectionString}");
 							}
@@ -1594,26 +1594,26 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		public Task ClearAsync(CancellationToken cancellationToken = default)
 			=> this._ClearAsync(cancellationToken);
-        #endregion
+		#endregion
 
-        #region [Public] Flush
-        /// <summary>
-        /// Removes all data from the cache
-        /// </summary>
-        public void FlushAll()
+		#region [Public] Flush
+		/// <summary>
+		/// Removes all data from the cache
+		/// </summary>
+		public void FlushAll()
 			=> Redis._Servers.ForEach(server =>
-            {
-                try
-                {
-                    server.FlushDatabase();
-                }
-                catch { }
-            });
+			{
+				try
+				{
+					server.FlushDatabase();
+				}
+				catch { }
+			});
 
-        /// <summary>
-        /// Removes all data from the cache
-        /// </summary>
-        public Task FlushAllAsync(CancellationToken cancellationToken = default)
+		/// <summary>
+		/// Removes all data from the cache
+		/// </summary>
+		public Task FlushAllAsync(CancellationToken cancellationToken = default)
 			=> Task.WhenAll(Redis._Servers.Select(async server =>
 			{
 				try

@@ -48,8 +48,8 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="StackExchange.Redis" Version="2.5.43" />
-		<PackageReference Include="VIEApps.Enyim.Caching" Version="5.0.2203.4" Condition="'$(GeneratePackage)' != 'true'" />
+		<PackageReference Include="StackExchange.Redis" Version="2.5.61" />
+		<PackageReference Include="VIEApps.Enyim.Caching" Version="5.0.2205.1" Condition="'$(GeneratePackage)' != 'true'" />
 		<PackageReference Include="VIEApps.Enyim.Caching$(PackageSuffix)" Version="5.0$(ReleaseVersion)" Condition="'$(GeneratePackage)' == 'true'" />
 	</ItemGroup>
 
