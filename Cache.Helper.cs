@@ -5,6 +5,7 @@ using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using net.vieapps.Components.Caching;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -349,21 +350,8 @@ namespace net.vieapps.Components.Caching
 		public void Set<T>(IDictionary<string, T> items, string keyPrefix, DateTime expiresAt, bool fireCallbackHandler = true)
 			=> this.Set(items?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value as object), keyPrefix, expiresAt, fireCallbackHandler);
 
-		public bool TryGetValue(string key, out object value)
-		{
-			value = null;
-			if (!string.IsNullOrWhiteSpace(key) && this._items.TryGetValue(key, out var cache))
-			{
-				value = cache.ExpiresAt > DateTime.Now ? cache.Value : null;
-				if (value == null)
-					this.Remove(key, false);
-				return value != null;
-			}
-			return false;
-		}
-
 		public object Get(string key)
-			=> this.TryGetValue(key, out var value) ? value : null;
+			=> !string.IsNullOrWhiteSpace(key) && this._items.TryGetValue(key, out var cache) && cache.ExpiresAt > DateTime.Now ? cache.Value : null;
 
 		public T Get<T>(string key)
 		{

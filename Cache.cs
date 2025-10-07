@@ -68,7 +68,7 @@ namespace net.vieapps.Components.Caching
 
 			this.UseMemoryCacheAsL1Cache = useMemoryCacheAsL1Cache;
 			this.PrefetchL1Cache = prefetchL1Cache;
-			this.PrefetchDelay = prefetchDelay > 0 ? prefetchDelay : 1234;
+			this.PrefetchDelay = prefetchDelay > 0 ? prefetchDelay : 2345;
 			this.ProcessCacheItemInvalidatingMessage = async key =>
 			{
 				if (this.UseMemoryCacheAsL1Cache && !string.IsNullOrWhiteSpace(key))
