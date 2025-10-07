@@ -1,17 +1,19 @@
 #region Related components
-using System;
-using System.Net;
-using System.Xml;
-using System.Linq;
-using System.Collections.Generic;
-using System.Collections.Concurrent;
-using System.Text.RegularExpressions;
-using Microsoft.Extensions.Logging;
+using Enyim.Caching.Configuration;
+using Enyim.Caching.Memcached;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
-using Enyim.Caching.Memcached;
-using Enyim.Caching.Configuration;
+using Microsoft.Extensions.Logging;
 using net.vieapps.Components.Caching;
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.Linq;
+using System.Net;
+using System.Text.RegularExpressions;
+using System.Xml;
+
 #endregion
 
 namespace net.vieapps.Components.Caching
@@ -312,32 +314,40 @@ namespace net.vieapps.Components.Caching
 
 	internal class MemoryCache : IDisposable
 	{
-		readonly Action<string, object> _onUpdateCallback;
+		readonly Action<string> _onUpdateCallback;
 		readonly Action<string, object> _onRemoveCallback;
 		readonly ConcurrentDictionary<string, (object Value, DateTime ExpiresAt)> _items;
 		readonly IDisposable _timer;
 
-		public MemoryCache(Action<string, object> onUpdateCallback = null, Action<string, object> onRemoveCallback = null)
+		public MemoryCache(Action<string> onUpdateCallback = null, Action<string, object> onRemoveCallback = null)
 		{
 			this._onUpdateCallback = onUpdateCallback;
 			this._onRemoveCallback = onRemoveCallback;
 			this._items = new ConcurrentDictionary<string, (object Value, DateTime ExpiresAt)>(StringComparer.OrdinalIgnoreCase);
-			this._timer = System.Reactive.Linq.Observable.Timer(TimeSpan.Zero, TimeSpan.FromSeconds(13)).Subscribe(_ => this._items.Where(kvp => kvp.Value.ExpiresAt <= DateTime.Now).Select(kvp => kvp.Key).ToList().ForEach(key => this.Remove(key)));
+			this._timer = System.Reactive.Linq.Observable.Timer(TimeSpan.Zero, TimeSpan.FromSeconds(13)).Subscribe(_ => this._items.Where(kvp => kvp.Value.ExpiresAt <= DateTime.Now).Select(kvp => kvp.Key).ToList().ForEach(key => this.Remove(key, false)));
 		}
 
-		public bool Set(string key, object value, DateTime expiresAt)
+		public bool Set(string key, object value, DateTime expiresAt, bool fireCallbackHandler = true)
 		{
-			this.Remove(key);
+			this.Remove(key, false);
 			if (!string.IsNullOrWhiteSpace(key) && value != null && this._items.TryAdd(key, (value, expiresAt)))
 			{
-				this._onUpdateCallback?.Invoke(key, value);
+				if (fireCallbackHandler)
+					this._onUpdateCallback?.Invoke(key);
 				return true;
 			}
 			return false;
 		}
 
-		public bool Set(string key, object value, TimeSpan validFor)
-			=> this.Set(key, value, DateTime.Now.AddMilliseconds(validFor.TotalMilliseconds));
+		public void Set(IDictionary<string, object> items, string keyPrefix, DateTime expiresAt, bool fireCallbackHandler = true)
+		{
+			var dictionary = items?.Where(kvp => kvp.Key != null).ToDictionary(kvp => (string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + kvp.Key, kvp => kvp.Value) ?? new Dictionary<string, object>();
+			foreach (var kvp in dictionary)
+				this.Set(kvp.Key, kvp.Value, expiresAt, fireCallbackHandler);
+		}
+
+		public void Set<T>(IDictionary<string, T> items, string keyPrefix, DateTime expiresAt, bool fireCallbackHandler = true)
+			=> this.Set(items?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value as object), keyPrefix, expiresAt, fireCallbackHandler);
 
 		public bool TryGetValue(string key, out object value)
 		{
@@ -346,7 +356,7 @@ namespace net.vieapps.Components.Caching
 			{
 				value = cache.ExpiresAt > DateTime.Now ? cache.Value : null;
 				if (value == null)
-					this.Remove(key);
+					this.Remove(key, false);
 				return value != null;
 			}
 			return false;
@@ -355,15 +365,37 @@ namespace net.vieapps.Components.Caching
 		public object Get(string key)
 			=> this.TryGetValue(key, out var value) ? value : null;
 
-		public bool Remove(string key)
+		public T Get<T>(string key)
+		{
+			var value = this.Get(key);
+			return value != null && value is T tvalue ? tvalue : default;
+		}
+
+		public IDictionary<string, object> Get(IEnumerable<string> keys)
+		{
+			var dictionary = keys?.Select(key => new KeyValuePair<string, object>(key, this.Get(key))).Where(kvp => kvp.Key != null && kvp.Value != null).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+			return dictionary != null && dictionary.Count > 0 ? dictionary : null;
+		}
+
+		public IDictionary<string, T> Get<T>(IEnumerable<string> keys)
+			=> this.Get(keys)?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value is T tvalue ? tvalue : default);
+
+		public bool Remove(string key, bool fireCallbackHandler = true)
 		{
 			if (!string.IsNullOrWhiteSpace(key) && this._items.TryRemove(key, out var cache))
 			{
-				this._onRemoveCallback?.Invoke(key, cache.Value);
+				if (fireCallbackHandler)
+					this._onRemoveCallback?.Invoke(key, cache.Value);
 				return true;
 			}
 			return false;
 		}
+
+		public void Remove(IEnumerable<string> keys, string keyPrefix, bool fireCallbackHandler = true)
+			=> keys?.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => (string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + key).ToList().ForEach(key => this.Remove(key, fireCallbackHandler));
+
+		public bool Exists(string key)
+			=> this._items.ContainsKey(key);
 
 		public void Clear()
 			=> this._items.Clear();
