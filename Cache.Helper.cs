@@ -328,7 +328,7 @@ namespace net.vieapps.Components.Caching
 		public bool Set(string key, object value, DateTime expiresAt)
 		{
 			this.Remove(key);
-			if (!string.IsNullOrWhiteSpace(key) && this._items.TryAdd(key, (value, expiresAt)))
+			if (!string.IsNullOrWhiteSpace(key) && value != null && this._items.TryAdd(key, (value, expiresAt)))
 			{
 				this._onUpdateCallback?.Invoke(key, value);
 				return true;

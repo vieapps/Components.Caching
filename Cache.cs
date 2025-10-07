@@ -198,17 +198,16 @@ namespace net.vieapps.Components.Caching
 				this.SendCacheItemInvalidatingMessage?.Invoke(key);
 		}
 
-		void _Set(string key, object value, TimeSpan validFor, bool sendCacheItemInvalidatingMessage = true)
+		bool _Set(string key, object value, TimeSpan validFor, bool sendCacheItemInvalidatingMessage = true)
 		{
 			this._Send(key, sendCacheItemInvalidatingMessage);
-			if (this.UseMemoryCacheAsL1Cache && value != null)
-				this._memoryCache.Set(key, value, TimeSpan.FromMinutes(validFor.TotalMinutes > 2 && validFor.TotalMinutes < 13 ? validFor.TotalMinutes / 2 : 3));
+			return this.UseMemoryCacheAsL1Cache && this._memoryCache.Set(key, value, TimeSpan.FromMinutes(validFor.TotalMinutes > 2 && validFor.TotalMinutes < 13 ? validFor.TotalMinutes / 2 : 3));
 		}
 
-		void _Set(string key, object value, int expirationTime = 0, bool sendCacheItemInvalidatingMessage = true)
+		bool _Set(string key, object value, int expirationTime = 0, bool sendCacheItemInvalidatingMessage = true)
 			=> this._Set(key, value, TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : Helper.ExpirationTime), sendCacheItemInvalidatingMessage);
 
-		void _Set(string key, object value, DateTime expiresAt, bool sendCacheItemInvalidatingMessage = true)
+		bool _Set(string key, object value, DateTime expiresAt, bool sendCacheItemInvalidatingMessage = true)
 			=> this._Set(key, value, (int)(expiresAt - DateTime.Now).TotalMinutes, sendCacheItemInvalidatingMessage);
 
 		void _Set<T>(IDictionary<string, T> items, string keyPrefix = null, int expirationTime = 0, bool sendCacheItemInvalidatingMessage = true)
@@ -223,11 +222,8 @@ namespace net.vieapps.Components.Caching
 			}
 		}
 
-		void _Set(string key, List<byte[]> fragments, int expirationTime = 0, bool sendCacheItemInvalidatingMessage = true)
-		{
-			if (this.UseMemoryCacheAsL1Cache)
-				this._Set(key, fragments.SelectMany(fragment => fragment).ToArray(), expirationTime, sendCacheItemInvalidatingMessage);
-		}
+		bool _Set(string key, List<byte[]> fragments, int expirationTime = 0, bool sendCacheItemInvalidatingMessage = true)
+			=> this.UseMemoryCacheAsL1Cache && this._Set(key, fragments.SelectMany(fragment => fragment).ToArray(), expirationTime, sendCacheItemInvalidatingMessage);
 
 		object _Get(string key)
 			=> this.UseMemoryCacheAsL1Cache	? this._memoryCache.Get(key) : null;
@@ -267,11 +263,10 @@ namespace net.vieapps.Components.Caching
 		HashSet<string> _GetSet(string key)
 			=> this._Get<HashSet<string>>(key);
 
-		void _Remove(string key, bool sendCacheItemInvalidatingMessage = true)
+		bool _Remove(string key, bool sendCacheItemInvalidatingMessage = true)
 		{
 			this._Send(key, sendCacheItemInvalidatingMessage);
-			if (this.UseMemoryCacheAsL1Cache)
-				this._memoryCache.Remove(key);
+			return this.UseMemoryCacheAsL1Cache && this._memoryCache.Remove(key);
 		}
 
 		void _Remove(IEnumerable<string> keys, string keyPrefix = null, bool sendCacheItemInvalidatingMessage = true)
