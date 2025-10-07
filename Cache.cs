@@ -24,8 +24,8 @@ namespace net.vieapps.Components.Caching
 	[DebuggerDisplay("{Name} ({ExpirationTime} minutes)")]
 	public sealed class Cache : IDistributedCache, ICache
 	{
-		readonly ICache _distributedCache;
-		readonly MemoryCache _memoryCache;
+		internal readonly ICache _distributedCache;
+		internal readonly MemoryCache _memoryCache;
 
 		/// <summary>
 		/// Create a new instance of distributed cache with isolated region
