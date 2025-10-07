@@ -21,6 +21,12 @@ namespace net.vieapps.Components.Caching
 
 		int ExpirationTime { get; }
 
+		bool UseMemoryCacheAsL1Cache { get; set; }
+
+		bool PrefetchL1Cache { get; set; }
+
+		int PrefetchDelay { get; set; }
+
 		IList<CacheServer> Servers { get; }
 
 		string Options { get; }
@@ -50,7 +56,13 @@ namespace net.vieapps.Components.Caching
 
 		public string RegionName { get; set; } = "VIEApps-NGX-Cache";
 
-		public int ExpirationTime { get; set; } = 30;
+		public int ExpirationTime { get; set; } = 25;
+
+		public bool UseMemoryCacheAsL1Cache { get; set; } = false;
+
+		public bool PrefetchL1Cache { get; set; } = false;
+
+		public int PrefetchDelay { get; set; } = 0;
 
 		public IList<CacheServer> Servers { get; set; } = new List<CacheServer>();
 
@@ -78,9 +90,11 @@ namespace net.vieapps.Components.Caching
 			this.Provider = configuration.Provider;
 			this.RegionName = configuration.RegionName;
 			this.ExpirationTime = configuration.ExpirationTime;
+			this.UseMemoryCacheAsL1Cache = configuration.UseMemoryCacheAsL1Cache;
+			this.PrefetchL1Cache = configuration.PrefetchL1Cache;
+			this.PrefetchDelay = configuration.PrefetchDelay;
 
 			this.Servers = configuration.Servers;
-
 			this.Options = configuration.Options;
 
 			this.Protocol = configuration.Protocol;
@@ -100,6 +114,10 @@ namespace net.vieapps.Components.Caching
 			this.RegionName = configuration.Section.Attributes["region"]?.Value ?? "VIEApps-NGX-Cache";
 			if (Int32.TryParse(configuration.Section.Attributes["expirationTime"]?.Value ?? "30", out var intValue))
 				this.ExpirationTime = intValue;
+
+			this.UseMemoryCacheAsL1Cache = "true".Equals(configuration.Section.Attributes["useMemoryCacheAsL1Cache"]?.Value.ToLower() ?? "false");
+			this.PrefetchL1Cache = "true".Equals(configuration.Section.Attributes["prefetchL1Cache"]?.Value.ToLower() ?? "false");
+			this.PrefetchDelay = Int32.TryParse(configuration.Section.Attributes["prefetchDelay"]?.Value, out var prefetchDelay) && prefetchDelay > 0 ? prefetchDelay : 0;
 
 			if (configuration.Section.SelectNodes("servers/add") is XmlNodeList servers)
 				foreach (XmlNode server in servers)
@@ -167,7 +185,6 @@ namespace net.vieapps.Components.Caching
 	/// <summary>
 	/// Caching options
 	/// </summary>
-	[Serializable]
 	public class CacheOptions : IOptions<CacheOptions>
 	{
 		public CacheOptions() { }
@@ -177,6 +194,12 @@ namespace net.vieapps.Components.Caching
 		public string RegionName { get; set; } = "VIEApps-NGX-Cache";
 
 		public int ExpirationTime { get; set; } = 30;
+
+		public bool UseMemoryCacheAsL1Cache { get; set; } = false;
+
+		public bool PrefetchL1Cache { get; set; } = false;
+
+		public int PrefetchDelay { get; set; } = 0;
 
 		public List<CacheServer> Servers { get; set; } = new List<CacheServer>();
 
@@ -202,7 +225,6 @@ namespace net.vieapps.Components.Caching
 	/// <summary>
 	/// Information of a distributed cache server
 	/// </summary>
-	[Serializable]
 	public class CacheServer
 	{
 		public string Address { get; set; }
@@ -226,7 +248,6 @@ namespace net.vieapps.Components.Caching
 	/// <summary>
 	/// Redis cache configuration
 	/// </summary>
-	[Serializable]
 	public class RedisClientConfiguration
 	{
 		public RedisClientConfiguration() { }
@@ -241,7 +262,6 @@ namespace net.vieapps.Components.Caching
 	/// <summary>
 	/// Redis cache options
 	/// </summary>
-	[Serializable]
 	public class RedisClientOptions : IOptions<RedisClientOptions>
 	{
 		public RedisClientOptions() { }

@@ -411,13 +411,266 @@ namespace net.vieapps.Components.Caching
 				: this._SetFragmentsAsync(key, CacheUtils.Helper.Split(Helper.Serialize(value), Helper.FragmentSize).ToList(), expirationTime, mode, cancellationToken);
 		#endregion
 
+		#region Get
+		object _Get(string key, bool autoGetFragments = true)
+		{
+			if (string.IsNullOrWhiteSpace(key))
+				throw new ArgumentNullException(key);
+
+			object value = null;
+			try
+			{
+				value = Memcached.Client.Get(this._GetKey(key));
+			}
+			catch (Exception ex)
+			{
+				Helper.WriteLogs(this.Name, $"Error occurred while fetching an object from cache storage [{key}]", ex);
+			}
+
+			if (autoGetFragments && value != null && value is byte[] bytes && bytes.Length > 8 && Helper.GetFlags(bytes).TypeFlag.Equals(Helper.FlagOfFirstFragmentBlock))
+				try
+				{
+					value = this._GetFromFragments(key, bytes);
+				}
+				catch (Exception ex)
+				{
+					Helper.WriteLogs(this.Name, $"Error occurred while fetching an objects' fragments from cache storage [{key}]", ex);
+					value = null;
+				}
+
+			return value;
+		}
+
+		async Task<object> _GetAsync(string key, bool autoGetFragments = true, CancellationToken cancellationToken = default)
+		{
+			if (string.IsNullOrWhiteSpace(key))
+				throw new ArgumentNullException(key);
+
+			object value = null;
+			try
+			{
+				value = await Memcached.Client.GetAsync(this._GetKey(key), cancellationToken).ConfigureAwait(false);
+			}
+			catch (OperationCanceledException)
+			{
+				throw;
+			}
+			catch (Exception ex)
+			{
+				Helper.WriteLogs(this.Name, $"Error occurred while fetching an object from cache storage [{key}]", ex);
+			}
+
+			if (autoGetFragments && value != null && value is byte[] bytes && bytes.Length > 8 && Helper.GetFlags(bytes).TypeFlag.Equals(Helper.FlagOfFirstFragmentBlock))
+				try
+				{
+					value = await this._GetFromFragmentsAsync(key, bytes, cancellationToken).ConfigureAwait(false);
+				}
+				catch (OperationCanceledException)
+				{
+					throw;
+				}
+				catch (Exception ex)
+				{
+					Helper.WriteLogs(this.Name, $"Error occurred while fetching an objects' fragments from cache storage [{key}]", ex);
+					value = null;
+				}
+
+			return value;
+		}
+		#endregion
+
+		#region Get (Multiple)
+		IDictionary<string, object> _Get(IEnumerable<string> keys)
+		{
+			if (keys == null)
+				return null;
+
+			// get collection of cached objects
+			IDictionary<string, object> items = null;
+			try
+			{
+				items = Memcached.Client.Get(keys.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => this._GetKey(key)));
+			}
+			catch (Exception ex)
+			{
+				Helper.WriteLogs(this.Name, "Error occurred while fetch a collection of objects from cache storage", ex);
+			}
+
+			var objects = items?.ToDictionary(kvp => kvp.Key.Substring(this.Name.Length + 1), kvp => kvp.Value);
+			return objects != null && objects.Count > 0
+				? objects
+				: null;
+		}
+
+		IDictionary<string, T> _Get<T>(IEnumerable<string> keys)
+			=> this._Get(keys)?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value is T value ? value : default);
+
+		async Task<IDictionary<string, object>> _GetAsync(IEnumerable<string> keys, CancellationToken cancellationToken = default)
+		{
+			if (keys == null)
+				return null;
+
+			IDictionary<string, object> items = null;
+			try
+			{
+				items = await Memcached.Client.GetAsync(keys.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => this._GetKey(key)), cancellationToken).ConfigureAwait(false);
+			}
+			catch (OperationCanceledException)
+			{
+				throw;
+			}
+			catch (Exception ex)
+			{
+				Helper.WriteLogs(this.Name, "Error occurred while fetch a collection of objects from cache storage", ex);
+			}
+
+			var objects = items?.ToDictionary(kvp => kvp.Key.Substring(this.Name.Length + 1), kvp => kvp.Value);
+			return objects != null && objects.Count > 0
+				? objects
+				: null;
+		}
+
+		async Task<IDictionary<string, T>> _GetAsync<T>(IEnumerable<string> keys, CancellationToken cancellationToken = default)
+			=> (await this._GetAsync(keys, cancellationToken).ConfigureAwait(false))?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value is T value ? value : default);
+		#endregion
+
+		#region Get (Fragment)
+		(int Blocks, int Length) _GetFragments(string key)
+			=> Helper.GetFragmentsInfo(this._Get(key, false) as byte[]);
+
+		async Task<(int Blocks, int Length)> _GetFragmentsAsync(string key, CancellationToken cancellationToken = default)
+			=> Helper.GetFragmentsInfo(await this._GetAsync(key, false, cancellationToken).ConfigureAwait(false) as byte[]);
+
+		List<byte[]> _GetAsFragments(string key, List<int> indexes)
+		{
+			var fragments = string.IsNullOrWhiteSpace(key) || indexes == null || indexes.Count < 1
+				? null
+				: this._Get(indexes.Select(index => this._GetFragmentKey(key, index)));
+			return fragments != null
+				? fragments.OrderBy(kvp => kvp.Key).Select(kvp => kvp.Value as byte[]).ToList()
+				: new List<byte[]>();
+		}
+
+		async Task<List<byte[]>> _GetAsFragmentsAsync(string key, List<int> indexes, CancellationToken cancellationToken = default)
+		{
+			var fragments = string.IsNullOrWhiteSpace(key) || indexes == null || indexes.Count < 1
+				? null
+				: await this._GetAsync(indexes.Select(index => this._GetFragmentKey(key, index)), cancellationToken).ConfigureAwait(false);
+			return fragments != null
+				? fragments.OrderBy(kvp => kvp.Key).Select(kvp => kvp.Value as byte[]).ToList()
+				: new List<byte[]>();
+		}
+
+		List<byte[]> _GetAsFragments(string key, params int[] indexes)
+			=> string.IsNullOrWhiteSpace(key) || indexes == null || indexes.Length < 1
+				? null
+				: this._GetAsFragments(key, indexes.ToList());
+
+		Task<List<byte[]>> _GetAsFragmentsAsync(string key, CancellationToken cancellationToken = default, params int[] indexes)
+			=> string.IsNullOrWhiteSpace(key) || indexes == null || indexes.Length < 1
+				? Task.FromResult<List<byte[]>>(null)
+				: this._GetAsFragmentsAsync(key, indexes.ToList(), cancellationToken);
+
+		object _GetFromFragments(string key, byte[] firstBlock)
+		{
+			try
+			{
+				var info = firstBlock.GetFragmentsInfo();
+				return CacheUtils.Helper.Concat(new[] { firstBlock }.Concat(info.Blocks > 1 ? this._GetAsFragments(key, Enumerable.Range(1, info.Blocks - 1).ToList()) : new List<byte[]>())).DeserializeFromFragments();
+			}
+			catch (Exception ex)
+			{
+				Helper.WriteLogs(this.Name, $"Error occurred while serializing an object from fragmented data [{key}]", ex);
+				return null;
+			}
+		}
+
+		async Task<object> _GetFromFragmentsAsync(string key, byte[] firstBlock, CancellationToken cancellationToken = default)
+		{
+			try
+			{
+				var info = firstBlock.GetFragmentsInfo();
+				return CacheUtils.Helper.Concat(new[] { firstBlock }.Concat(info.Blocks > 1 ? await this._GetAsFragmentsAsync(key, Enumerable.Range(1, info.Blocks - 1).ToList(), cancellationToken).ConfigureAwait(false) : new List<byte[]>())).DeserializeFromFragments();
+			}
+			catch (OperationCanceledException)
+			{
+				throw;
+			}
+			catch (Exception ex)
+			{
+				Helper.WriteLogs(this.Name, $"Error occurred while serializing an object from fragmented data [{key}]", ex);
+				return null;
+			}
+		}
+		#endregion
+
+		#region Remove
+		bool _Remove(string key, bool doPush = true)
+		{
+			var success = false;
+			if (!string.IsNullOrWhiteSpace(key))
+				try
+				{
+					success = Memcached.Client.Remove(this._GetKey(key));
+				}
+				catch (Exception ex)
+				{
+					Helper.WriteLogs(this.Name, $"Error occurred while removing an object from cache storage [{key}]", ex);
+				}
+
+			if (success)
+				this._UpdateKey(key, doPush, true);
+
+			return success;
+		}
+
+		async Task<bool> _RemoveAsync(string key, bool doPush = true, CancellationToken cancellationToken = default)
+		{
+			var success = false;
+			if (!string.IsNullOrWhiteSpace(key))
+				try
+				{
+					success = await Memcached.Client.RemoveAsync(this._GetKey(key), cancellationToken).ConfigureAwait(false);
+				}
+				catch (OperationCanceledException)
+				{
+					throw;
+				}
+				catch (Exception ex)
+				{
+					Helper.WriteLogs(this.Name, $"Error occurred while removing an object from cache storage [{key}]", ex);
+				}
+
+			if (success)
+				this._UpdateKey(key, doPush, true);
+
+			return success;
+		}
+		#endregion
+
+		#region Remove (Multiple)
+		void _Remove(IEnumerable<string> keys, string keyPrefix = null)
+		{
+			(keys ?? new List<string>()).Where(key => !string.IsNullOrWhiteSpace(key))
+				.ToList()
+				.ForEach(key => this._Remove((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + key, false));
+			this._PushKeys();
+		}
+
+		async Task _RemoveAsync(IEnumerable<string> keys, string keyPrefix = null, CancellationToken cancellationToken = default)
+		{
+			await Task.WhenAll((keys ?? new List<string>()).Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => this._RemoveAsync((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + key, false, cancellationToken))).ConfigureAwait(false);
+			this._PushKeys();
+		}
+		#endregion
+
 		#region Set Members
 		HashSet<string> _GetSetMembers(string key)
 		{
 			try
 			{
 				var firstBlock = Memcached.Client.Get<byte[]>(this._GetKey(key));
-				return firstBlock != null && firstBlock.Length > 8 && Helper.GetFlags(firstBlock).Item1.Equals(Helper.FlagOfFirstFragmentBlock)
+				return firstBlock != null && firstBlock.Length > 8 && Helper.GetFlags(firstBlock).TypeFlag.Equals(Helper.FlagOfFirstFragmentBlock)
 					? this._GetFromFragments(key, firstBlock) as HashSet<string> ?? new HashSet<string>()
 					: new HashSet<string>();
 			}
@@ -437,7 +690,7 @@ namespace net.vieapps.Components.Caching
 			try
 			{
 				var firstBlock = await Memcached.Client.GetAsync<byte[]>(this._GetKey(key), cancellationToken).ConfigureAwait(false);
-				return firstBlock != null && firstBlock.Length > 8 && Helper.GetFlags(firstBlock).Item1.Equals(Helper.FlagOfFirstFragmentBlock)
+				return firstBlock != null && firstBlock.Length > 8 && Helper.GetFlags(firstBlock).TypeFlag.Equals(Helper.FlagOfFirstFragmentBlock)
 					? await this._GetFromFragmentsAsync(key, firstBlock, cancellationToken).ConfigureAwait(false) as HashSet<string> ?? new HashSet<string>()
 					: new HashSet<string>();
 			}
@@ -514,259 +767,6 @@ namespace net.vieapps.Components.Caching
 			var set = await this._GetSetMembersAsync(key, cancellationToken).ConfigureAwait(false);
 			values?.ToList().ForEach(value => set.Remove(value));
 			return await this._SetAsFragmentsAsync(key, set, 0, StoreMode.Set, cancellationToken).ConfigureAwait(false);
-		}
-		#endregion
-
-		#region Get
-		object _Get(string key, bool autoGetFragments = true)
-		{
-			if (string.IsNullOrWhiteSpace(key))
-				throw new ArgumentNullException(key);
-
-			object value = null;
-			try
-			{
-				value = Memcached.Client.Get(this._GetKey(key));
-			}
-			catch (Exception ex)
-			{
-				Helper.WriteLogs(this.Name, $"Error occurred while fetching an object from cache storage [{key}]", ex);
-			}
-
-			if (autoGetFragments && value != null && value is byte[] && (value as byte[]).Length > 8 && Helper.GetFlags(value as byte[]).Item1.Equals(Helper.FlagOfFirstFragmentBlock))
-				try
-				{
-					value = this._GetFromFragments(key, value as byte[]);
-				}
-				catch (Exception ex)
-				{
-					Helper.WriteLogs(this.Name, $"Error occurred while fetching an objects' fragments from cache storage [{key}]", ex);
-					value = null;
-				}
-
-			return value;
-		}
-
-		async Task<object> _GetAsync(string key, bool autoGetFragments = true, CancellationToken cancellationToken = default)
-		{
-			if (string.IsNullOrWhiteSpace(key))
-				throw new ArgumentNullException(key);
-
-			object value = null;
-			try
-			{
-				value = await Memcached.Client.GetAsync(this._GetKey(key), cancellationToken).ConfigureAwait(false);
-			}
-			catch (OperationCanceledException)
-			{
-				throw;
-			}
-			catch (Exception ex)
-			{
-				Helper.WriteLogs(this.Name, $"Error occurred while fetching an object from cache storage [{key}]", ex);
-			}
-
-			if (autoGetFragments && value != null && value is byte[] && (value as byte[]).Length > 8 && Helper.GetFlags(value as byte[]).Item1.Equals(Helper.FlagOfFirstFragmentBlock))
-				try
-				{
-					value = await this._GetFromFragmentsAsync(key, value as byte[], cancellationToken).ConfigureAwait(false);
-				}
-				catch (OperationCanceledException)
-				{
-					throw;
-				}
-				catch (Exception ex)
-				{
-					Helper.WriteLogs(this.Name, $"Error occurred while fetching an objects' fragments from cache storage [{key}]", ex);
-					value = null;
-				}
-
-			return value;
-		}
-		#endregion
-
-		#region Get (Multiple)
-		IDictionary<string, object> _Get(IEnumerable<string> keys)
-		{
-			if (keys == null)
-				return null;
-
-			// get collection of cached objects
-			IDictionary<string, object> items = null;
-			try
-			{
-				items = Memcached.Client.Get(keys.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => this._GetKey(key)));
-			}
-			catch (Exception ex)
-			{
-				Helper.WriteLogs(this.Name, "Error occurred while fetch a collection of objects from cache storage", ex);
-			}
-
-			var objects = items?.ToDictionary(kvp => kvp.Key.Substring(this.Name.Length + 1), kvp => kvp.Value);
-			return objects != null && objects.Count > 0
-				? objects
-				: null;
-		}
-
-		IDictionary<string, T> _Get<T>(IEnumerable<string> keys)
-			=> this._Get(keys)?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value is T value ? value : default);
-
-		async Task<IDictionary<string, object>> _GetAsync(IEnumerable<string> keys, CancellationToken cancellationToken = default)
-		{
-			if (keys == null)
-				return null;
-
-			IDictionary<string, object> items = null;
-			try
-			{
-				items = await Memcached.Client.GetAsync(keys.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => this._GetKey(key)), cancellationToken).ConfigureAwait(false);
-			}
-			catch (OperationCanceledException)
-			{
-				throw;
-			}
-			catch (Exception ex)
-			{
-				Helper.WriteLogs(this.Name, "Error occurred while fetch a collection of objects from cache storage", ex);
-			}
-
-			var objects = items?.ToDictionary(kvp => kvp.Key.Substring(this.Name.Length + 1), kvp => kvp.Value);
-			return objects != null && objects.Count > 0
-				? objects
-				: null;
-		}
-
-		async Task<IDictionary<string, T>> _GetAsync<T>(IEnumerable<string> keys, CancellationToken cancellationToken = default)
-			=> (await this._GetAsync(keys, cancellationToken).ConfigureAwait(false))?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value is T value ? value : default);
-		#endregion
-
-		#region Get (Fragment)
-		Tuple<int, int> _GetFragments(string key)
-			=> Helper.GetFragmentsInfo(this._Get(key, false) as byte[]);
-
-		async Task<Tuple<int, int>> _GetFragmentsAsync(string key, CancellationToken cancellationToken = default)
-			=> Helper.GetFragmentsInfo(await this._GetAsync(key, false, cancellationToken).ConfigureAwait(false) as byte[]);
-
-		List<byte[]> _GetAsFragments(string key, List<int> indexes)
-		{
-			var fragments = string.IsNullOrWhiteSpace(key) || indexes == null || indexes.Count < 1
-				? null
-				: this._Get(indexes.Select(index => this._GetFragmentKey(key, index)));
-			return fragments != null
-				? fragments.OrderBy(kvp => kvp.Key).Select(kvp => kvp.Value as byte[]).ToList()
-				: new List<byte[]>();
-		}
-
-		async Task<List<byte[]>> _GetAsFragmentsAsync(string key, List<int> indexes, CancellationToken cancellationToken = default)
-		{
-			var fragments = string.IsNullOrWhiteSpace(key) || indexes == null || indexes.Count < 1
-				? null
-				: await this._GetAsync(indexes.Select(index => this._GetFragmentKey(key, index)), cancellationToken).ConfigureAwait(false);
-			return fragments != null
-				? fragments.OrderBy(kvp => kvp.Key).Select(kvp => kvp.Value as byte[]).ToList()
-				: new List<byte[]>();
-		}
-
-		List<byte[]> _GetAsFragments(string key, params int[] indexes)
-			=> string.IsNullOrWhiteSpace(key) || indexes == null || indexes.Length < 1
-				? null
-				: this._GetAsFragments(key, indexes.ToList());
-
-		Task<List<byte[]>> _GetAsFragmentsAsync(string key, CancellationToken cancellationToken = default, params int[] indexes)
-			=> string.IsNullOrWhiteSpace(key) || indexes == null || indexes.Length < 1
-				? Task.FromResult<List<byte[]>>(null)
-				: this._GetAsFragmentsAsync(key, indexes.ToList(), cancellationToken);
-
-		object _GetFromFragments(string key, byte[] firstBlock)
-		{
-			try
-			{
-				var info = firstBlock.GetFragmentsInfo();
-				return CacheUtils.Helper.Concat(new[] { firstBlock }.Concat(info.Item1 > 1 ? this._GetAsFragments(key, Enumerable.Range(1, info.Item1 - 1).ToList()) : new List<byte[]>())).DeserializeFromFragments();
-			}
-			catch (Exception ex)
-			{
-				Helper.WriteLogs(this.Name, $"Error occurred while serializing an object from fragmented data [{key}]", ex);
-				return null;
-			}
-		}
-
-		async Task<object> _GetFromFragmentsAsync(string key, byte[] firstBlock, CancellationToken cancellationToken = default)
-		{
-			try
-			{
-				var info = firstBlock.GetFragmentsInfo();
-				return CacheUtils.Helper.Concat(new[] { firstBlock }.Concat(info.Item1 > 1 ? await this._GetAsFragmentsAsync(key, Enumerable.Range(1, info.Item1 - 1).ToList(), cancellationToken).ConfigureAwait(false) : new List<byte[]>())).DeserializeFromFragments();
-			}
-			catch (OperationCanceledException)
-			{
-				throw;
-			}
-			catch (Exception ex)
-			{
-				Helper.WriteLogs(this.Name, $"Error occurred while serializing an object from fragmented data [{key}]", ex);
-				return null;
-			}
-		}
-		#endregion
-
-		#region Remove
-		bool _Remove(string key, bool doPush = true)
-		{
-			var success = false;
-			if (!string.IsNullOrWhiteSpace(key))
-				try
-				{
-					success = Memcached.Client.Remove(this._GetKey(key));
-				}
-				catch (Exception ex)
-				{
-					Helper.WriteLogs(this.Name, $"Error occurred while removing an object from cache storage [{key}]", ex);
-				}
-
-			if (success)
-				this._UpdateKey(key, doPush, true);
-
-			return success;
-		}
-
-		async Task<bool> _RemoveAsync(string key, bool doPush = true, CancellationToken cancellationToken = default)
-		{
-			var success = false;
-			if (!string.IsNullOrWhiteSpace(key))
-				try
-				{
-					success = await Memcached.Client.RemoveAsync(this._GetKey(key), cancellationToken).ConfigureAwait(false);
-				}
-				catch (OperationCanceledException)
-				{
-					throw;
-				}
-				catch (Exception ex)
-				{
-					Helper.WriteLogs(this.Name, $"Error occurred while removing an object from cache storage [{key}]", ex);
-				}
-
-			if (success)
-				this._UpdateKey(key, doPush, true);
-
-			return success;
-		}
-		#endregion
-
-		#region Remove (Multiple)
-		void _Remove(IEnumerable<string> keys, string keyPrefix = null)
-		{
-			(keys ?? new List<string>()).Where(key => !string.IsNullOrWhiteSpace(key))
-				.ToList()
-				.ForEach(key => this._Remove((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + key, false));
-			this._PushKeys();
-		}
-
-		async Task _RemoveAsync(IEnumerable<string> keys, string keyPrefix = null, CancellationToken cancellationToken = default)
-		{
-			await Task.WhenAll((keys ?? new List<string>()).Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => this._RemoveAsync((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + key, false, cancellationToken))).ConfigureAwait(false);
-			this._PushKeys();
 		}
 		#endregion
 
@@ -1167,101 +1167,6 @@ namespace net.vieapps.Components.Caching
 			=> this.SetAsFragmentsAsync(key, value, 0, cancellationToken);
 		#endregion
 
-		#region [Public] Set Members
-		/// <summary>
-		/// Gets a set
-		/// </summary>
-		/// <param name="key"></param>
-		/// <returns></returns>
-		public HashSet<string> GetSetMembers(string key)
-			=> this._GetSetMembers(key);
-
-		/// <summary>
-		/// Gets a set
-		/// </summary>
-		/// <param name="key"></param>
-		/// <param name="cancellationToken"></param>
-		/// <returns></returns>
-		public Task<HashSet<string>> GetSetMembersAsync(string key, CancellationToken cancellationToken = default)
-			=> this._GetSetMembersAsync(key, cancellationToken);
-
-		/// <summary>
-		/// Adds a value into a set
-		/// </summary>
-		/// <param name="key"></param>
-		/// <param name="value"></param>
-		/// <returns></returns>
-		public bool AddSetMember(string key, string value)
-			=> this._AddSetMember(key, value, 0, StoreMode.Set);
-
-		/// <summary>
-		/// Adds the values into a set
-		/// </summary>
-		/// <param name="key"></param>
-		/// <param name="values"></param>
-		/// <returns></returns>
-		public bool AddSetMembers(string key, IEnumerable<string> values)
-			=> this._AddSetMembers(key, values, 0, StoreMode.Set);
-
-		/// <summary>
-		/// Adds a value into a set
-		/// </summary>
-		/// <param name="key"></param>
-		/// <param name="value"></param>
-		/// <param name="cancellationToken"></param>
-		/// <returns></returns>
-		public Task<bool> AddSetMemberAsync(string key, string value, CancellationToken cancellationToken = default)
-			=> this._AddSetMemberAsync(key, value, 0, StoreMode.Set, cancellationToken);
-
-		/// <summary>
-		/// Adds the values into a set
-		/// </summary>
-		/// <param name="key"></param>
-		/// <param name="values"></param>
-		/// <param name="cancellationToken"></param>
-		/// <returns></returns>
-		public Task<bool> AddSetMembersAsync(string key, IEnumerable<string> values, CancellationToken cancellationToken = default)
-			=> this._AddSetMembersAsync(key, values, 0, StoreMode.Set, cancellationToken);
-
-		/// <summary>
-		/// Removes a value from a set
-		/// </summary>
-		/// <param name="key"></param>
-		/// <param name="value"></param>
-		/// <returns></returns>
-		public bool RemoveSetMember(string key, string value)
-			=> this._RemoveSetMember(key, value);
-
-		/// <summary>
-		/// Removes the values from a set
-		/// </summary>
-		/// <param name="key"></param>
-		/// <param name="values"></param>
-		/// <returns></returns>
-		public bool RemoveSetMembers(string key, IEnumerable<string> values)
-			=> this._RemoveSetMembers(key, values);
-
-		/// <summary>
-		/// Removes a value from a set
-		/// </summary>
-		/// <param name="key"></param>
-		/// <param name="value"></param>
-		/// <param name="cancellationToken"></param>
-		/// <returns></returns>
-		public Task<bool> RemoveSetMemberAsync(string key, string value, CancellationToken cancellationToken = default)
-			=> this._RemoveSetMemberAsync(key, value, cancellationToken);
-
-		/// <summary>
-		/// Removes the values from a set
-		/// </summary>
-		/// <param name="key"></param>
-		/// <param name="values"></param>
-		/// <param name="cancellationToken"></param>
-		/// <returns></returns>
-		public Task<bool> RemoveSetMembersAsync(string key, IEnumerable<string> values, CancellationToken cancellationToken = default)
-			=> this._RemoveSetMembersAsync(key, values, cancellationToken);
-		#endregion
-
 		#region [Public] Add
 		/// <summary>
 		/// Adds an item into cache with a specified key when the the key is not existed
@@ -1450,9 +1355,7 @@ namespace net.vieapps.Components.Caching
 		public T Get<T>(string key)
 		{
 			var @object = this.Get(key);
-			return @object != null && @object is T
-				? (T)@object
-				: default;
+			return @object != null && @object is T tobject ? tobject : default;
 		}
 
 		/// <summary>
@@ -1472,9 +1375,7 @@ namespace net.vieapps.Components.Caching
 		public async Task<T> GetAsync<T>(string key, CancellationToken cancellationToken = default)
 		{
 			var @object = await this.GetAsync(key, cancellationToken).ConfigureAwait(false);
-			return @object != null && @object is T
-				? (T)@object
-				: default;
+			return @object != null && @object is T tobject ? tobject : default;
 		}
 		#endregion
 
@@ -1518,7 +1419,7 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		/// <param name="key">The string that presents key of fragment information</param>
 		/// <returns>The information of fragments, first element is total number of fragments, second element is total length of data</returns>
-		public Tuple<int, int> GetFragments(string key)
+		public (int Blocks, int Length) GetFragments(string key)
 			=> this._GetFragments(key);
 
 		/// <summary>
@@ -1526,7 +1427,7 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		/// <param name="key">The string that presents key of fragment information</param>
 		/// <returns>The information of fragments, first element is total number of fragments, second element is total length of data</returns>
-		public Task<Tuple<int, int>> GetFragmentsAsync(string key, CancellationToken cancellationToken = default)
+		public Task<(int Blocks, int Length)> GetFragmentsAsync(string key, CancellationToken cancellationToken = default)
 			=> this._GetFragmentsAsync(key, cancellationToken);
 
 		/// <summary>
@@ -1641,6 +1542,101 @@ namespace net.vieapps.Components.Caching
 		/// <returns>Returns a boolean value indicating if the object that associates with the key is cached or not</returns>
 		public Task<bool> ExistsAsync(string key, CancellationToken cancellationToken = default)
 			=> Memcached.Client.ExistsAsync(this._GetKey(key), cancellationToken);
+		#endregion
+
+		#region [Public] Set Members
+		/// <summary>
+		/// Gets a set
+		/// </summary>
+		/// <param name="key"></param>
+		/// <returns></returns>
+		public HashSet<string> GetSetMembers(string key)
+			=> this._GetSetMembers(key);
+
+		/// <summary>
+		/// Gets a set
+		/// </summary>
+		/// <param name="key"></param>
+		/// <param name="cancellationToken"></param>
+		/// <returns></returns>
+		public Task<HashSet<string>> GetSetMembersAsync(string key, CancellationToken cancellationToken = default)
+			=> this._GetSetMembersAsync(key, cancellationToken);
+
+		/// <summary>
+		/// Adds a value into a set
+		/// </summary>
+		/// <param name="key"></param>
+		/// <param name="value"></param>
+		/// <returns></returns>
+		public bool AddSetMember(string key, string value)
+			=> this._AddSetMember(key, value, 0, StoreMode.Set);
+
+		/// <summary>
+		/// Adds the values into a set
+		/// </summary>
+		/// <param name="key"></param>
+		/// <param name="values"></param>
+		/// <returns></returns>
+		public bool AddSetMembers(string key, IEnumerable<string> values)
+			=> this._AddSetMembers(key, values, 0, StoreMode.Set);
+
+		/// <summary>
+		/// Adds a value into a set
+		/// </summary>
+		/// <param name="key"></param>
+		/// <param name="value"></param>
+		/// <param name="cancellationToken"></param>
+		/// <returns></returns>
+		public Task<bool> AddSetMemberAsync(string key, string value, CancellationToken cancellationToken = default)
+			=> this._AddSetMemberAsync(key, value, 0, StoreMode.Set, cancellationToken);
+
+		/// <summary>
+		/// Adds the values into a set
+		/// </summary>
+		/// <param name="key"></param>
+		/// <param name="values"></param>
+		/// <param name="cancellationToken"></param>
+		/// <returns></returns>
+		public Task<bool> AddSetMembersAsync(string key, IEnumerable<string> values, CancellationToken cancellationToken = default)
+			=> this._AddSetMembersAsync(key, values, 0, StoreMode.Set, cancellationToken);
+
+		/// <summary>
+		/// Removes a value from a set
+		/// </summary>
+		/// <param name="key"></param>
+		/// <param name="value"></param>
+		/// <returns></returns>
+		public bool RemoveSetMember(string key, string value)
+			=> this._RemoveSetMember(key, value);
+
+		/// <summary>
+		/// Removes the values from a set
+		/// </summary>
+		/// <param name="key"></param>
+		/// <param name="values"></param>
+		/// <returns></returns>
+		public bool RemoveSetMembers(string key, IEnumerable<string> values)
+			=> this._RemoveSetMembers(key, values);
+
+		/// <summary>
+		/// Removes a value from a set
+		/// </summary>
+		/// <param name="key"></param>
+		/// <param name="value"></param>
+		/// <param name="cancellationToken"></param>
+		/// <returns></returns>
+		public Task<bool> RemoveSetMemberAsync(string key, string value, CancellationToken cancellationToken = default)
+			=> this._RemoveSetMemberAsync(key, value, cancellationToken);
+
+		/// <summary>
+		/// Removes the values from a set
+		/// </summary>
+		/// <param name="key"></param>
+		/// <param name="values"></param>
+		/// <param name="cancellationToken"></param>
+		/// <returns></returns>
+		public Task<bool> RemoveSetMembersAsync(string key, IEnumerable<string> values, CancellationToken cancellationToken = default)
+			=> this._RemoveSetMembersAsync(key, values, cancellationToken);
 		#endregion
 
 		#region [Public] Clear

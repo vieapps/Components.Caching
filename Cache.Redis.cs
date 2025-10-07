@@ -1,13 +1,13 @@
 #region Related components
 using System;
 using System.Linq;
-using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Configuration;
-using System.Diagnostics;
-using StackExchange.Redis;
+using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
+using StackExchange.Redis;
 using CacheUtils;
 #endregion
 
@@ -19,9 +19,6 @@ namespace net.vieapps.Components.Caching
 	[DebuggerDisplay("Redis: {Name} ({ExpirationTime} minutes)")]
 	public sealed class Redis : ICache
 	{
-		readonly SemaphoreSlim _lock = new SemaphoreSlim(1, 1);
-		readonly bool _storeKeys;
-
 		/// <summary>
 		/// Create new instance of Redis
 		/// </summary>
@@ -89,11 +86,11 @@ namespace net.vieapps.Components.Caching
 							{
 								Redis._Connection = string.IsNullOrWhiteSpace(connectionString) ? null : ConnectionMultiplexer.Connect(connectionString);
 								configuration.Servers.ForEach(server =>
-																{
-																	var redisSRV = Redis._Connection.GetServer($"{server.Address}:{server.Port}");
-																	if (redisSRV != null)
-																		Redis._Servers.Add(redisSRV);
-																});
+								{
+									var redisSRV = Redis._Connection.GetServer($"{server.Address}:{server.Port}");
+									if (redisSRV != null)
+										Redis._Servers.Add(redisSRV);
+								});
 								if (logger.IsEnabled(LogLevel.Debug))
 									logger.LogDebug($"The Redis's connection was established => {connectionString}");
 							}
@@ -150,6 +147,11 @@ namespace net.vieapps.Components.Caching
 				return Redis._Client;
 			}
 		}
+		#endregion
+
+		#region Attributes
+		readonly SemaphoreSlim _lock = new SemaphoreSlim(1, 1);
+		readonly bool _storeKeys;
 		#endregion
 
 		#region Keys
@@ -484,17 +486,31 @@ namespace net.vieapps.Components.Caching
 			{
 				value = Redis.Client.Get(this._GetKey(key), false);
 			}
+			catch (RedisServerException ex)
+			{
+				if (ex.Message.Contains("WRONGTYPE"))
+					try
+					{
+						value = Redis.Client.FetchSetMembers(this._GetKey(key));
+					}
+					catch (Exception exception)
+					{
+						Helper.WriteLogs(this.Name, $"Error occurred while re-fetching an object from cache storage [{key}]", exception);
+					}
+				else
+					Helper.WriteLogs(this.Name, $"Error occurred while fetching an object from cache storage [{key}]", ex);
+			}
 			catch (Exception ex)
 			{
 				Helper.WriteLogs(this.Name, $"Error occurred while fetching an object from cache storage [{key}]", ex);
 			}
 
-			if (value != null && (value as byte[]).Length > 7)
+			if (value != null && value is byte[] bytes && bytes.Length > 7)
 			{
-				if (autoGetFragments && Helper.GetFlags(value as byte[]).Item1.Equals(Helper.FlagOfFirstFragmentBlock))
+				if (autoGetFragments && Helper.GetFlags(bytes).TypeFlag.Equals(Helper.FlagOfFirstFragmentBlock))
 					try
 					{
-						value = this._GetFromFragments(key, value as byte[]);
+						value = this._GetFromFragments(key, bytes);
 					}
 					catch (Exception ex)
 					{
@@ -504,11 +520,11 @@ namespace net.vieapps.Components.Caching
 				else
 					try
 					{
-						value = Helper.Deserialize(value as byte[]);
+						value = Helper.Deserialize(bytes);
 					}
 					catch (Exception ex)
 					{
-						Helper.WriteLogs(this.Name, $"Error occurred while fetching an object from cache storage [{key}]", ex);
+						Helper.WriteLogs(this.Name, $"Error occurred while fetching an object from cache storage (cannot deserialize) [{key}]", ex);
 						value = null;
 					}
 			}
@@ -530,17 +546,31 @@ namespace net.vieapps.Components.Caching
 			{
 				throw;
 			}
+			catch (RedisServerException ex)
+			{
+				if (ex.Message.Contains("WRONGTYPE"))
+					try
+					{
+						value = await Redis.Client.FetchSetMembersAsync(this._GetKey(key), cancellationToken).ConfigureAwait(false);
+					}
+					catch (Exception exception)
+					{
+						Helper.WriteLogs(this.Name, $"Error occurred while re-fetching an object from cache storage [{key}]", exception);
+					}
+				else
+					Helper.WriteLogs(this.Name, $"Error occurred while fetching an object from cache storage [{key}]", ex);
+			}
 			catch (Exception ex)
 			{
 				Helper.WriteLogs(this.Name, $"Error occurred while fetching an object from cache storage [{key}]", ex);
 			}
 
-			if (value != null && (value as byte[]).Length > 7)
+			if (value != null && value is byte[] bytes && bytes.Length > 7)
 			{
-				if (autoGetFragments && Helper.GetFlags(value as byte[]).Item1.Equals(Helper.FlagOfFirstFragmentBlock))
+				if (autoGetFragments && Helper.GetFlags(bytes).TypeFlag.Equals(Helper.FlagOfFirstFragmentBlock))
 					try
 					{
-						value = await this._GetFromFragmentsAsync(key, value as byte[], cancellationToken).ConfigureAwait(false);
+						value = await this._GetFromFragmentsAsync(key, bytes, cancellationToken).ConfigureAwait(false);
 					}
 					catch (OperationCanceledException)
 					{
@@ -554,11 +584,11 @@ namespace net.vieapps.Components.Caching
 				else
 					try
 					{
-						value = Helper.Deserialize(value as byte[]);
+						value = Helper.Deserialize(bytes);
 					}
 					catch (Exception ex)
 					{
-						Helper.WriteLogs(this.Name, $"Error occurred while fetching an object from cache storage [{key}]", ex);
+						Helper.WriteLogs(this.Name, $"Error occurred while fetching an object from cache storage (cannot deserialize) [{key}]", ex);
 						value = null;
 					}
 			}
@@ -662,10 +692,10 @@ namespace net.vieapps.Components.Caching
 		#endregion
 
 		#region Get (Fragment)
-		Tuple<int, int> _GetFragments(string key)
+		(int Blocks, int Length) _GetFragments(string key)
 			=> Helper.GetFragmentsInfo(this._Get(key, false) as byte[]);
 
-		async Task<Tuple<int, int>> _GetFragmentsAsync(string key, CancellationToken cancellationToken = default)
+		async Task<(int Blocks, int Length)> _GetFragmentsAsync(string key, CancellationToken cancellationToken = default)
 			=> Helper.GetFragmentsInfo(await this._GetAsync(key, false, cancellationToken).ConfigureAwait(false) as byte[]);
 
 		List<byte[]> _GetAsFragments(string key, List<int> indexes)
@@ -703,7 +733,7 @@ namespace net.vieapps.Components.Caching
 			try
 			{
 				var info = firstBlock.GetFragmentsInfo();
-				return CacheUtils.Helper.Concat(new[] { firstBlock }.Concat(info.Item1 > 1 ? this._GetAsFragments(key, Enumerable.Range(1, info.Item1 - 1).ToList()) : new List<byte[]>())).DeserializeFromFragments();
+				return CacheUtils.Helper.Concat(new[] { firstBlock }.Concat(info.Blocks > 1 ? this._GetAsFragments(key, Enumerable.Range(1, info.Blocks - 1).ToList()) : new List<byte[]>())).DeserializeFromFragments();
 			}
 			catch (Exception ex)
 			{
@@ -717,7 +747,7 @@ namespace net.vieapps.Components.Caching
 			try
 			{
 				var info = firstBlock.GetFragmentsInfo();
-				return CacheUtils.Helper.Concat(new[] { firstBlock }.Concat(info.Item1 > 1 ? await this._GetAsFragmentsAsync(key, Enumerable.Range(1, info.Item1 - 1).ToList(), cancellationToken).ConfigureAwait(false) : new List<byte[]>())).DeserializeFromFragments();
+				return CacheUtils.Helper.Concat(new[] { firstBlock }.Concat(info.Blocks > 1 ? await this._GetAsFragmentsAsync(key, Enumerable.Range(1, info.Blocks - 1).ToList(), cancellationToken).ConfigureAwait(false) : new List<byte[]>())).DeserializeFromFragments();
 			}
 			catch (OperationCanceledException)
 			{
@@ -1106,101 +1136,6 @@ namespace net.vieapps.Components.Caching
 			=> this.SetAsFragmentsAsync(key, value, 0, cancellationToken);
 		#endregion
 
-		#region [Public] Set Members
-		/// <summary>
-		/// Gets a set
-		/// </summary>
-		/// <param name="key"></param>
-		/// <returns></returns>
-		public HashSet<string> GetSetMembers(string key)
-			=> Redis.Client.FetchSetMembers(this._GetKey(key));
-
-		/// <summary>
-		/// Gets a set
-		/// </summary>
-		/// <param name="key"></param>
-		/// <param name="cancellationToken"></param>
-		/// <returns></returns>
-		public Task<HashSet<string>> GetSetMembersAsync(string key, CancellationToken cancellationToken = default)
-			=> Redis.Client.FetchSetMembersAsync(this._GetKey(key), cancellationToken);
-
-		/// <summary>
-		/// Adds a value into a set
-		/// </summary>
-		/// <param name="key"></param>
-		/// <param name="value"></param>
-		/// <returns></returns>
-		public bool AddSetMember(string key, string value)
-			=> Redis.Client.UpdateSetMember(this._GetKey(key), value);
-
-		/// <summary>
-		/// Adds the values into a set
-		/// </summary>
-		/// <param name="key"></param>
-		/// <param name="values"></param>
-		/// <returns></returns>
-		public bool AddSetMembers(string key, IEnumerable<string> values)
-			=> Redis.Client.UpdateSetMember(this._GetKey(key), values);
-
-		/// <summary>
-		/// Adds a value into a set
-		/// </summary>
-		/// <param name="key"></param>
-		/// <param name="value"></param>
-		/// <param name="cancellationToken"></param>
-		/// <returns></returns>
-		public Task<bool> AddSetMemberAsync(string key, string value, CancellationToken cancellationToken = default)
-			=> Redis.Client.UpdateSetMemberAsync(this._GetKey(key), value, cancellationToken);
-
-		/// <summary>
-		/// Adds the values into a set
-		/// </summary>
-		/// <param name="key"></param>
-		/// <param name="values"></param>
-		/// <param name="cancellationToken"></param>
-		/// <returns></returns>
-		public Task<bool> AddSetMembersAsync(string key, IEnumerable<string> values, CancellationToken cancellationToken = default)
-			=> Redis.Client.UpdateSetMembersAsync(this._GetKey(key), values, cancellationToken);
-
-		/// <summary>
-		/// Removes a value from a set
-		/// </summary>
-		/// <param name="key"></param>
-		/// <param name="value"></param>
-		/// <returns></returns>
-		public bool RemoveSetMember(string key, string value)
-			=> Redis.Client.DeleteSetMember(this._GetKey(key), value);
-
-		/// <summary>
-		/// Removes the values from a set
-		/// </summary>
-		/// <param name="key"></param>
-		/// <param name="values"></param>
-		/// <returns></returns>
-		public bool RemoveSetMembers(string key, IEnumerable<string> values)
-			=> Redis.Client.DeleteSetMembers(this._GetKey(key), values);
-
-		/// <summary>
-		/// Removes a value from a set
-		/// </summary>
-		/// <param name="key"></param>
-		/// <param name="value"></param>
-		/// <param name="cancellationToken"></param>
-		/// <returns></returns>
-		public Task<bool> RemoveSetMemberAsync(string key, string value, CancellationToken cancellationToken = default)
-			=> Redis.Client.DeleteSetMemberAsync(this._GetKey(key), value, cancellationToken);
-
-		/// <summary>
-		/// Removes the values from a set
-		/// </summary>
-		/// <param name="key"></param>
-		/// <param name="values"></param>
-		/// <param name="cancellationToken"></param>
-		/// <returns></returns>
-		public Task<bool> RemoveSetMembersAsync(string key, IEnumerable<string> values, CancellationToken cancellationToken = default)
-			=> Redis.Client.DeleteSetMembersAsync(this._GetKey(key), values, cancellationToken);
-		#endregion
-
 		#region [Public] Add
 		/// <summary>
 		/// Adds an item into cache with a specified key when the the key is not existed
@@ -1352,9 +1287,7 @@ namespace net.vieapps.Components.Caching
 		public bool Refresh(string key)
 		{
 			var value = this.Get(key);
-			return value != null
-				? this.Set(key, value)
-				: false;
+			return value != null && this.Set(key, value);
 		}
 
 		/// <summary>
@@ -1365,9 +1298,7 @@ namespace net.vieapps.Components.Caching
 		public async Task<bool> RefreshAsync(string key, CancellationToken cancellationToken = default)
 		{
 			var value = await this.GetAsync(key, cancellationToken).ConfigureAwait(false);
-			return value != null
-				? await this.SetAsync(key, value, cancellationToken).ConfigureAwait(false)
-				: false;
+			return value != null && await this.SetAsync(key, value, cancellationToken).ConfigureAwait(false);
 		}
 		#endregion
 
@@ -1389,9 +1320,7 @@ namespace net.vieapps.Components.Caching
 		public T Get<T>(string key)
 		{
 			var @object = this.Get(key);
-			return @object != null && @object is T
-				? (T)@object
-				: default;
+			return @object != null && @object is T tobject ? tobject : default;
 		}
 
 		/// <summary>
@@ -1411,9 +1340,7 @@ namespace net.vieapps.Components.Caching
 		public async Task<T> GetAsync<T>(string key, CancellationToken cancellationToken = default)
 		{
 			var @object = await this.GetAsync(key, cancellationToken).ConfigureAwait(false);
-			return @object != null && @object is T
-				? (T)@object
-				: default;
+			return @object != null && @object is T tobject ? tobject : default;
 		}
 		#endregion
 
@@ -1457,7 +1384,7 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		/// <param name="key">The string that presents key of fragment information</param>
 		/// <returns>The information of fragments, first element is total number of fragments, second element is total length of data</returns>
-		public Tuple<int, int> GetFragments(string key)
+		public (int Blocks, int Length) GetFragments(string key)
 			=> this._GetFragments(key);
 
 		/// <summary>
@@ -1465,7 +1392,7 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		/// <param name="key">The string that presents key of fragment information</param>
 		/// <returns>The information of fragments, first element is total number of fragments, second element is total length of data</returns>
-		public Task<Tuple<int, int>> GetFragmentsAsync(string key, CancellationToken cancellationToken = default)
+		public Task<(int Blocks, int Length)> GetFragmentsAsync(string key, CancellationToken cancellationToken = default)
 			=> this._GetFragmentsAsync(key, cancellationToken);
 
 		/// <summary>
@@ -1580,6 +1507,101 @@ namespace net.vieapps.Components.Caching
 		/// <returns>Returns a boolean value indicating if the object that associates with the key is cached or not</returns>
 		public Task<bool> ExistsAsync(string key, CancellationToken cancellationToken = default)
 			=> Redis.Client.ExistsAsync(this._GetKey(key), cancellationToken);
+		#endregion
+
+		#region [Public] Set Members
+		/// <summary>
+		/// Gets a set
+		/// </summary>
+		/// <param name="key"></param>
+		/// <returns></returns>
+		public HashSet<string> GetSetMembers(string key)
+			=> Redis.Client.FetchSetMembers(this._GetKey(key));
+
+		/// <summary>
+		/// Gets a set
+		/// </summary>
+		/// <param name="key"></param>
+		/// <param name="cancellationToken"></param>
+		/// <returns></returns>
+		public Task<HashSet<string>> GetSetMembersAsync(string key, CancellationToken cancellationToken = default)
+			=> Redis.Client.FetchSetMembersAsync(this._GetKey(key), cancellationToken);
+
+		/// <summary>
+		/// Adds a value into a set
+		/// </summary>
+		/// <param name="key"></param>
+		/// <param name="value"></param>
+		/// <returns></returns>
+		public bool AddSetMember(string key, string value)
+			=> Redis.Client.UpdateSetMember(this._GetKey(key), value);
+
+		/// <summary>
+		/// Adds the values into a set
+		/// </summary>
+		/// <param name="key"></param>
+		/// <param name="values"></param>
+		/// <returns></returns>
+		public bool AddSetMembers(string key, IEnumerable<string> values)
+			=> Redis.Client.UpdateSetMember(this._GetKey(key), values);
+
+		/// <summary>
+		/// Adds a value into a set
+		/// </summary>
+		/// <param name="key"></param>
+		/// <param name="value"></param>
+		/// <param name="cancellationToken"></param>
+		/// <returns></returns>
+		public Task<bool> AddSetMemberAsync(string key, string value, CancellationToken cancellationToken = default)
+			=> Redis.Client.UpdateSetMemberAsync(this._GetKey(key), value, cancellationToken);
+
+		/// <summary>
+		/// Adds the values into a set
+		/// </summary>
+		/// <param name="key"></param>
+		/// <param name="values"></param>
+		/// <param name="cancellationToken"></param>
+		/// <returns></returns>
+		public Task<bool> AddSetMembersAsync(string key, IEnumerable<string> values, CancellationToken cancellationToken = default)
+			=> Redis.Client.UpdateSetMembersAsync(this._GetKey(key), values, cancellationToken);
+
+		/// <summary>
+		/// Removes a value from a set
+		/// </summary>
+		/// <param name="key"></param>
+		/// <param name="value"></param>
+		/// <returns></returns>
+		public bool RemoveSetMember(string key, string value)
+			=> Redis.Client.DeleteSetMember(this._GetKey(key), value);
+
+		/// <summary>
+		/// Removes the values from a set
+		/// </summary>
+		/// <param name="key"></param>
+		/// <param name="values"></param>
+		/// <returns></returns>
+		public bool RemoveSetMembers(string key, IEnumerable<string> values)
+			=> Redis.Client.DeleteSetMembers(this._GetKey(key), values);
+
+		/// <summary>
+		/// Removes a value from a set
+		/// </summary>
+		/// <param name="key"></param>
+		/// <param name="value"></param>
+		/// <param name="cancellationToken"></param>
+		/// <returns></returns>
+		public Task<bool> RemoveSetMemberAsync(string key, string value, CancellationToken cancellationToken = default)
+			=> Redis.Client.DeleteSetMemberAsync(this._GetKey(key), value, cancellationToken);
+
+		/// <summary>
+		/// Removes the values from a set
+		/// </summary>
+		/// <param name="key"></param>
+		/// <param name="values"></param>
+		/// <param name="cancellationToken"></param>
+		/// <returns></returns>
+		public Task<bool> RemoveSetMembersAsync(string key, IEnumerable<string> values, CancellationToken cancellationToken = default)
+			=> Redis.Client.DeleteSetMembersAsync(this._GetKey(key), values, cancellationToken);
 		#endregion
 
 		#region [Public] Clear

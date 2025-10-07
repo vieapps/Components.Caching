@@ -1,15 +1,16 @@
 #region Related components
 using System;
-using System.Linq;
 using System.Net;
 using System.Xml;
-using System.Text.RegularExpressions;
+using System.Linq;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
+using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
-using Enyim.Caching.Configuration;
 using Enyim.Caching.Memcached;
+using Enyim.Caching.Configuration;
 using net.vieapps.Components.Caching;
 #endregion
 
@@ -53,10 +54,10 @@ namespace net.vieapps.Components.Caching
 		/// <param name="data"></param>
 		/// <param name="getLength"></param>
 		/// <returns></returns>
-		public static Tuple<int, int> GetFlags(this byte[] data, bool getLength = false)
+		public static (int TypeFlag, int Length) GetFlags(this byte[] data, bool getLength = false)
 		{
 			if (data == null || data.Length < 4)
-				return null;
+				return (0, 0);
 
 			var tmp = new byte[4];
 			Buffer.BlockCopy(data, 0, tmp, 0, 4);
@@ -69,7 +70,7 @@ namespace net.vieapps.Components.Caching
 				length = BitConverter.ToInt32(tmp, 0);
 			}
 
-			return new Tuple<int, int>(typeFlag, length);
+			return (typeFlag, length);
 		}
 
 		/// <summary>
@@ -82,8 +83,8 @@ namespace net.vieapps.Components.Caching
 		{
 			var data = CacheUtils.Helper.Serialize(value);
 			return addFlags
-				? CacheUtils.Helper.Concat(new[] { BitConverter.GetBytes(data.Item1), data.Item2 })
-				: data.Item2;
+				? CacheUtils.Helper.Concat(new[] { BitConverter.GetBytes(data.TypeFlag), data.Data })
+				: data.Data;
 		}
 
 		/// <summary>
@@ -115,7 +116,7 @@ namespace net.vieapps.Components.Caching
 		public static object Deserialize(byte[] data)
 			=> data == null || data.Length < 4
 				? null
-				: Helper.Deserialize(data, data.GetFlags().Item1, 4, data.Length - 4);
+				: Helper.Deserialize(data, data.GetFlags().TypeFlag, 4, data.Length - 4);
 
 		/// <summary>
 		/// Deserializes an object from the array of bytes
@@ -150,21 +151,21 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		/// <param name="data"></param>
 		/// <returns></returns>
-		public static Tuple<int, int> GetFragmentsInfo(this byte[] data)
+		public static (int Blocks, int Length) GetFragmentsInfo(this byte[] data)
 		{
 			var info = data.GetFlags(true);
-			if (info == null)
-				return null;
+			if (info.TypeFlag == 0 && info.Length == 0)
+				return (0, 0);
 
 			var blocks = 0;
 			var offset = 0;
-			var length = info.Item2;
+			var length = info.Length;
 			while (offset < length)
 			{
 				blocks++;
 				offset += Helper.FragmentSize;
 			}
-			return new Tuple<int, int>(blocks, length);
+			return (blocks, length);
 		}
 
 		/// <summary>
@@ -308,6 +309,74 @@ namespace net.vieapps.Components.Caching
 		#endregion
 
 	}
+
+	internal class MemoryCache : IDisposable
+	{
+		readonly Action<string, object> _onUpdateCallback;
+		readonly Action<string, object> _onRemoveCallback;
+		readonly ConcurrentDictionary<string, (object Value, DateTime ExpiresAt)> _items;
+		readonly IDisposable _timer;
+
+		public MemoryCache(Action<string, object> onUpdateCallback = null, Action<string, object> onRemoveCallback = null)
+		{
+			this._onUpdateCallback = onUpdateCallback;
+			this._onRemoveCallback = onRemoveCallback;
+			this._items = new ConcurrentDictionary<string, (object Value, DateTime ExpiresAt)>(StringComparer.OrdinalIgnoreCase);
+			this._timer = System.Reactive.Linq.Observable.Timer(TimeSpan.Zero, TimeSpan.FromSeconds(13)).Subscribe(_ => this._items.Where(kvp => kvp.Value.ExpiresAt <= DateTime.Now).Select(kvp => kvp.Key).ToList().ForEach(key => this.Remove(key)));
+		}
+
+		public bool Set(string key, object value, DateTime expiresAt)
+		{
+			this.Remove(key);
+			if (!string.IsNullOrWhiteSpace(key) && this._items.TryAdd(key, (value, expiresAt)))
+			{
+				this._onUpdateCallback?.Invoke(key, value);
+				return true;
+			}
+			return false;
+		}
+
+		public bool Set(string key, object value, TimeSpan validFor)
+			=> this.Set(key, value, DateTime.Now.AddMilliseconds(validFor.TotalMilliseconds));
+
+		public bool TryGetValue(string key, out object value)
+		{
+			value = null;
+			if (!string.IsNullOrWhiteSpace(key) && this._items.TryGetValue(key, out var cache))
+			{
+				value = cache.ExpiresAt > DateTime.Now ? cache.Value : null;
+				if (value == null)
+					this.Remove(key);
+				return value != null;
+			}
+			return false;
+		}
+
+		public object Get(string key)
+			=> this.TryGetValue(key, out var value) ? value : null;
+
+		public bool Remove(string key)
+		{
+			if (!string.IsNullOrWhiteSpace(key) && this._items.TryRemove(key, out var cache))
+			{
+				this._onRemoveCallback?.Invoke(key, cache.Value);
+				return true;
+			}
+			return false;
+		}
+
+		public void Clear()
+			=> this._items.Clear();
+
+		public void Dispose()
+		{
+			GC.SuppressFinalize(this);
+			this._timer.Dispose();
+		}
+
+		~MemoryCache()
+			=> this.Dispose();
+	}
 }
 
 namespace Microsoft.Extensions.DependencyInjection
@@ -315,7 +384,7 @@ namespace Microsoft.Extensions.DependencyInjection
 	public static partial class CachingServiceCollectionExtensions
 	{
 		/// <summary>
-		/// Adds the <see cref="ICache">VIEApps NGX Caching</see> service into the collection of services for using with dependency injection
+		/// Adds the caching service into the collection of services for using with dependency injection
 		/// </summary>
 		/// <param name="services"></param>
 		/// <param name="setupAction">The action to bind options of 'Cache' section from appsettings.json file</param>
@@ -328,9 +397,9 @@ namespace Microsoft.Extensions.DependencyInjection
 
 			services.AddOptions().Configure(setupAction);
 			services.Add(ServiceDescriptor.Singleton<ICacheConfiguration, CacheConfiguration>());
-			services.Add(ServiceDescriptor.Singleton<ICache, Cache>(svcProvider => Cache.GetInstance(svcProvider)));
+			services.Add(ServiceDescriptor.Singleton<ICache, Cache>(Cache.GetInstance));
 			if (addInstanceOfIDistributedCache)
-				services.Add(ServiceDescriptor.Singleton<IDistributedCache, Cache>(svcProvider => Cache.GetInstance(svcProvider)));
+				services.Add(ServiceDescriptor.Singleton<IDistributedCache, Cache>(Cache.GetInstance));
 
 			return services;
 		}
@@ -342,19 +411,21 @@ namespace Microsoft.AspNetCore.Builder
 	public static partial class CachingApplicationBuilderExtensions
 	{
 		/// <summary>
-		/// Calls to use the <see cref="ICache">VIEApps NGX Caching</see> service
+		/// Calls to use the caching service
 		/// </summary>
 		/// <param name="appBuilder"></param>
 		/// <returns></returns>
 		public static IApplicationBuilder UseCache(this IApplicationBuilder appBuilder)
 		{
+			var logger = appBuilder.ApplicationServices.GetService<ILogger<ICache>>();
 			try
 			{
-				appBuilder.ApplicationServices.GetService<ILogger<ICache>>().LogInformation($"The service of VIEApps NGX Caching was{(appBuilder.ApplicationServices.GetService<ICache>() != null ? " " : " not ")}registered with application service providers");
+				var cache = appBuilder.ApplicationServices.GetService<ICache>() as Cache;
+				logger.LogInformation($"The caching service was {(cache != null ? "" : "not ")}registered with application service providers{(cache != null ? $" - {cache.Provider}: {cache.Name} ({cache.ExpirationTime} minutes) :: L1-Cache: {cache.UseMemoryCacheAsL1Cache}/{cache.PrefetchL1Cache}" : "")}");
 			}
 			catch (Exception ex)
 			{
-				appBuilder.ApplicationServices.GetService<ILogger<ICache>>().LogError(ex, $"Error occurred while collecting information of VIEApps NGX Caching => {ex.Message}");
+				logger.LogError(ex, $"Error occurred while collecting information of caching service => {ex.Message}");
 			}
 			return appBuilder;
 		}

@@ -421,14 +421,14 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		/// <param name="key">The string that presents key of fragment information</param>
 		/// <returns>The information of fragments, first element is total number of fragments, second element is total length of data</returns>
-		Tuple<int, int> GetFragments(string key);
+		(int Blocks, int Length) GetFragments(string key);
 
 		/// <summary>
 		/// Gets fragment information that associates with the key
 		/// </summary>
 		/// <param name="key">The string that presents key of fragment information</param>
 		/// <returns>The information of fragments, first element is total number of fragments, second element is total length of data</returns>
-		Task<Tuple<int, int>> GetFragmentsAsync(string key, CancellationToken cancellationToken = default);
+		Task<(int Blocks, int Length)> GetFragmentsAsync(string key, CancellationToken cancellationToken = default);
 
 		/// <summary>
 		/// Gets cached of fragmented items that associates with the key and indexes
