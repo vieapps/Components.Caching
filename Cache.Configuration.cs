@@ -21,11 +21,13 @@ namespace net.vieapps.Components.Caching
 
 		int ExpirationTime { get; }
 
-		bool UseMemoryCacheAsL1Cache { get; set; }
+		bool UseL1Cache { get; set; }
+
+		string ModeL1CacheExpires { get; set; }
 
 		bool PrefetchL1Cache { get; set; }
 
-		int PrefetchDelay { get; set; }
+		int PrefetchL1CacheDelay { get; set; }
 
 		IList<CacheServer> Servers { get; }
 
@@ -58,11 +60,13 @@ namespace net.vieapps.Components.Caching
 
 		public int ExpirationTime { get; set; } = 25;
 
-		public bool UseMemoryCacheAsL1Cache { get; set; } = false;
+		public bool UseL1Cache { get; set; } = false;
+
+		public string ModeL1CacheExpires { get; set; } = "auto";
 
 		public bool PrefetchL1Cache { get; set; } = false;
 
-		public int PrefetchDelay { get; set; } = 0;
+		public int PrefetchL1CacheDelay { get; set; } = 0;
 
 		public IList<CacheServer> Servers { get; set; } = new List<CacheServer>();
 
@@ -90,9 +94,10 @@ namespace net.vieapps.Components.Caching
 			this.Provider = configuration.Provider;
 			this.RegionName = configuration.RegionName;
 			this.ExpirationTime = configuration.ExpirationTime;
-			this.UseMemoryCacheAsL1Cache = configuration.UseMemoryCacheAsL1Cache;
+			this.UseL1Cache = configuration.UseL1Cache;
+			this.ModeL1CacheExpires = configuration.ModeL1CacheExpires;
 			this.PrefetchL1Cache = configuration.PrefetchL1Cache;
-			this.PrefetchDelay = configuration.PrefetchDelay;
+			this.PrefetchL1CacheDelay = configuration.PrefetchL1CacheDelay;
 
 			this.Servers = configuration.Servers;
 			this.Options = configuration.Options;
@@ -115,9 +120,10 @@ namespace net.vieapps.Components.Caching
 			if (Int32.TryParse(configuration.Section.Attributes["expirationTime"]?.Value ?? "30", out var intValue))
 				this.ExpirationTime = intValue;
 
-			this.UseMemoryCacheAsL1Cache = "true".Equals(configuration.Section.Attributes["useMemoryCacheAsL1Cache"]?.Value.ToLower() ?? "false");
+			this.UseL1Cache = "true".Equals(configuration.Section.Attributes["useL1Cache"]?.Value.ToLower() ?? "false");
+			this.ModeL1CacheExpires = configuration.Section.Attributes["modeL1CacheExpires"]?.Value.ToLower() ?? "auto";
 			this.PrefetchL1Cache = "true".Equals(configuration.Section.Attributes["prefetchL1Cache"]?.Value.ToLower() ?? "false");
-			this.PrefetchDelay = Int32.TryParse(configuration.Section.Attributes["prefetchDelay"]?.Value, out var prefetchDelay) && prefetchDelay > 0 ? prefetchDelay : 0;
+			this.PrefetchL1CacheDelay = Int32.TryParse(configuration.Section.Attributes["prefetchL1CacheDelay"]?.Value, out var prefetchL1CacheDelay) && prefetchL1CacheDelay > 0 ? prefetchL1CacheDelay : 0;
 
 			if (configuration.Section.SelectNodes("servers/add") is XmlNodeList servers)
 				foreach (XmlNode server in servers)
@@ -195,11 +201,13 @@ namespace net.vieapps.Components.Caching
 
 		public int ExpirationTime { get; set; } = 30;
 
-		public bool UseMemoryCacheAsL1Cache { get; set; } = false;
+		public bool UseL1Cache { get; set; } = false;
+
+		public string ModeL1CacheExpires { get; set; } = "auto";
 
 		public bool PrefetchL1Cache { get; set; } = false;
 
-		public int PrefetchDelay { get; set; } = 0;
+		public int PrefetchL1CacheDelay { get; set; } = 0;
 
 		public List<CacheServer> Servers { get; set; } = new List<CacheServer>();
 

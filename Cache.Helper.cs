@@ -316,11 +316,11 @@ namespace net.vieapps.Components.Caching
 	internal class MemoryCache : IDisposable
 	{
 		readonly Action<string> _onUpdateCallback;
-		readonly Action<string, object> _onRemoveCallback;
+		readonly Action<string> _onRemoveCallback;
 		readonly ConcurrentDictionary<string, (object Value, DateTime ExpiresAt)> _items;
 		readonly IDisposable _timer;
 
-		public MemoryCache(Action<string> onUpdateCallback = null, Action<string, object> onRemoveCallback = null)
+		public MemoryCache(Action<string> onUpdateCallback = null, Action<string> onRemoveCallback = null)
 		{
 			this._onUpdateCallback = onUpdateCallback;
 			this._onRemoveCallback = onRemoveCallback;
@@ -330,7 +330,7 @@ namespace net.vieapps.Components.Caching
 
 		public bool Set(string key, object value, DateTime expiresAt, bool fireCallbackHandler = true)
 		{
-			this.Remove(key, false);
+			this.Remove(key, !fireCallbackHandler);
 			if (!string.IsNullOrWhiteSpace(key) && value != null && this._items.TryAdd(key, (value, expiresAt)))
 			{
 				if (fireCallbackHandler)
@@ -373,7 +373,7 @@ namespace net.vieapps.Components.Caching
 			if (!string.IsNullOrWhiteSpace(key) && this._items.TryRemove(key, out var cache))
 			{
 				if (fireCallbackHandler)
-					this._onRemoveCallback?.Invoke(key, cache.Value);
+					this._onRemoveCallback?.Invoke(key);
 				return true;
 			}
 			return false;
@@ -441,7 +441,7 @@ namespace Microsoft.AspNetCore.Builder
 			try
 			{
 				var cache = appBuilder.ApplicationServices.GetService<ICache>() as Cache;
-				logger.LogInformation($"The caching service was {(cache != null ? "" : "not ")}registered with application service providers{(cache != null ? $" - {cache.Provider}: {cache.Name} ({cache.ExpirationTime} minutes) :: L1-Cache: {cache.UseMemoryCacheAsL1Cache}/{cache.PrefetchL1Cache}" : "")}");
+				logger.LogInformation($"The caching service was {(cache != null ? "" : "not ")}registered with application service providers{(cache != null ? $" - {cache.Provider}: {cache.Name} ({cache.ExpirationTime} minutes) - L1-Cache: {cache.UseL1Cache}/{cache.PrefetchL1Cache}" : "")}");
 			}
 			catch (Exception ex)
 			{
