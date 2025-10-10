@@ -1,20 +1,17 @@
 #region Related components
-using Enyim.Caching.Configuration;
-using Enyim.Caching.Memcached;
+using System;
+using System.Net;
+using System.Xml;
+using System.Linq;
+using System.Collections.Generic;
+using System.Collections.Concurrent;
+using System.Text.RegularExpressions;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Enyim.Caching.Configuration;
+using Enyim.Caching.Memcached;
 using net.vieapps.Components.Caching;
-using Newtonsoft.Json.Linq;
-using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using System.Net;
-using System.Text.RegularExpressions;
-using System.Xml;
-
 #endregion
 
 namespace net.vieapps.Components.Caching
@@ -315,7 +312,7 @@ namespace net.vieapps.Components.Caching
 
 	internal class MemoryCache : IDisposable
 	{
-		internal class CacheItem
+		public class CacheItem
 		{
 			public object Value { get; set; }
 			public DateTime ExpiresAt { get; set; }
@@ -326,9 +323,9 @@ namespace net.vieapps.Components.Caching
 			}
 		}
 
-		readonly Action<string> _onUpdateCallback;
-		readonly Action<string> _onRemoveCallback;
-		readonly ConcurrentDictionary<string, CacheItem> _items;
+		internal readonly Action<string> _onUpdateCallback;
+		internal readonly Action<string> _onRemoveCallback;
+		internal readonly ConcurrentDictionary<string, CacheItem> _items;
 		readonly IDisposable _timer;
 
 		public MemoryCache(Action<string> onUpdateCallback = null, Action<string> onRemoveCallback = null)
@@ -351,18 +348,19 @@ namespace net.vieapps.Components.Caching
 			return false;
 		}
 
-		public void Set(IDictionary<string, object> items, string keyPrefix, DateTime expiresAt, bool fireCallbackHandler = true)
+		public bool Set(IDictionary<string, object> items, string keyPrefix, DateTime expiresAt, bool fireCallbackHandler = true)
 		{
 			var dictionary = items?.Where(kvp => kvp.Key != null).ToDictionary(kvp => (string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + kvp.Key, kvp => kvp.Value) ?? new Dictionary<string, object>();
 			foreach (var kvp in dictionary)
 				this.Set(kvp.Key, kvp.Value, expiresAt, fireCallbackHandler);
+			return items != null && items.Any();
 		}
 
-		public void Set<T>(IDictionary<string, T> items, string keyPrefix, DateTime expiresAt, bool fireCallbackHandler = true)
+		public bool Set<T>(IDictionary<string, T> items, string keyPrefix, DateTime expiresAt, bool fireCallbackHandler = true)
 			=> this.Set(items?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value as object), keyPrefix, expiresAt, fireCallbackHandler);
 
 		public object Get(string key)
-			=> !string.IsNullOrWhiteSpace(key) && this._items.TryGetValue(key, out var cache) && cache.ExpiresAt > DateTime.Now ? cache.Value : null;
+			=> !string.IsNullOrWhiteSpace(key) && this._items.TryGetValue(key, out var cacheItem) && cacheItem.ExpiresAt > DateTime.Now ? cacheItem.Value : null;
 
 		public T Get<T>(string key)
 		{
@@ -390,8 +388,8 @@ namespace net.vieapps.Components.Caching
 			return false;
 		}
 
-		public void Remove(IEnumerable<string> keys, string keyPrefix, bool fireCallbackHandler = true)
-			=> keys?.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => (string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + key).ToList().ForEach(key => this.Remove(key, fireCallbackHandler));
+		public bool Remove(IEnumerable<string> keys, string keyPrefix, bool fireCallbackHandler = true)
+			=> keys != null && !keys.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => (string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + key).ToList().Select(key => this.Remove(key, fireCallbackHandler)).Any(value => value == false);
 
 		public bool Exists(string key)
 			=> this._items.ContainsKey(key);
