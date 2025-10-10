@@ -315,23 +315,34 @@ namespace net.vieapps.Components.Caching
 
 	internal class MemoryCache : IDisposable
 	{
+		internal class CacheItem
+		{
+			public object Value { get; set; }
+			public DateTime ExpiresAt { get; set; }
+			public CacheItem(object value, DateTime expiresAt)
+			{
+				this.Value = value;
+				this.ExpiresAt = expiresAt;
+			}
+		}
+
 		readonly Action<string> _onUpdateCallback;
 		readonly Action<string> _onRemoveCallback;
-		readonly ConcurrentDictionary<string, (object Value, DateTime ExpiresAt)> _items;
+		readonly ConcurrentDictionary<string, CacheItem> _items;
 		readonly IDisposable _timer;
 
 		public MemoryCache(Action<string> onUpdateCallback = null, Action<string> onRemoveCallback = null)
 		{
 			this._onUpdateCallback = onUpdateCallback;
 			this._onRemoveCallback = onRemoveCallback;
-			this._items = new ConcurrentDictionary<string, (object Value, DateTime ExpiresAt)>(StringComparer.OrdinalIgnoreCase);
+			this._items = new ConcurrentDictionary<string, CacheItem>(StringComparer.OrdinalIgnoreCase);
 			this._timer = System.Reactive.Linq.Observable.Timer(TimeSpan.Zero, TimeSpan.FromSeconds(13)).Subscribe(_ => this._items.Where(kvp => kvp.Value.ExpiresAt <= DateTime.Now).Select(kvp => kvp.Key).ToList().ForEach(key => this.Remove(key, false)));
 		}
 
 		public bool Set(string key, object value, DateTime expiresAt, bool fireCallbackHandler = true)
 		{
 			this.Remove(key, !fireCallbackHandler);
-			if (!string.IsNullOrWhiteSpace(key) && value != null && this._items.TryAdd(key, (value, expiresAt)))
+			if (!string.IsNullOrWhiteSpace(key) && value != null && this._items.TryAdd(key, new CacheItem(value, expiresAt)))
 			{
 				if (fireCallbackHandler)
 					this._onUpdateCallback?.Invoke(key);
