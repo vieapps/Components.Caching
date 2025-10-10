@@ -338,7 +338,7 @@ namespace net.vieapps.Components.Caching
 
 		public bool Set(string key, object value, DateTime expiresAt, bool fireCallbackHandler = true)
 		{
-			this.Remove(key, !fireCallbackHandler);
+			this.Remove(key, false);
 			if (!string.IsNullOrWhiteSpace(key) && value != null && this._items.TryAdd(key, new CacheItem(value, expiresAt)))
 			{
 				if (fireCallbackHandler)
