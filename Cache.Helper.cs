@@ -310,8 +310,14 @@ namespace net.vieapps.Components.Caching
 
 	}
 
-	internal class MemoryCache : IDisposable
+	/// <summary>
+	/// Presents in-process memory cache
+	/// </summary>
+	public class MemoryCache : IDisposable
 	{
+		/// <summary>
+		/// Presents a cache item
+		/// </summary>
 		public class CacheItem
 		{
 			public object Value { get; set; }
@@ -323,11 +329,21 @@ namespace net.vieapps.Components.Caching
 			}
 		}
 
+		/// <summary>
+		/// Gets the collection of keys
+		/// </summary>
+		public IEnumerable<string> Keys => this._items.Keys;
+
 		internal readonly Action<string> _onUpdateCallback;
 		internal readonly Action<string> _onRemoveCallback;
 		internal readonly ConcurrentDictionary<string, CacheItem> _items;
 		readonly IDisposable _timer;
 
+		/// <summary>
+		/// Creates new an instance of MemoryCache
+		/// </summary>
+		/// <param name="onUpdateCallback">The action to callback when an item was updated</param>
+		/// <param name="onRemoveCallback">The action to callback when an item was removed</param>
 		public MemoryCache(Action<string> onUpdateCallback = null, Action<string> onRemoveCallback = null)
 		{
 			this._onUpdateCallback = onUpdateCallback;
@@ -336,6 +352,14 @@ namespace net.vieapps.Components.Caching
 			this._timer = System.Reactive.Linq.Observable.Timer(TimeSpan.Zero, TimeSpan.FromSeconds(13)).Subscribe(_ => this._items.Where(kvp => kvp.Value.ExpiresAt <= DateTime.Now).Select(kvp => kvp.Key).ToList().ForEach(key => this.Remove(key, false)));
 		}
 
+		/// <summary>
+		/// Sets a cache item
+		/// </summary>
+		/// <param name="key"></param>
+		/// <param name="value"></param>
+		/// <param name="expiresAt"></param>
+		/// <param name="fireCallbackHandler"></param>
+		/// <returns></returns>
 		public bool Set(string key, object value, DateTime expiresAt, bool fireCallbackHandler = true)
 		{
 			this.Remove(key, false);
@@ -348,6 +372,25 @@ namespace net.vieapps.Components.Caching
 			return false;
 		}
 
+		/// <summary>
+		/// Sets a cache item
+		/// </summary>
+		/// <param name="key"></param>
+		/// <param name="value"></param>
+		/// <param name="validFor"></param>
+		/// <param name="fireCallbackHandler"></param>
+		/// <returns></returns>
+		public bool Set(string key, object value, TimeSpan validFor, bool fireCallbackHandler = true)
+			=> this.Set(key, value, validFor.Equals(TimeSpan.Zero) ? DateTime.Now.AddYears(10) : DateTime.Now.AddSeconds(validFor.TotalSeconds), fireCallbackHandler);
+
+		/// <summary>
+		/// Sets a collection of cache items
+		/// </summary>
+		/// <param name="items"></param>
+		/// <param name="keyPrefix"></param>
+		/// <param name="expiresAt"></param>
+		/// <param name="fireCallbackHandler"></param>
+		/// <returns></returns>
 		public bool Set(IDictionary<string, object> items, string keyPrefix, DateTime expiresAt, bool fireCallbackHandler = true)
 		{
 			var dictionary = items?.Where(kvp => kvp.Key != null).ToDictionary(kvp => (string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + kvp.Key, kvp => kvp.Value) ?? new Dictionary<string, object>();
@@ -356,27 +399,64 @@ namespace net.vieapps.Components.Caching
 			return items != null && items.Any();
 		}
 
+		/// <summary>
+		/// Sets a collection of cache items
+		/// </summary>
+		/// <typeparam name="T"></typeparam>
+		/// <param name="items"></param>
+		/// <param name="keyPrefix"></param>
+		/// <param name="expiresAt"></param>
+		/// <param name="fireCallbackHandler"></param>
+		/// <returns></returns>
 		public bool Set<T>(IDictionary<string, T> items, string keyPrefix, DateTime expiresAt, bool fireCallbackHandler = true)
 			=> this.Set(items?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value as object), keyPrefix, expiresAt, fireCallbackHandler);
 
+		/// <summary>
+		/// Gets a cache item
+		/// </summary>
+		/// <param name="key"></param>
+		/// <returns></returns>
 		public object Get(string key)
 			=> !string.IsNullOrWhiteSpace(key) && this._items.TryGetValue(key, out var cacheItem) && cacheItem.ExpiresAt > DateTime.Now ? cacheItem.Value : null;
 
+		/// <summary>
+		/// Gets a cache item
+		/// </summary>
+		/// <typeparam name="T"></typeparam>
+		/// <param name="key"></param>
+		/// <returns></returns>
 		public T Get<T>(string key)
 		{
 			var value = this.Get(key);
 			return value != null && value is T tvalue ? tvalue : default;
 		}
 
+		/// <summary>
+		/// Gets a collection of cache items
+		/// </summary>
+		/// <param name="keys"></param>
+		/// <returns></returns>
 		public IDictionary<string, object> Get(IEnumerable<string> keys)
 		{
 			var dictionary = keys?.Select(key => new KeyValuePair<string, object>(key, this.Get(key))).Where(kvp => kvp.Key != null && kvp.Value != null).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
 			return dictionary != null && dictionary.Count > 0 ? dictionary : null;
 		}
 
+		/// <summary>
+		/// Gets a collection of cache items
+		/// </summary>
+		/// <typeparam name="T"></typeparam>
+		/// <param name="keys"></param>
+		/// <returns></returns>
 		public IDictionary<string, T> Get<T>(IEnumerable<string> keys)
 			=> this.Get(keys)?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value is T tvalue ? tvalue : default);
 
+		/// <summary>
+		/// Removes a cache item
+		/// </summary>
+		/// <param name="key"></param>
+		/// <param name="fireCallbackHandler"></param>
+		/// <returns></returns>
 		public bool Remove(string key, bool fireCallbackHandler = true)
 		{
 			if (!string.IsNullOrWhiteSpace(key) && this._items.TryRemove(key, out var cache))
@@ -388,12 +468,27 @@ namespace net.vieapps.Components.Caching
 			return false;
 		}
 
+		/// <summary>
+		/// Removes a collection of cache items
+		/// </summary>
+		/// <param name="keys"></param>
+		/// <param name="keyPrefix"></param>
+		/// <param name="fireCallbackHandler"></param>
+		/// <returns></returns>
 		public bool Remove(IEnumerable<string> keys, string keyPrefix, bool fireCallbackHandler = true)
 			=> keys != null && !keys.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => (string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + key).ToList().Select(key => this.Remove(key, fireCallbackHandler)).Any(value => value == false);
 
+		/// <summary>
+		/// Checks existing of a cache item
+		/// </summary>
+		/// <param name="key"></param>
+		/// <returns></returns>
 		public bool Exists(string key)
 			=> this._items.ContainsKey(key);
 
+		/// <summary>
+		/// Clears the cache bag
+		/// </summary>
 		public void Clear()
 			=> this._items.Clear();
 
