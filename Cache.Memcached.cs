@@ -340,7 +340,7 @@ namespace net.vieapps.Components.Caching
 		#endregion
 
 		#region Set (Multiple)
-		void _Set<T>(IDictionary<string, T> items, string keyPrefix = null, int expirationTime = 0, StoreMode mode = StoreMode.Set)
+		void _Set<T>(IDictionary<string, T> items, string keyPrefix, int expirationTime, StoreMode mode = StoreMode.Set)
 		{
 			if (items != null && items.Count > 0)
 			{
@@ -351,10 +351,10 @@ namespace net.vieapps.Components.Caching
 			}
 		}
 
-		void _Set(IDictionary<string, object> items, string keyPrefix = null, int expirationTime = 0, StoreMode mode = StoreMode.Set)
+		void _Set(IDictionary<string, object> items, string keyPrefix, int expirationTime, StoreMode mode = StoreMode.Set)
 			=> this._Set<object>(items, keyPrefix, expirationTime, mode);
 
-		async Task _SetAsync<T>(IDictionary<string, T> items, string keyPrefix = null, int expirationTime = 0, StoreMode mode = StoreMode.Set, CancellationToken cancellationToken = default)
+		async Task _SetAsync<T>(IDictionary<string, T> items, string keyPrefix, int expirationTime, StoreMode mode = StoreMode.Set, CancellationToken cancellationToken = default)
 		{
 			await Task.WhenAll(items != null
 				? items.Where(kvp => !string.IsNullOrWhiteSpace(kvp.Key)).Select(kvp => this._SetAsync((string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + kvp.Key, kvp.Value, expirationTime, false, mode, cancellationToken))
@@ -363,7 +363,7 @@ namespace net.vieapps.Components.Caching
 			this._PushKeys();
 		}
 
-		Task _SetAsync(IDictionary<string, object> items, string keyPrefix = null, int expirationTime = 0, StoreMode mode = StoreMode.Set, CancellationToken cancellationToken = default)
+		Task _SetAsync(IDictionary<string, object> items, string keyPrefix, int expirationTime, StoreMode mode = StoreMode.Set, CancellationToken cancellationToken = default)
 			=> this._SetAsync<object>(items, keyPrefix, expirationTime, mode, cancellationToken);
 		#endregion
 
@@ -1059,7 +1059,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="items">The collection of items to add</param>
 		/// <param name="keyPrefix">The string that presents prefix of all keys</param>
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
-		public void Set(IDictionary<string, object> items, string keyPrefix = null, int expirationTime = 0)
+		public void Set(IDictionary<string, object> items, string keyPrefix, int expirationTime)
 			=> this._Set(items, keyPrefix, expirationTime, StoreMode.Set);
 
 		/// <summary>
@@ -1069,7 +1069,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="items">The collection of items to add</param>
 		/// <param name="keyPrefix">The string that presents prefix of all keys</param>
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
-		public void Set<T>(IDictionary<string, T> items, string keyPrefix = null, int expirationTime = 0)
+		public void Set<T>(IDictionary<string, T> items, string keyPrefix, int expirationTime)
 			=> this._Set(items, keyPrefix, expirationTime, StoreMode.Set);
 
 		/// <summary>
@@ -1078,15 +1078,8 @@ namespace net.vieapps.Components.Caching
 		/// <param name="items">The collection of items to add</param>
 		/// <param name="keyPrefix">The string that presents prefix of all keys</param>
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
-		public Task SetAsync(IDictionary<string, object> items, string keyPrefix = null, int expirationTime = 0, CancellationToken cancellationToken = default)
+		public Task SetAsync(IDictionary<string, object> items, string keyPrefix, int expirationTime, CancellationToken cancellationToken = default)
 			=> this._SetAsync(items, keyPrefix, expirationTime, StoreMode.Set, cancellationToken);
-
-		/// <summary>
-		/// Adds a collection of items into cache
-		/// </summary>
-		/// <param name="items">The collection of items to add</param>
-		public Task SetAsync(IDictionary<string, object> items, CancellationToken cancellationToken)
-			=> this.SetAsync(items, null, 0, cancellationToken);
 
 		/// <summary>
 		/// Adds a collection of items into cache
@@ -1095,16 +1088,8 @@ namespace net.vieapps.Components.Caching
 		/// <param name="items">The collection of items to add</param>
 		/// <param name="keyPrefix">The string that presents prefix of all keys</param>
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
-		public Task SetAsync<T>(IDictionary<string, T> items, string keyPrefix = null, int expirationTime = 0, CancellationToken cancellationToken = default)
+		public Task SetAsync<T>(IDictionary<string, T> items, string keyPrefix, int expirationTime, CancellationToken cancellationToken = default)
 			=> this._SetAsync(items, keyPrefix, expirationTime, StoreMode.Set, cancellationToken);
-
-		/// <summary>
-		/// Adds a collection of items into cache
-		/// </summary>
-		/// <typeparam name="T">The type for casting the cached item</typeparam>
-		/// <param name="items">The collection of items to add</param>
-		public Task SetAsync<T>(IDictionary<string, T> items, CancellationToken cancellationToken)
-			=> this.SetAsync(items, null, 0, cancellationToken);
 		#endregion
 
 		#region [Public] Set (Fragment)

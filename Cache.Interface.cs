@@ -113,7 +113,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="items">The collection of items to add</param>
 		/// <param name="keyPrefix">The string that presents prefix of all keys</param>
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
-		void Set(IDictionary<string, object> items, string keyPrefix = null, int expirationTime = 0);
+		void Set(IDictionary<string, object> items, string keyPrefix, int expirationTime);
 
 		/// <summary>
 		/// Adds a collection of items into cache
@@ -122,7 +122,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="items">The collection of items to add</param>
 		/// <param name="keyPrefix">The string that presents prefix of all keys</param>
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
-		void Set<T>(IDictionary<string, T> items, string keyPrefix = null, int expirationTime = 0);
+		void Set<T>(IDictionary<string, T> items, string keyPrefix, int expirationTime);
 
 		/// <summary>
 		/// Adds a collection of items into cache
@@ -130,13 +130,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="items">The collection of items to add</param>
 		/// <param name="keyPrefix">The string that presents prefix of all keys</param>
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
-		Task SetAsync(IDictionary<string, object> items, string keyPrefix = null, int expirationTime = 0, CancellationToken cancellationToken = default);
-
-		/// <summary>
-		/// Adds a collection of items into cache
-		/// </summary>
-		/// <param name="items">The collection of items to add</param>
-		Task SetAsync(IDictionary<string, object> items, CancellationToken cancellationToken);
+		Task SetAsync(IDictionary<string, object> items, string keyPrefix, int expirationTime, CancellationToken cancellationToken = default);
 
 		/// <summary>
 		/// Adds a collection of items into cache
@@ -145,14 +139,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="items">The collection of items to add</param>
 		/// <param name="keyPrefix">The string that presents prefix of all keys</param>
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
-		Task SetAsync<T>(IDictionary<string, T> items, string keyPrefix = null, int expirationTime = 0, CancellationToken cancellationToken = default);
-
-		/// <summary>
-		/// Adds a collection of items into cache
-		/// </summary>
-		/// <typeparam name="T">The type for casting the cached item</typeparam>
-		/// <param name="items">The collection of items to add</param>
-		Task SetAsync<T>(IDictionary<string, T> items, CancellationToken cancellationToken);
+		Task SetAsync<T>(IDictionary<string, T> items, string keyPrefix, int expirationTime, CancellationToken cancellationToken = default);
 		#endregion
 
 		#region Set (Fragment)

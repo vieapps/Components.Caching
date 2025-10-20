@@ -99,6 +99,9 @@ namespace net.vieapps.Components.Caching
 		public static void Set<T>(this IDatabase redis, IDictionary<string, T> items, TimeSpan validFor)
 			=> items?.Where(kvp => !string.IsNullOrWhiteSpace(kvp.Key)).ToList().ForEach(kvp => redis.StringSet(kvp.Key, Helper.Serialize(kvp.Value), validFor));
 
+		internal static void Set(this IDatabase redis, IDictionary<string, byte[]> items, TimeSpan validFor)
+			=> items?.Where(kvp => !string.IsNullOrWhiteSpace(kvp.Key)).ToList().ForEach(kvp => redis.StringSet(kvp.Key, kvp.Value, validFor));
+
 		/// <summary>
 		/// Adds an item into cache with a specified key (if the key is already existed, then old cached item will be overriden)
 		/// </summary>
@@ -107,14 +110,23 @@ namespace net.vieapps.Components.Caching
 		/// <param name="items"></param>
 		/// <param name="validFor"></param>
 		/// <returns></returns>
-		public static Task SetAsync<T>(this IDatabase redis, IDictionary<string, T> items, TimeSpan validFor, CancellationToken cancellationToken = default)
-			=> Task.WhenAll(items?.Where(kvp => !string.IsNullOrWhiteSpace(kvp.Key)).Select(kvp => redis.StringSetAsync(kvp.Key, Helper.Serialize(kvp.Value), validFor).WithCancellationToken(cancellationToken)) ?? new List<Task<bool>>());
+		public static async Task SetAsync<T>(this IDatabase redis, IDictionary<string, T> items, TimeSpan validFor, CancellationToken cancellationToken = default)
+		{
+			var tasks = new List<Task<bool>>();
+			var batch = redis.CreateBatch();
+			items?.Where(kvp => !string.IsNullOrWhiteSpace(kvp.Key)).ToList().ForEach(kvp => tasks.Add(batch.StringSetAsync(kvp.Key, Helper.Serialize(kvp.Value), validFor).WithCancellationToken(cancellationToken)));
+			batch.Execute();
+			await Task.WhenAll(tasks).ConfigureAwait(false);
+		}
 
-		internal static void Set(this IDatabase redis, IDictionary<string, byte[]> items, TimeSpan validFor)
-			=> items?.Where(kvp => !string.IsNullOrWhiteSpace(kvp.Key)).ToList().ForEach(kvp => redis.StringSet(kvp.Key, kvp.Value, validFor));
-
-		internal static Task SetAsync(this IDatabase redis, IDictionary<string, byte[]> items, TimeSpan validFor, CancellationToken cancellationToken = default)
-			=> Task.WhenAll(items?.Where(kvp => !string.IsNullOrWhiteSpace(kvp.Key)).Select(kvp => redis.StringSetAsync(kvp.Key, kvp.Value, validFor).WithCancellationToken(cancellationToken)) ?? new List<Task<bool>>());
+		internal static async Task SetAsync(this IDatabase redis, IDictionary<string, byte[]> items, TimeSpan validFor, CancellationToken cancellationToken = default)
+		{
+			var tasks = new List<Task<bool>>();
+			var batch = redis.CreateBatch();
+			items?.Where(kvp => !string.IsNullOrWhiteSpace(kvp.Key)).ToList().ForEach(kvp => tasks.Add(batch.StringSetAsync(kvp.Key, kvp.Value, validFor).WithCancellationToken(cancellationToken)));
+			batch.Execute();
+			await Task.WhenAll(tasks).ConfigureAwait(false);
+		}
 
 		/// <summary>
 		/// Adds an item into cache with a specified key when the the key is not existed
