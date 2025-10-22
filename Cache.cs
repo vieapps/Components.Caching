@@ -240,10 +240,8 @@ namespace net.vieapps.Components.Caching
 
 		DateTime GetExpiresAt(DateTime expiresAt)
 		{
-			if ("original" == this.ModeL1CacheExpires?.ToLower())
-				return expiresAt.AddMinutes(-2);
 			var minutes = (expiresAt - DateTime.Now).TotalMinutes;
-			return DateTime.Now.AddMinutes(minutes > 2 && minutes < 13 ? minutes / 2 : 3);
+			return DateTime.Now.AddMinutes("original" == this.ModeL1CacheExpires?.ToLower() ? minutes - 2 : minutes > 2 && minutes < 13 ? minutes / 2 : 3);
 		}
 
 		DateTime GetExpiresAt(TimeSpan validFor)
@@ -322,7 +320,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
 		public Task<bool> SetAsync(string key, object value, int expirationTime = 0, CancellationToken cancellationToken = default)
 			=> this._distributedCache.SetAsync(key, value, expirationTime, cancellationToken)
-			.ContinueWith(task => task.Result && (this.UseL1Cache ? this._L1Cache.Set(key, value, this.GetExpiresAt(expirationTime)) : this.SendL1CacheRequests(key)), TaskContinuationOptions.OnlyOnRanToCompletion);
+				.ContinueWith(task => task.Result && (this.UseL1Cache ? this._L1Cache.Set(key, value, this.GetExpiresAt(expirationTime)) : this.SendL1CacheRequests(key)), TaskContinuationOptions.OnlyOnRanToCompletion);
 
 		/// <summary>
 		/// Adds an item into cache with a specified key (if the key is already existed, then old cached item will be overriden)
@@ -376,9 +374,16 @@ namespace net.vieapps.Components.Caching
 		/// Adds a collection of items into cache
 		/// </summary>
 		/// <param name="items">The collection of items to add</param>
-		/// <param name="expiresAt">The time when the item is invalidated in the cache</param>
-		public void Set(IDictionary<string, object> items, DateTime? expiresAt)
-			=> this.Set(items, null, expiresAt);
+		/// <param name="keyPrefix">The string that presents prefix of all keys</param>
+		/// <param name="validFor">The time when the item is invalidated in the cache</param>
+		public void Set(IDictionary<string, object> items, string keyPrefix, TimeSpan validFor)
+		{
+			this._distributedCache.Set(items, keyPrefix, validFor != TimeSpan.Zero ? (int)validFor.TotalMinutes : this.ExpirationTime);
+			if (this.UseL1Cache)
+				this._L1Cache.Set(items, keyPrefix, this.GetExpiresAt(validFor != TimeSpan.Zero ? (int)validFor.TotalMinutes : this.ExpirationTime));
+			else
+				this.SendL1CacheRequests(items?.Select(kvp => kvp.Key), keyPrefix);
+		}
 
 		/// <summary>
 		/// Adds a collection of items into cache
@@ -410,9 +415,16 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		/// <typeparam name="T">The type for casting the cached item</typeparam>
 		/// <param name="items">The collection of items to add</param>
-		/// <param name="expiresAt">The time when the item is invalidated in the cache</param>
-		public void Set<T>(IDictionary<string, T> items, DateTime? expiresAt)
-			=> this.Set(items, null, expiresAt);
+		/// <param name="keyPrefix">The string that presents prefix of all keys</param>
+		/// <param name="validFor">The time when the item is invalidated in the cache</param>
+		public void Set<T>(IDictionary<string, T> items, string keyPrefix, TimeSpan validFor)
+		{
+			this._distributedCache.Set(items, keyPrefix, validFor != TimeSpan.Zero ? (int)validFor.TotalMinutes : this.ExpirationTime);
+			if (this.UseL1Cache)
+				this._L1Cache.Set(items, keyPrefix, this.GetExpiresAt(validFor != TimeSpan.Zero ? (int)validFor.TotalMinutes : this.ExpirationTime));
+			else
+				this.SendL1CacheRequests(items?.Select(kvp => kvp.Key), keyPrefix);
+		}
 
 		/// <summary>
 		/// Adds a collection of items into cache
@@ -445,10 +457,18 @@ namespace net.vieapps.Components.Caching
 		/// Adds a collection of items into cache
 		/// </summary>
 		/// <param name="items">The collection of items to add</param>
-		/// <param name="expiresAt">The time when the item is invalidated in the cache</param>
+		/// <param name="keyPrefix">The string that presents prefix of all keys</param>
+		/// <param name="validFor">The time when the item is invalidated in the cache</param>
 		/// <param name="cancellationToken">The cancellation token</param>
-		public Task SetAsync(IDictionary<string, object> items, DateTime? expiresAt, CancellationToken cancellationToken = default)
-			=> this.SetAsync(items, null, expiresAt, cancellationToken);
+		public Task SetAsync(IDictionary<string, object> items, string keyPrefix, TimeSpan validFor, CancellationToken cancellationToken = default)
+			=> this._distributedCache.SetAsync(items, keyPrefix, validFor != TimeSpan.Zero ? (int)validFor.TotalMinutes : this.ExpirationTime, cancellationToken)
+				.ContinueWith(_ =>
+				{
+					if (this.UseL1Cache)
+						this._L1Cache.Set(items, keyPrefix, this.GetExpiresAt(validFor != TimeSpan.Zero ? (int)validFor.TotalMinutes : this.ExpirationTime));
+					else
+						this.SendL1CacheRequests(items?.Select(kvp => kvp.Key), keyPrefix);
+				}, TaskContinuationOptions.OnlyOnRanToCompletion);
 
 		/// <summary>
 		/// Adds a collection of items into cache
@@ -483,10 +503,18 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		/// <typeparam name="T">The type for casting the cached item</typeparam>
 		/// <param name="items">The collection of items to add</param>
-		/// <param name="expiresAt">The time when the item is invalidated in the cache</param>
+		/// <param name="keyPrefix">The string that presents prefix of all keys</param>
+		/// <param name="validFor">The time when the item is invalidated in the cache</param>
 		/// <param name="cancellationToken">The cancellation token</param>
-		public Task SetAsync<T>(IDictionary<string, T> items, DateTime? expiresAt, CancellationToken cancellationToken = default)
-			=> this.SetAsync(items, null, expiresAt, cancellationToken);
+		public Task SetAsync<T>(IDictionary<string, T> items, string keyPrefix, TimeSpan validFor, CancellationToken cancellationToken = default)
+			=> this._distributedCache.SetAsync(items, keyPrefix, validFor != TimeSpan.Zero ? (int)validFor.TotalMinutes : this.ExpirationTime, cancellationToken)
+				.ContinueWith(_ =>
+				{
+					if (this.UseL1Cache)
+						this._L1Cache.Set(items, keyPrefix, this.GetExpiresAt(validFor != TimeSpan.Zero ? (int)validFor.TotalMinutes : this.ExpirationTime));
+					else
+						this.SendL1CacheRequests(items?.Select(kvp => kvp.Key), keyPrefix);
+				}, TaskContinuationOptions.OnlyOnRanToCompletion);
 
 		/// <summary>
 		/// Adds a collection of items into cache
