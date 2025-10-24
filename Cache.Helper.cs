@@ -352,7 +352,7 @@ namespace net.vieapps.Components.Caching
 				this._timer = System.Reactive.Linq.Observable.Timer(TimeSpan.Zero, TimeSpan.FromSeconds(60)).Subscribe(_ => this._storage.Where(kvp => kvp.Value.ExpiresAt <= DateTime.Now).Select(kvp => kvp.Key).ToList().ForEach(key => this.Remove(key, false)));
 			}
 		}
-
+			
 		/// <summary>
 		/// Sets a cache item
 		/// </summary>
@@ -361,7 +361,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="validFor"></param>
 		/// <param name="fireCallbackHandler"></param>
 		/// <returns></returns>
-		public bool Set(string key, object value, TimeSpan validFor, bool fireCallbackHandler = true)
+		public bool Set<T>(string key, T value, TimeSpan validFor, bool fireCallbackHandler = true)
 		{
 			this.Remove(key, false);
 			var result = false;
@@ -384,7 +384,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="expiresAt"></param>
 		/// <param name="fireCallbackHandler"></param>
 		/// <returns></returns>
-		public bool Set(string key, object value, DateTime expiresAt, bool fireCallbackHandler = true)
+		public bool Set<T>(string key, T value, DateTime expiresAt, bool fireCallbackHandler = true)
 			=> this.Set(key, value, expiresAt.ToTimeSpan(), fireCallbackHandler);
 
 		/// <summary>
@@ -395,25 +395,13 @@ namespace net.vieapps.Components.Caching
 		/// <param name="expiresAt"></param>
 		/// <param name="fireCallbackHandler"></param>
 		/// <returns></returns>
-		public bool Set(IDictionary<string, object> items, string keyPrefix, DateTime expiresAt, bool fireCallbackHandler = true)
+		public bool Set<T>(IDictionary<string, T> items, string keyPrefix, DateTime expiresAt, bool fireCallbackHandler = true)
 		{
-			var dictionary = items?.Where(kvp => kvp.Key != null).ToDictionary(kvp => (string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + kvp.Key, kvp => kvp.Value) ?? new Dictionary<string, object>();
+			var dictionary = items?.Where(kvp => kvp.Key != null).ToDictionary(kvp => (string.IsNullOrWhiteSpace(keyPrefix) ? "" : keyPrefix) + kvp.Key, kvp => kvp.Value) ?? new Dictionary<string, T>();
 			foreach (var kvp in dictionary)
 				this.Set(kvp.Key, kvp.Value, expiresAt, fireCallbackHandler);
 			return items != null && items.Any();
 		}
-
-		/// <summary>
-		/// Sets a collection of cache items
-		/// </summary>
-		/// <typeparam name="T"></typeparam>
-		/// <param name="items"></param>
-		/// <param name="keyPrefix"></param>
-		/// <param name="expiresAt"></param>
-		/// <param name="fireCallbackHandler"></param>
-		/// <returns></returns>
-		public bool Set<T>(IDictionary<string, T> items, string keyPrefix, DateTime expiresAt, bool fireCallbackHandler = true)
-			=> this.Set(items?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value as object), keyPrefix, expiresAt, fireCallbackHandler);
 
 		/// <summary>
 		/// Gets a cache item
@@ -453,7 +441,7 @@ namespace net.vieapps.Components.Caching
 		public IDictionary<string, object> Get(IEnumerable<string> keys)
 		{
 			var dictionary = keys?.Select(key => new KeyValuePair<string, object>(key, this.Get(key))).Where(kvp => kvp.Key != null && kvp.Value != null).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
-			return dictionary != null && dictionary.Count > 0 ? dictionary : null;
+			return dictionary != null && dictionary.Count > 0 && keys != null && dictionary.Keys.Count == keys.Count() ? dictionary : null;
 		}
 
 		/// <summary>
