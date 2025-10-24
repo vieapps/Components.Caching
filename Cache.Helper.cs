@@ -6,12 +6,14 @@ using System.Linq;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Enyim.Caching.Configuration;
 using Enyim.Caching.Memcached;
 using net.vieapps.Components.Caching;
+using CacheUtils;
 #endregion
 
 namespace net.vieapps.Components.Caching
@@ -315,10 +317,7 @@ namespace net.vieapps.Components.Caching
 	/// </summary>
 	public class MemoryCache : IDisposable
 	{
-		/// <summary>
-		/// Presents a cache item
-		/// </summary>
-		public class CacheItem
+		internal class CacheItem
 		{
 			public object Value { get; set; }
 			public DateTime ExpiresAt { get; set; }
@@ -329,14 +328,10 @@ namespace net.vieapps.Components.Caching
 			}
 		}
 
-		/// <summary>
-		/// Gets the collection of keys
-		/// </summary>
-		public IEnumerable<string> Keys => this._items.Keys;
-
 		internal readonly Action<string> _onUpdateCallback;
 		internal readonly Action<string> _onRemoveCallback;
-		internal readonly ConcurrentDictionary<string, CacheItem> _items;
+		internal readonly Microsoft.Extensions.Caching.Memory.MemoryCache _cache;
+		internal readonly ConcurrentDictionary<string, CacheItem> _storage;
 		readonly IDisposable _timer;
 
 		/// <summary>
@@ -344,32 +339,18 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		/// <param name="onUpdateCallback">The action to callback when an item was updated</param>
 		/// <param name="onRemoveCallback">The action to callback when an item was removed</param>
-		public MemoryCache(Action<string> onUpdateCallback = null, Action<string> onRemoveCallback = null)
+		/// <param name="useMemoryCacheExtension">true to use <see cref="Microsoft.Extensions.Caching.Memory.MemoryCache">MemoryCache</see> as L1-Cache object</param>
+		public MemoryCache(Action<string> onUpdateCallback = null, Action<string> onRemoveCallback = null, bool useMemoryCacheExtension = true)
 		{
 			this._onUpdateCallback = onUpdateCallback;
 			this._onRemoveCallback = onRemoveCallback;
-			this._items = new ConcurrentDictionary<string, CacheItem>(StringComparer.OrdinalIgnoreCase);
-			this._timer = System.Reactive.Linq.Observable.Timer(TimeSpan.Zero, TimeSpan.FromSeconds(13)).Subscribe(_ => this._items.Where(kvp => kvp.Value.ExpiresAt <= DateTime.Now).Select(kvp => kvp.Key).ToList().ForEach(key => this.Remove(key, false)));
-		}
-
-		/// <summary>
-		/// Sets a cache item
-		/// </summary>
-		/// <param name="key"></param>
-		/// <param name="value"></param>
-		/// <param name="expiresAt"></param>
-		/// <param name="fireCallbackHandler"></param>
-		/// <returns></returns>
-		public bool Set(string key, object value, DateTime expiresAt, bool fireCallbackHandler = true)
-		{
-			this.Remove(key, false);
-			if (!string.IsNullOrWhiteSpace(key) && value != null && this._items.TryAdd(key, new CacheItem(value, expiresAt)))
+			if (useMemoryCacheExtension)
+				this._cache = new Microsoft.Extensions.Caching.Memory.MemoryCache(new MemoryCacheOptions());
+			else
 			{
-				if (fireCallbackHandler)
-					this._onUpdateCallback?.Invoke(key);
-				return true;
+				this._storage = new ConcurrentDictionary<string, CacheItem>(StringComparer.OrdinalIgnoreCase);
+				this._timer = System.Reactive.Linq.Observable.Timer(TimeSpan.Zero, TimeSpan.FromSeconds(60)).Subscribe(_ => this._storage.Where(kvp => kvp.Value.ExpiresAt <= DateTime.Now).Select(kvp => kvp.Key).ToList().ForEach(key => this.Remove(key, false)));
 			}
-			return false;
 		}
 
 		/// <summary>
@@ -381,7 +362,30 @@ namespace net.vieapps.Components.Caching
 		/// <param name="fireCallbackHandler"></param>
 		/// <returns></returns>
 		public bool Set(string key, object value, TimeSpan validFor, bool fireCallbackHandler = true)
-			=> this.Set(key, value, validFor.Equals(TimeSpan.Zero) ? DateTime.Now.AddYears(10) : DateTime.Now.AddSeconds(validFor.TotalSeconds), fireCallbackHandler);
+		{
+			this.Remove(key, false);
+			var result = false;
+			if (!string.IsNullOrWhiteSpace(key) && value != null)
+			{
+				result = this._cache != null
+					? this._cache.Set(key, value, new MemoryCacheEntryOptions { AbsoluteExpirationRelativeToNow = validFor }) != null
+					: this._storage.TryAdd(key, new CacheItem(value, validFor.Equals(TimeSpan.Zero) ? DateTime.Now.AddYears(10) : DateTime.Now.AddSeconds(validFor.TotalSeconds)));
+				if (result && fireCallbackHandler)
+					this._onUpdateCallback?.Invoke(key);
+			}
+			return result;
+		}
+
+		/// <summary>
+		/// Sets a cache item
+		/// </summary>
+		/// <param name="key"></param>
+		/// <param name="value"></param>
+		/// <param name="expiresAt"></param>
+		/// <param name="fireCallbackHandler"></param>
+		/// <returns></returns>
+		public bool Set(string key, object value, DateTime expiresAt, bool fireCallbackHandler = true)
+			=> this.Set(key, value, expiresAt.ToTimeSpan(), fireCallbackHandler);
 
 		/// <summary>
 		/// Sets a collection of cache items
@@ -417,7 +421,17 @@ namespace net.vieapps.Components.Caching
 		/// <param name="key"></param>
 		/// <returns></returns>
 		public object Get(string key)
-			=> !string.IsNullOrWhiteSpace(key) && this._items.TryGetValue(key, out var cacheItem) && cacheItem.ExpiresAt > DateTime.Now ? cacheItem.Value : null;
+		{
+			object value = null;
+			if (!string.IsNullOrWhiteSpace(key))
+			{
+				if (this._cache != null)
+					this._cache.TryGetValue(key, out value);
+				else if (this._storage.TryGetValue(key, out var cacheItem) && cacheItem.ExpiresAt > DateTime.Now)
+					value = cacheItem.Value;
+			}
+			return value;
+		}
 
 		/// <summary>
 		/// Gets a cache item
@@ -459,13 +473,15 @@ namespace net.vieapps.Components.Caching
 		/// <returns></returns>
 		public bool Remove(string key, bool fireCallbackHandler = true)
 		{
-			if (!string.IsNullOrWhiteSpace(key) && this._items.TryRemove(key, out var cache))
+			var result = false;
+			if (!string.IsNullOrWhiteSpace(key))
 			{
-				if (fireCallbackHandler)
+				this._cache?.Remove(key);
+				result = this._cache != null || this._storage.TryRemove(key, out var _);
+				if (result && fireCallbackHandler)
 					this._onRemoveCallback?.Invoke(key);
-				return true;
 			}
-			return false;
+			return result;
 		}
 
 		/// <summary>
@@ -484,22 +500,38 @@ namespace net.vieapps.Components.Caching
 		/// <param name="key"></param>
 		/// <returns></returns>
 		public bool Exists(string key)
-			=> this._items.ContainsKey(key);
+			=> this._cache != null
+				? this._cache.TryGetValue(key, out var _)
+				: this._storage.ContainsKey(key);
 
 		/// <summary>
 		/// Clears the cache bag
 		/// </summary>
 		public void Clear()
-			=> this._items.Clear();
+		{
+			if (this._cache != null)
+				this._cache.Clear();
+			else
+				this._storage.Clear();
+		}
 
 		public void Dispose()
 		{
 			GC.SuppressFinalize(this);
-			this._timer.Dispose();
+			this._cache?.Dispose();
+			this._timer?.Dispose();
 		}
 
 		~MemoryCache()
 			=> this.Dispose();
+
+		/// <summary>
+		/// Gets the collection of keys
+		/// </summary>
+		public IEnumerable<string> Keys
+			=> this._cache != null
+				? this._cache.Keys.Select(key => key as string)
+				: this._storage.Keys;
 	}
 }
 

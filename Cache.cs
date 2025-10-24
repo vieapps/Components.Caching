@@ -44,7 +44,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="loggerFactory">The logger factory for working with logs</param>
 		/// <param name="useL1Cache">true to use L-1 Cache (in-process memory)</param>
 		public Cache(string name, ICacheConfiguration configuration, ILoggerFactory loggerFactory, bool useL1Cache = false)
-			: this(name ?? configuration?.RegionName, configuration != null ? configuration.ExpirationTime : 25, configuration?.Provider, useL1Cache || (configuration != null && configuration.UseL1Cache), configuration?.ModeL1CacheExpires, configuration != null && configuration.UseL1Cache && configuration.PrefetchL1Cache, configuration != null ? configuration.PrefetchL1CacheDelay : 0, loggerFactory) { }
+			: this(name ?? configuration?.RegionName, configuration != null ? configuration.ExpirationTime : 25, configuration?.Provider, useL1Cache || (configuration != null && configuration.UseL1Cache), configuration?.TypeL1Cache, configuration?.ModeL1CacheExpires, configuration != null && configuration.UseL1Cache && configuration.PrefetchL1Cache, configuration != null ? configuration.PrefetchL1CacheDelay : 0, loggerFactory) { }
 
 		/// <summary>
 		/// Create a new instance of distributed cache with isolated region
@@ -53,8 +53,9 @@ namespace net.vieapps.Components.Caching
 		/// <param name="expirationTime">Time for caching an item (in minutes)</param>
 		/// <param name="provider">The string that presents the caching provider ('Redis' or 'Memcached') - the default provider is 'Redis'</param>
 		/// <param name="useL1Cache">true to use L-1 Cache (in-process memory)</param>
+		/// <param name="typeL1Cache">Type of L-1 Cache</param>
 		/// <param name="storeKeys">true to active store all keys of the region (to clear or use with other purposes further)</param>
-		public Cache(string name, int expirationTime, string provider, bool useL1Cache, string modeL1CacheExpires, bool prefetchL1Cache, int prefetchL1CacheDelay, ILoggerFactory loggerFactory = null, bool storeKeys = false)
+		public Cache(string name, int expirationTime, string provider, bool useL1Cache, string typeL1Cache, string modeL1CacheExpires, bool prefetchL1Cache, int prefetchL1CacheDelay, ILoggerFactory loggerFactory = null, bool storeKeys = false)
 		{
 			this._distributedCache = (string.IsNullOrWhiteSpace(provider) ? "Redis" : provider).Trim().ToLower().Equals("memcached")
 				? new Memcached(name, expirationTime, storeKeys)
@@ -63,10 +64,10 @@ namespace net.vieapps.Components.Caching
 			this.UseL1Cache = useL1Cache;
 			this.ModeL1CacheExpires = modeL1CacheExpires;
 			this.PrefetchL1Cache = prefetchL1Cache;
-			this.PrefetchL1CacheDelay = prefetchL1CacheDelay > 0 ? prefetchL1CacheDelay : 2345;
+			this.PrefetchL1CacheDelay = prefetchL1CacheDelay > 0 ? prefetchL1CacheDelay : 1234;
 
 			if (useL1Cache)
-				this._L1Cache = new MemoryCache(key => this.SendL1CacheRequest?.Invoke(key, "update"), key => this.SendL1CacheRequest?.Invoke(key, "remove"));
+				this._L1Cache = new MemoryCache(key => this.SendL1CacheRequest?.Invoke(key, "update"), key => this.SendL1CacheRequest?.Invoke(key, "remove"), "memorycacheextension".Equals((typeL1Cache ?? "MemoryCacheExtension").ToLower()));
 
 			(loggerFactory ?? Enyim.Caching.Logger.GetLoggerFactory()).CreateLogger<Cache>().LogInformation($"A new instance of caching was created [{this.Provider}: {this.Name} ({this.ExpirationTime} minutes) - L1-Cache: {this.UseL1Cache}/{this.PrefetchL1Cache}]");
 		}
@@ -213,7 +214,7 @@ namespace net.vieapps.Components.Caching
 			if (!this.UseL1Cache || string.IsNullOrWhiteSpace(key))
 				return;
 
-			if ("clear" == key.ToLower())
+			if ("clear".Equals(key.ToLower()))
 				this._L1Cache.Clear();
 
 			else
@@ -254,7 +255,7 @@ namespace net.vieapps.Components.Caching
 		/// Gets the collection of L1-Cache keys
 		/// </summary>
 		public HashSet<string> GetL1CacheKeys()
-			=> new HashSet<string>(this._L1Cache?._items.Keys ?? Array.Empty<string>());
+			=> new HashSet<string>(this._L1Cache?.Keys ?? Array.Empty<string>());
 
 		/// <summary>
 		/// Clears L1-Cache
