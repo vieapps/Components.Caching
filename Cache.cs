@@ -67,7 +67,7 @@ namespace net.vieapps.Components.Caching
 			this.PrefetchL1CacheDelay = prefetchL1CacheDelay > 0 ? prefetchL1CacheDelay : 1234;
 
 			if (useL1Cache)
-				this._L1Cache = new MemoryCache(key => this.SendL1CacheRequest?.Invoke(key, "update"), key => this.SendL1CacheRequest?.Invoke(key, "remove"), "memorycacheextension".Equals((typeL1Cache ?? "MemoryCacheExtension").ToLower()));
+				this._L1Cache = new MemoryCache(key => this.SendL1CacheRequest?.Invoke(key, "update"), key => this.SendL1CacheRequest?.Invoke(key, "remove"), "memorycacheextension".Equals((typeL1Cache ?? "MemoryCacheExtension").ToLower()), loggerFactory);
 
 			(loggerFactory ?? Enyim.Caching.Logger.GetLoggerFactory()).CreateLogger<Cache>().LogInformation($"A new instance of caching was created [{this.Provider}: {this.Name} ({this.ExpirationTime} minutes) - L1-Cache: {this.UseL1Cache}/{this.PrefetchL1Cache}]");
 		}

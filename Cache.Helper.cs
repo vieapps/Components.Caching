@@ -340,13 +340,23 @@ namespace net.vieapps.Components.Caching
 		/// <param name="onUpdateCallback">The action to callback when an item was updated</param>
 		/// <param name="onRemoveCallback">The action to callback when an item was removed</param>
 		/// <param name="useMemoryCacheExtension">true to use <see cref="Microsoft.Extensions.Caching.Memory.MemoryCache">MemoryCache</see> as L1-Cache object</param>
-		public MemoryCache(Action<string> onUpdateCallback = null, Action<string> onRemoveCallback = null, bool useMemoryCacheExtension = true)
+		/// <param name="loggerFactory">The logger factory for working with logs</param>
+		public MemoryCache(Action<string> onUpdateCallback = null, Action<string> onRemoveCallback = null, bool useMemoryCacheExtension = true, ILoggerFactory loggerFactory = null)
 		{
 			this._onUpdateCallback = onUpdateCallback;
 			this._onRemoveCallback = onRemoveCallback;
+			var useInternal = !useMemoryCacheExtension;
 			if (useMemoryCacheExtension)
-				this._cache = new Microsoft.Extensions.Caching.Memory.MemoryCache(new MemoryCacheOptions());
-			else
+				try
+				{
+					this._cache = new Microsoft.Extensions.Caching.Memory.MemoryCache(new MemoryCacheOptions(), loggerFactory);
+				}
+				catch (Exception ex)
+				{
+					useInternal = true;
+					(loggerFactory ?? Enyim.Caching.Logger.GetLoggerFactory()).CreateLogger<Cache>().LogError(ex, $"Cannot create new instance of MemoryCache => {ex.Message}");
+				}
+			if (useInternal)
 			{
 				this._storage = new ConcurrentDictionary<string, CacheItem>(StringComparer.OrdinalIgnoreCase);
 				this._timer = System.Reactive.Linq.Observable.Timer(TimeSpan.Zero, TimeSpan.FromSeconds(60)).Subscribe(_ => this._storage.Where(kvp => kvp.Value.ExpiresAt <= DateTime.Now).Select(kvp => kvp.Key).ToList().ForEach(key => this.Remove(key, false)));
@@ -441,7 +451,7 @@ namespace net.vieapps.Components.Caching
 		public IDictionary<string, object> Get(IEnumerable<string> keys)
 		{
 			var dictionary = keys?.Select(key => new KeyValuePair<string, object>(key, this.Get(key))).Where(kvp => kvp.Key != null && kvp.Value != null).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
-			return dictionary != null && dictionary.Count > 0 && keys != null && dictionary.Keys.Count == keys.Count() ? dictionary : null;
+			return dictionary != null && keys != null && dictionary.Count > 0 && dictionary.Count == keys.Count() ? dictionary : null;
 		}
 
 		/// <summary>
@@ -497,10 +507,8 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		public void Clear()
 		{
-			if (this._cache != null)
-				this._cache.Clear();
-			else
-				this._storage.Clear();
+			this._cache?.Clear();
+			this._storage?.Clear();
 		}
 
 		public void Dispose()
