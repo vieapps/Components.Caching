@@ -23,8 +23,6 @@ namespace net.vieapps.Components.Caching
 
 		bool UseL1Cache { get; set; }
 
-		string TypeL1Cache { get; set; }
-
 		string ModeL1CacheExpires { get; set; }
 
 		bool PrefetchL1Cache { get; set; }
@@ -63,8 +61,6 @@ namespace net.vieapps.Components.Caching
 
 		public bool UseL1Cache { get; set; } = false;
 
-		public string TypeL1Cache { get; set; } = "MemoryCacheExtension";
-
 		public string ModeL1CacheExpires { get; set; } = "auto";
 
 		public bool PrefetchL1Cache { get; set; } = false;
@@ -98,7 +94,6 @@ namespace net.vieapps.Components.Caching
 			this.RegionName = configuration.RegionName;
 			this.ExpirationTime = configuration.ExpirationTime;
 			this.UseL1Cache = configuration.UseL1Cache;
-			this.TypeL1Cache = configuration.TypeL1Cache;
 			this.ModeL1CacheExpires = configuration.ModeL1CacheExpires;
 			this.PrefetchL1Cache = configuration.PrefetchL1Cache;
 			this.PrefetchL1CacheDelay = configuration.PrefetchL1CacheDelay;
@@ -125,7 +120,6 @@ namespace net.vieapps.Components.Caching
 				this.ExpirationTime = intValue;
 
 			this.UseL1Cache = "true".Equals(configuration.Section.Attributes["useL1Cache"]?.Value.ToLower() ?? "false");
-			this.TypeL1Cache = configuration.Section.Attributes["typeL1CacheExpires"]?.Value ?? "MemoryCacheExtension";
 			this.ModeL1CacheExpires = configuration.Section.Attributes["modeL1CacheExpires"]?.Value.ToLower() ?? "auto";
 			this.PrefetchL1Cache = "true".Equals(configuration.Section.Attributes["prefetchL1Cache"]?.Value.ToLower() ?? "false");
 			this.PrefetchL1CacheDelay = Int32.TryParse(configuration.Section.Attributes["prefetchL1CacheDelay"]?.Value, out var prefetchL1CacheDelay) && prefetchL1CacheDelay > 0 ? prefetchL1CacheDelay : 0;
@@ -207,8 +201,6 @@ namespace net.vieapps.Components.Caching
 		public int ExpirationTime { get; set; } = 30;
 
 		public bool UseL1Cache { get; set; } = false;
-
-		public string TypeL1Cache { get; set; } = "MemoryCacheExtension";
 
 		public string ModeL1CacheExpires { get; set; } = "auto";
 

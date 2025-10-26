@@ -4,7 +4,6 @@ using System.Net;
 using System.Xml;
 using System.Linq;
 using System.Collections.Generic;
-using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Caching.Distributed;
@@ -317,52 +316,38 @@ namespace net.vieapps.Components.Caching
 	/// </summary>
 	public class MemoryCache : IDisposable
 	{
-		internal class CacheItem
-		{
-			public object Value { get; set; }
-			public DateTime ExpiresAt { get; set; }
-			public CacheItem(object value, DateTime expiresAt)
-			{
-				this.Value = value;
-				this.ExpiresAt = expiresAt;
-			}
-		}
-
 		internal readonly Action<string> _onUpdateCallback;
 		internal readonly Action<string> _onRemoveCallback;
 		internal readonly Microsoft.Extensions.Caching.Memory.MemoryCache _cache;
-		internal readonly ConcurrentDictionary<string, CacheItem> _storage;
-		readonly IDisposable _timer;
+
+		/// <summary>
+		/// Gets the collection of keys
+		/// </summary>
+		public IEnumerable<string> Keys
+			=> this._cache.Keys.Select(key => key as string);
 
 		/// <summary>
 		/// Creates new an instance of MemoryCache
 		/// </summary>
 		/// <param name="onUpdateCallback">The action to callback when an item was updated</param>
 		/// <param name="onRemoveCallback">The action to callback when an item was removed</param>
-		/// <param name="useMemoryCacheExtension">true to use <see cref="Microsoft.Extensions.Caching.Memory.MemoryCache">MemoryCache</see> as L1-Cache object</param>
 		/// <param name="loggerFactory">The logger factory for working with logs</param>
-		public MemoryCache(Action<string> onUpdateCallback = null, Action<string> onRemoveCallback = null, bool useMemoryCacheExtension = true, ILoggerFactory loggerFactory = null)
+		public MemoryCache(Action<string> onUpdateCallback = null, Action<string> onRemoveCallback = null, ILoggerFactory loggerFactory = null)
 		{
 			this._onUpdateCallback = onUpdateCallback;
 			this._onRemoveCallback = onRemoveCallback;
-			var useInternal = !useMemoryCacheExtension;
-			if (useMemoryCacheExtension)
-				try
-				{
-					this._cache = new Microsoft.Extensions.Caching.Memory.MemoryCache(new MemoryCacheOptions(), loggerFactory);
-				}
-				catch (Exception ex)
-				{
-					useInternal = true;
-					(loggerFactory ?? Enyim.Caching.Logger.GetLoggerFactory()).CreateLogger<Cache>().LogError(ex, $"Cannot create new instance of MemoryCache => {ex.Message}");
-				}
-			if (useInternal)
-			{
-				this._storage = new ConcurrentDictionary<string, CacheItem>(StringComparer.OrdinalIgnoreCase);
-				this._timer = System.Reactive.Linq.Observable.Timer(TimeSpan.Zero, TimeSpan.FromSeconds(60)).Subscribe(_ => this._storage.Where(kvp => kvp.Value.ExpiresAt <= DateTime.Now).Select(kvp => kvp.Key).ToList().ForEach(key => this.Remove(key, false)));
-			}
+			this._cache = new Microsoft.Extensions.Caching.Memory.MemoryCache(new MemoryCacheOptions(), loggerFactory);
 		}
-			
+
+		public void Dispose()
+		{
+			GC.SuppressFinalize(this);
+			this._cache.Dispose();
+		}
+
+		~MemoryCache()
+			=> this.Dispose();
+
 		/// <summary>
 		/// Sets a cache item
 		/// </summary>
@@ -374,16 +359,13 @@ namespace net.vieapps.Components.Caching
 		public bool Set<T>(string key, T value, TimeSpan validFor, bool fireCallbackHandler = true)
 		{
 			this.Remove(key, false);
-			var result = false;
-			if (!string.IsNullOrWhiteSpace(key) && value != null)
+			if (!string.IsNullOrWhiteSpace(key) && value != null && this._cache.Set(key, value, new MemoryCacheEntryOptions { AbsoluteExpirationRelativeToNow = validFor }) != null)
 			{
-				result = this._cache != null
-					? this._cache.Set(key, value, new MemoryCacheEntryOptions { AbsoluteExpirationRelativeToNow = validFor }) != null
-					: this._storage.TryAdd(key, new CacheItem(value, validFor.Equals(TimeSpan.Zero) ? DateTime.Now.AddYears(10) : DateTime.Now.AddSeconds(validFor.TotalSeconds)));
-				if (result && fireCallbackHandler)
+				if (fireCallbackHandler)
 					this._onUpdateCallback?.Invoke(key);
+				return true;
 			}
-			return result;
+			return false;
 		}
 
 		/// <summary>
@@ -419,17 +401,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="key"></param>
 		/// <returns></returns>
 		public object Get(string key)
-		{
-			object value = null;
-			if (!string.IsNullOrWhiteSpace(key))
-			{
-				if (this._cache != null)
-					this._cache.TryGetValue(key, out value);
-				else if (this._storage.TryGetValue(key, out var cacheItem) && cacheItem.ExpiresAt > DateTime.Now)
-					value = cacheItem.Value;
-			}
-			return value;
-		}
+			=> !string.IsNullOrWhiteSpace(key) && this._cache.TryGetValue(key, out var value) ? value : null;
 
 		/// <summary>
 		/// Gets a cache item
@@ -471,15 +443,14 @@ namespace net.vieapps.Components.Caching
 		/// <returns></returns>
 		public bool Remove(string key, bool fireCallbackHandler = true)
 		{
-			var result = false;
 			if (!string.IsNullOrWhiteSpace(key))
 			{
-				this._cache?.Remove(key);
-				result = this._cache != null || this._storage.TryRemove(key, out var _);
-				if (result && fireCallbackHandler)
+				this._cache.Remove(key);
+				if (fireCallbackHandler)
 					this._onRemoveCallback?.Invoke(key);
+				return true;
 			}
-			return result;
+			return false;
 		}
 
 		/// <summary>
@@ -498,36 +469,13 @@ namespace net.vieapps.Components.Caching
 		/// <param name="key"></param>
 		/// <returns></returns>
 		public bool Exists(string key)
-			=> this._cache != null
-				? this._cache.TryGetValue(key, out var _)
-				: this._storage.ContainsKey(key);
+			=> this._cache.TryGetValue(key, out var _);
 
 		/// <summary>
 		/// Clears the cache bag
 		/// </summary>
 		public void Clear()
-		{
-			this._cache?.Clear();
-			this._storage?.Clear();
-		}
-
-		public void Dispose()
-		{
-			GC.SuppressFinalize(this);
-			this._cache?.Dispose();
-			this._timer?.Dispose();
-		}
-
-		~MemoryCache()
-			=> this.Dispose();
-
-		/// <summary>
-		/// Gets the collection of keys
-		/// </summary>
-		public IEnumerable<string> Keys
-			=> this._cache != null
-				? this._cache.Keys.Select(key => key as string)
-				: this._storage.Keys;
+			=> this._cache.Clear();
 	}
 }
 
