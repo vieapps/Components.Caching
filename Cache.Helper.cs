@@ -316,9 +316,11 @@ namespace net.vieapps.Components.Caching
 	/// </summary>
 	public class MemoryCache : IDisposable
 	{
+		internal readonly Microsoft.Extensions.Caching.Memory.MemoryCache _cache;
 		internal readonly Action<string> _onUpdateCallback;
 		internal readonly Action<string> _onRemoveCallback;
-		internal readonly Microsoft.Extensions.Caching.Memory.MemoryCache _cache;
+		internal readonly Func<string, string> _getKey;
+		internal readonly byte _maxSize;
 
 		/// <summary>
 		/// Gets the collection of keys
@@ -331,12 +333,16 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		/// <param name="onUpdateCallback">The action to callback when an item was updated</param>
 		/// <param name="onRemoveCallback">The action to callback when an item was removed</param>
+		/// <param name="getKey">The function to get 'real-key' in the distributed cache</param>
+		/// <param name="maxSize">Max memory size (giga-bytes)</param>
 		/// <param name="loggerFactory">The logger factory for working with logs</param>
-		public MemoryCache(Action<string> onUpdateCallback = null, Action<string> onRemoveCallback = null, ILoggerFactory loggerFactory = null)
+		public MemoryCache(Action<string> onUpdateCallback = null, Action<string> onRemoveCallback = null, Func<string, string> getKey = null, byte maxSize = 0, ILoggerFactory loggerFactory = null)
 		{
 			this._onUpdateCallback = onUpdateCallback;
 			this._onRemoveCallback = onRemoveCallback;
-			this._cache = new Microsoft.Extensions.Caching.Memory.MemoryCache(new MemoryCacheOptions(), loggerFactory);
+			this._getKey = getKey;
+			this._maxSize = maxSize > 0 ? maxSize : (byte)0;
+			this._cache = new Microsoft.Extensions.Caching.Memory.MemoryCache(new MemoryCacheOptions { SizeLimit = this._maxSize > 0 ? this._maxSize * 1024 * 1024 * 1024 : (long?)null }, loggerFactory);
 		}
 
 		public void Dispose()
@@ -348,6 +354,17 @@ namespace net.vieapps.Components.Caching
 		~MemoryCache()
 			=> this.Dispose();
 
+		bool Set<T>(string key, T value, TimeSpan validFor)
+		{
+			var options = new MemoryCacheEntryOptions
+			{
+				AbsoluteExpirationRelativeToNow = validFor
+			};
+			if (Cache.Sizes.TryRemove(this._getKey?.Invoke(key) ?? key, out var size) && this._maxSize > 0)
+				options.SetSize(size);
+			return this._cache.Set(key, value, options) != null;
+		}
+
 		/// <summary>
 		/// Sets a cache item
 		/// </summary>
@@ -356,10 +373,10 @@ namespace net.vieapps.Components.Caching
 		/// <param name="validFor"></param>
 		/// <param name="fireCallbackHandler"></param>
 		/// <returns></returns>
-		public bool Set<T>(string key, T value, TimeSpan validFor, bool fireCallbackHandler = true)
+		public bool Set<T>(string key, T value, TimeSpan validFor, bool fireCallbackHandler)
 		{
 			this.Remove(key, false);
-			if (!string.IsNullOrWhiteSpace(key) && value != null && this._cache.Set(key, value, new MemoryCacheEntryOptions { AbsoluteExpirationRelativeToNow = validFor }) != null)
+			if (!string.IsNullOrWhiteSpace(key) && value != null && this.Set(key, value, validFor))
 			{
 				if (fireCallbackHandler)
 					this._onUpdateCallback?.Invoke(key);

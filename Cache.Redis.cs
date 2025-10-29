@@ -284,9 +284,7 @@ namespace net.vieapps.Components.Caching
 		bool _SetFragments(string key, List<byte[]> fragments, int expirationTime = 0)
 		{
 			var validFor = TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime);
-			var success = fragments != null && fragments.Count > 0
-				? Redis.Client.Set(this._GetKey(key), fragments.GetFirstFragment(), validFor)
-				: false;
+			var success = fragments != null && fragments.Count > 0 && Redis.Client.Set(this._GetKey(key), fragments.GetFirstFragment(), validFor, false);
 
 			if (success)
 			{
@@ -296,7 +294,7 @@ namespace net.vieapps.Components.Caching
 					var items = new Dictionary<string, byte[]>();
 					for (var index = 1; index < fragments.Count; index++)
 						items[this._GetKey(this._GetFragmentKey(key, index))] = fragments[index];
-					Redis.Client.Set(items, validFor);
+					Redis.Client.Set(items, validFor, false);
 				}
 			}
 
@@ -306,9 +304,7 @@ namespace net.vieapps.Components.Caching
 		async Task<bool> _SetFragmentsAsync(string key, List<byte[]> fragments, int expirationTime = 0, CancellationToken cancellationToken = default)
 		{
 			var validFor = TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime);
-			var success = fragments != null && fragments.Count > 0
-				? await Redis.Client.SetAsync(this._GetKey(key), fragments.GetFirstFragment(), validFor, cancellationToken).ConfigureAwait(false)
-				: false;
+			var success = fragments != null && fragments.Count > 0 && await Redis.Client.SetAsync(this._GetKey(key), fragments.GetFirstFragment(), validFor, cancellationToken, false).ConfigureAwait(false);
 
 			if (success)
 			{
@@ -318,7 +314,7 @@ namespace net.vieapps.Components.Caching
 					var items = new Dictionary<string, byte[]>();
 					for (var index = 1; index < fragments.Count; index++)
 						items[this._GetKey(this._GetFragmentKey(key, index))] = fragments[index];
-					tasks.Add(Redis.Client.SetAsync(items, validFor, cancellationToken));
+					tasks.Add(Redis.Client.SetAsync(items, validFor, cancellationToken, false));
 				}
 				await Task.WhenAll(tasks);
 			}
@@ -327,14 +323,32 @@ namespace net.vieapps.Components.Caching
 		}
 
 		bool _SetAsFragments(string key, object value, int expirationTime = 0)
-			=> string.IsNullOrWhiteSpace(key) || value == null
-				? false
-				: this._SetFragments(key, CacheUtils.Helper.Split(Helper.Serialize(value), Helper.FragmentSize).ToList(), expirationTime);
+		{
+			if (!string.IsNullOrWhiteSpace(key) && value != null)
+			{
+				var bytes = Helper.Serialize(value);
+				if (this._SetFragments(key, CacheUtils.Helper.Split(bytes, Helper.FragmentSize).ToList(), expirationTime))
+				{
+					Cache.Sizes[this._GetKey(key)] = bytes.LongLength;
+					return true;
+				}
+			}
+			return false;
+		}
 
-		Task<bool> _SetAsFragmentsAsync(string key, object value, int expirationTime = 0, CancellationToken cancellationToken = default)
-			=> string.IsNullOrWhiteSpace(key) || value == null
-				? Task.FromResult(false)
-				: this._SetFragmentsAsync(key, CacheUtils.Helper.Split(Helper.Serialize(value), Helper.FragmentSize).ToList(), expirationTime, cancellationToken);
+		async Task<bool> _SetAsFragmentsAsync(string key, object value, int expirationTime = 0, CancellationToken cancellationToken = default)
+		{
+			if (!string.IsNullOrWhiteSpace(key) && value != null)
+			{
+				var bytes = Helper.Serialize(value);
+				if (await this._SetFragmentsAsync(key, CacheUtils.Helper.Split(bytes, Helper.FragmentSize).ToList(), expirationTime, cancellationToken).ConfigureAwait(false))
+				{
+					Cache.Sizes[this._GetKey(key)] = bytes.LongLength;
+					return true;
+				}
+			}
+			return false;
+		}
 		#endregion
 
 		#region Add

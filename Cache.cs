@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Configuration;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -24,6 +25,8 @@ namespace net.vieapps.Components.Caching
 	[DebuggerDisplay("{Name} ({ExpirationTime} minutes)")]
 	public sealed class Cache : IDistributedCache, ICache
 	{
+		internal static ConcurrentDictionary<string, long> Sizes { get; } = new ConcurrentDictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+
 		internal readonly ICache _distributedCache;
 		internal readonly MemoryCache _L1Cache;
 
@@ -44,7 +47,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="loggerFactory">The logger factory for working with logs</param>
 		/// <param name="useL1Cache">true to use L-1 Cache (in-process memory)</param>
 		public Cache(string name, ICacheConfiguration configuration, ILoggerFactory loggerFactory, bool useL1Cache = false)
-			: this(name ?? configuration?.RegionName, configuration != null ? configuration.ExpirationTime : 25, configuration?.Provider, useL1Cache || (configuration != null && configuration.UseL1Cache), configuration?.ModeL1CacheExpires, configuration != null && configuration.UseL1Cache && configuration.PrefetchL1Cache, configuration != null ? configuration.PrefetchL1CacheDelay : 0, loggerFactory) { }
+			: this(name ?? configuration?.RegionName, configuration != null ? configuration.ExpirationTime : 25, configuration?.Provider, useL1Cache || (configuration != null && configuration.UseL1Cache), configuration != null ? configuration.MaxL1CacheSize : (byte)0, configuration?.ModeL1CacheExpires, configuration != null && configuration.UseL1Cache && configuration.PrefetchL1Cache, configuration != null ? configuration.PrefetchL1CacheDelay : 0, loggerFactory) { }
 
 		/// <summary>
 		/// Create a new instance of distributed cache with isolated region
@@ -53,8 +56,9 @@ namespace net.vieapps.Components.Caching
 		/// <param name="expirationTime">Time for caching an item (in minutes)</param>
 		/// <param name="provider">The string that presents the caching provider ('Redis' or 'Memcached') - the default provider is 'Redis'</param>
 		/// <param name="useL1Cache">true to use L-1 Cache (in-process memory)</param>
+		/// <param name="maxL1CacheSize">Max memory size of L-1 Cache (in giga-bytes)</param>
 		/// <param name="storeKeys">true to active store all keys of the region (to clear or use with other purposes further)</param>
-		public Cache(string name, int expirationTime, string provider, bool useL1Cache, string modeL1CacheExpires, bool prefetchL1Cache, int prefetchL1CacheDelay, ILoggerFactory loggerFactory = null, bool storeKeys = false)
+		public Cache(string name, int expirationTime, string provider, bool useL1Cache, byte maxL1CacheSize, string modeL1CacheExpires, bool prefetchL1Cache, int prefetchL1CacheDelay, ILoggerFactory loggerFactory = null, bool storeKeys = false)
 		{
 			this._distributedCache = (string.IsNullOrWhiteSpace(provider) ? "Redis" : provider).Trim().ToLower().Equals("memcached")
 				? new Memcached(name, expirationTime, storeKeys)
@@ -66,7 +70,7 @@ namespace net.vieapps.Components.Caching
 			this.PrefetchL1CacheDelay = prefetchL1CacheDelay > 0 ? prefetchL1CacheDelay : 1234;
 
 			if (useL1Cache)
-				this._L1Cache = new MemoryCache(key => this.SendL1CacheRequest?.Invoke(key, "update"), key => this.SendL1CacheRequest?.Invoke(key, "remove"), loggerFactory);
+				this._L1Cache = new MemoryCache(key => this.SendL1CacheRequest?.Invoke(key, "update"), key => this.SendL1CacheRequest?.Invoke(key, "remove"), key => Helper.GetCacheKey(this.Name, key), maxL1CacheSize, loggerFactory);
 
 			(loggerFactory ?? Enyim.Caching.Logger.GetLoggerFactory()).CreateLogger<Cache>().LogInformation($"A new instance of caching was created [{this.Provider}: {this.Name} ({this.ExpirationTime} minutes) - L1-Cache: {this.UseL1Cache}/{this.PrefetchL1Cache}]");
 		}
