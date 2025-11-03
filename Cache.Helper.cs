@@ -329,7 +329,7 @@ namespace net.vieapps.Components.Caching
 			=> this._cache.Keys.Select(key => key as string);
 
 		/// <summary>
-		/// Creates new an instance of MemoryCache
+		/// Creates new an instance
 		/// </summary>
 		/// <param name="onUpdateCallback">The action to callback when an item was updated</param>
 		/// <param name="onRemoveCallback">The action to callback when an item was removed</param>

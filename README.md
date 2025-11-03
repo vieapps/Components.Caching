@@ -3,7 +3,8 @@
 A wrapper component for working with distributed cache
 
 - Ready with .NET Core 2.0+/.NET Framework 4.6.1+
-- Supported: Redis & Memcached
+- In-memory cache as L-1 cache
+- Supporting distributed cache: Redis & Memcached
 
 ## NuGet
 

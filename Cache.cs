@@ -72,7 +72,7 @@ namespace net.vieapps.Components.Caching
 			if (useL1Cache)
 				this._L1Cache = new MemoryCache(key => this.SendL1CacheRequest?.Invoke(key, "update"), key => this.SendL1CacheRequest?.Invoke(key, "remove"), key => Helper.GetCacheKey(this.Name, key), maxL1CacheSize, loggerFactory);
 
-			(loggerFactory ?? Enyim.Caching.Logger.GetLoggerFactory()).CreateLogger<Cache>().LogInformation($"A new instance of caching was created [{this.Provider}: {this.Name} ({this.ExpirationTime} minutes) - L1-Cache: {this.UseL1Cache}/{this.PrefetchL1Cache}]");
+			(loggerFactory ?? Enyim.Caching.Logger.GetLoggerFactory()).CreateLogger<Cache>().LogInformation($"A new instance of caching was created [{this.Provider}: {this.Name} ({this.ExpirationTime} minutes) - L1-Cache: {this.UseL1Cache && this._L1Cache != null}/{this.PrefetchL1Cache}]");
 		}
 
 		public void Dispose()
@@ -214,7 +214,7 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		public async Task ProcessL1CacheRequestAsync(string key, string reason = null)
 		{
-			if (!this.UseL1Cache || string.IsNullOrWhiteSpace(key))
+			if (!this.UseL1Cache || this._L1Cache == null || string.IsNullOrWhiteSpace(key))
 				return;
 
 			if ("clear".Equals(key.ToLower()))
@@ -242,23 +242,66 @@ namespace net.vieapps.Components.Caching
 		bool SendL1CacheRequests(string key, string reason = "update")
 			=> this.SendL1CacheRequests(new[] { key }, null, reason);
 
-		DateTime GetExpiresAt(DateTime expiresAt)
+		DateTime GetExpiresAt(DateTime? expiresAt)
 		{
-			var minutes = (expiresAt - DateTime.Now).TotalMinutes;
+			var minutes = expiresAt == null ? this.ExpirationTime : (expiresAt.Value - DateTime.Now).TotalMinutes;
 			return DateTime.Now.AddMinutes("original" == this.ModeL1CacheExpires?.ToLower() ? minutes - 2 : minutes > 2 && minutes < 13 ? minutes / 2 : 3);
 		}
 
-		DateTime GetExpiresAt(TimeSpan validFor)
-			=> this.GetExpiresAt(DateTime.Now.AddSeconds(validFor.TotalSeconds));
+		DateTime GetExpiresAt(TimeSpan? validFor)
+			=> this.GetExpiresAt(validFor == null || validFor.Value.Equals(TimeSpan.Zero) ? DateTime.Now.AddMinutes(this.ExpirationTime) : DateTime.Now.AddSeconds(validFor.Value.TotalSeconds));
 
 		DateTime GetExpiresAt(int expirationTime = 0)
 			=> this.GetExpiresAt(DateTime.Now.AddMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime));
 
 		/// <summary>
-		/// Gets the collection of L1-Cache keys
+		/// Sets a cache item of L1-Cache
 		/// </summary>
-		public HashSet<string> GetL1CacheKeys()
-			=> new HashSet<string>(this._L1Cache?.Keys ?? Array.Empty<string>());
+		/// <typeparam name="T"></typeparam>
+		/// <param name="key"></param>
+		/// <param name="value"></param>
+		/// <param name="validFor"></param>
+		/// <param name="fireCallbackHandler"></param>
+		/// <returns></returns>
+		public bool SetL1CacheItem<T>(string key, T value, TimeSpan? validFor = null, bool fireCallbackHandler = false)
+			=> this._L1Cache != null && this._L1Cache.Set(key, value, this.GetExpiresAt(validFor), fireCallbackHandler);
+
+		/// <summary>
+		/// Sets a cache item of L1-Cache
+		/// </summary>
+		/// <typeparam name="T"></typeparam>
+		/// <param name="key"></param>
+		/// <param name="value"></param>
+		/// <param name="expiresAt"></param>
+		/// <param name="fireCallbackHandler"></param>
+		/// <returns></returns>
+		public bool SetL1CacheItem<T>(string key, T value, DateTime expiresAt, bool fireCallbackHandler = false)
+			=> this._L1Cache != null && this._L1Cache.Set(key, value, this.GetExpiresAt(expiresAt), fireCallbackHandler);
+
+		/// <summary>
+		/// Gets a cache item of L1-Cache
+		/// </summary>
+		/// <param name="key"></param>
+		/// <returns></returns>
+		public object GetL1CacheItem(string key)
+			=> this._L1Cache?.Get(key);
+
+		/// <summary>
+		/// Gets a cache item of L1-Cache
+		/// </summary>
+		/// <param name="key"></param>
+		/// <returns></returns>
+		public T GetL1CacheItem<T>(string key)
+			=> this._L1Cache == null ? default : this._L1Cache.Get<T>(key);
+
+		/// <summary>
+		/// Removes a cache item of L1-Cache
+		/// </summary>
+		/// <param name="key"></param>
+		/// <param name="fireCallbackHandler"></param>
+		/// <returns></returns>
+		public bool RemoveL1CacheItem(string key, bool fireCallbackHandler = false)
+			=> this._L1Cache != null && this._L1Cache.Remove(key, fireCallbackHandler);
 
 		/// <summary>
 		/// Clears L1-Cache
@@ -268,6 +311,12 @@ namespace net.vieapps.Components.Caching
 			this._L1Cache?.Clear();
 			this.SendL1CacheRequests("clear", "remove");
 		}
+
+		/// <summary>
+		/// Gets the collection of L1-Cache keys
+		/// </summary>
+		public HashSet<string> GetL1CacheKeys()
+			=> new HashSet<string>(this._L1Cache?.Keys ?? Array.Empty<string>());
 		#endregion
 
 		#region Keys
@@ -293,7 +342,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
 		public bool Set(string key, object value, int expirationTime = 0)
-			=> this._distributedCache.Set(key, value, expirationTime) && (this.UseL1Cache ? this._L1Cache.Set(key, value, this.GetExpiresAt(expirationTime)) : this.SendL1CacheRequests(key));
+			=> this._distributedCache.Set(key, value, expirationTime) && (this.UseL1Cache && this._L1Cache != null ? this._L1Cache.Set(key, value, this.GetExpiresAt(expirationTime)) : this.SendL1CacheRequests(key));
 
 		/// <summary>
 		/// Adds an item into cache with a specified key (if the key is already existed, then old cached item will be overriden)
@@ -303,7 +352,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="validFor">The time when the item is invalidated in the cache</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
 		public bool Set(string key, object value, TimeSpan validFor)
-			=> this._distributedCache.Set(key, value, validFor) && (this.UseL1Cache ? this._L1Cache.Set(key, value, this.GetExpiresAt(validFor)) : this.SendL1CacheRequests(key));
+			=> this._distributedCache.Set(key, value, validFor) && (this.UseL1Cache && this._L1Cache != null ? this._L1Cache.Set(key, value, this.GetExpiresAt(validFor)) : this.SendL1CacheRequests(key));
 
 		/// <summary>
 		/// Adds an item into cache with a specified key (if the key is already existed, then old cached item will be overriden)
@@ -313,7 +362,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="expiresAt">The time when the item is invalidated in the cache</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
 		public bool Set(string key, object value, DateTime expiresAt)
-			=> this._distributedCache.Set(key, value, expiresAt) && (this.UseL1Cache ? this._L1Cache.Set(key, value, this.GetExpiresAt(expiresAt)) : this.SendL1CacheRequests(key));
+			=> this._distributedCache.Set(key, value, expiresAt) && (this.UseL1Cache && this._L1Cache != null ? this._L1Cache.Set(key, value, this.GetExpiresAt(expiresAt)) : this.SendL1CacheRequests(key));
 
 		/// <summary>
 		/// Adds an item into cache with a specified key (if the key is already existed, then old cached item will be overriden)
@@ -324,7 +373,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
 		public Task<bool> SetAsync(string key, object value, int expirationTime = 0, CancellationToken cancellationToken = default)
 			=> this._distributedCache.SetAsync(key, value, expirationTime, cancellationToken)
-				.ContinueWith(task => task.Result && (this.UseL1Cache ? this._L1Cache.Set(key, value, this.GetExpiresAt(expirationTime)) : this.SendL1CacheRequests(key)), TaskContinuationOptions.OnlyOnRanToCompletion);
+				.ContinueWith(task => task.Result && (this.UseL1Cache && this._L1Cache != null ? this._L1Cache.Set(key, value, this.GetExpiresAt(expirationTime)) : this.SendL1CacheRequests(key)), TaskContinuationOptions.OnlyOnRanToCompletion);
 
 		/// <summary>
 		/// Adds an item into cache with a specified key (if the key is already existed, then old cached item will be overriden)
@@ -344,7 +393,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
 		public Task<bool> SetAsync(string key, object value, TimeSpan validFor, CancellationToken cancellationToken = default)
 			=> this._distributedCache.SetAsync(key, value, validFor, cancellationToken)
-				.ContinueWith(task => task.Result && (this.UseL1Cache ? this._L1Cache.Set(key, value, this.GetExpiresAt(validFor)) : this.SendL1CacheRequests(key)), TaskContinuationOptions.OnlyOnRanToCompletion);
+				.ContinueWith(task => task.Result && (this.UseL1Cache && this._L1Cache != null ? this._L1Cache.Set(key, value, this.GetExpiresAt(validFor)) : this.SendL1CacheRequests(key)), TaskContinuationOptions.OnlyOnRanToCompletion);
 
 		/// <summary>
 		/// Adds an item into cache with a specified key (if the key is already existed, then old cached item will be overriden)
@@ -355,7 +404,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
 		public Task<bool> SetAsync(string key, object value, DateTime expiresAt, CancellationToken cancellationToken = default)
 			=> this._distributedCache.SetAsync(key, value, expiresAt, cancellationToken)
-				.ContinueWith(task => task.Result && (this.UseL1Cache ? this._L1Cache.Set(key, value, this.GetExpiresAt(expiresAt)) : this.SendL1CacheRequests(key)), TaskContinuationOptions.OnlyOnRanToCompletion);
+				.ContinueWith(task => task.Result && (this.UseL1Cache && this._L1Cache != null ? this._L1Cache.Set(key, value, this.GetExpiresAt(expiresAt)) : this.SendL1CacheRequests(key)), TaskContinuationOptions.OnlyOnRanToCompletion);
 		#endregion
 
 		#region Set (Multiple)
@@ -368,7 +417,7 @@ namespace net.vieapps.Components.Caching
 		public void Set(IDictionary<string, object> items, string keyPrefix, DateTime? expiresAt)
 		{
 			this._distributedCache.Set(items, keyPrefix, expiresAt != null ? (int)expiresAt.Value.ToTimeSpan().TotalMinutes : this.ExpirationTime);
-			if (this.UseL1Cache)
+			if (this.UseL1Cache && this._L1Cache != null)
 				this._L1Cache.Set(items, keyPrefix, expiresAt != null ? this.GetExpiresAt(expiresAt.Value) : this.GetExpiresAt(this.ExpirationTime));
 			else
 				this.SendL1CacheRequests(items?.Select(kvp => kvp.Key), keyPrefix);
@@ -383,7 +432,7 @@ namespace net.vieapps.Components.Caching
 		public void Set(IDictionary<string, object> items, string keyPrefix, TimeSpan validFor)
 		{
 			this._distributedCache.Set(items, keyPrefix, validFor != TimeSpan.Zero ? (int)validFor.TotalMinutes : this.ExpirationTime);
-			if (this.UseL1Cache)
+			if (this.UseL1Cache && this._L1Cache != null)
 				this._L1Cache.Set(items, keyPrefix, this.GetExpiresAt(validFor != TimeSpan.Zero ? (int)validFor.TotalMinutes : this.ExpirationTime));
 			else
 				this.SendL1CacheRequests(items?.Select(kvp => kvp.Key), keyPrefix);
@@ -408,7 +457,7 @@ namespace net.vieapps.Components.Caching
 		public void Set<T>(IDictionary<string, T> items, string keyPrefix, DateTime? expiresAt)
 		{
 			this._distributedCache.Set(items, keyPrefix, expiresAt != null ? (int)expiresAt.Value.ToTimeSpan().TotalMinutes : this.ExpirationTime);
-			if (this.UseL1Cache)
+			if (this.UseL1Cache && this._L1Cache != null)
 				this._L1Cache.Set(items, keyPrefix, expiresAt != null ? this.GetExpiresAt(expiresAt.Value) : this.GetExpiresAt(this.ExpirationTime));
 			else
 				this.SendL1CacheRequests(items?.Select(kvp => kvp.Key), keyPrefix);
@@ -424,7 +473,7 @@ namespace net.vieapps.Components.Caching
 		public void Set<T>(IDictionary<string, T> items, string keyPrefix, TimeSpan validFor)
 		{
 			this._distributedCache.Set(items, keyPrefix, validFor != TimeSpan.Zero ? (int)validFor.TotalMinutes : this.ExpirationTime);
-			if (this.UseL1Cache)
+			if (this.UseL1Cache && this._L1Cache != null)
 				this._L1Cache.Set(items, keyPrefix, this.GetExpiresAt(validFor != TimeSpan.Zero ? (int)validFor.TotalMinutes : this.ExpirationTime));
 			else
 				this.SendL1CacheRequests(items?.Select(kvp => kvp.Key), keyPrefix);
@@ -451,7 +500,7 @@ namespace net.vieapps.Components.Caching
 			=> this._distributedCache.SetAsync(items, keyPrefix, expiresAt != null ? (int)expiresAt.Value.ToTimeSpan().TotalMinutes : this.ExpirationTime, cancellationToken)
 				.ContinueWith(_ =>
 				{
-					if (this.UseL1Cache)
+					if (this.UseL1Cache && this._L1Cache != null)
 						this._L1Cache.Set(items, keyPrefix, expiresAt != null ? this.GetExpiresAt(expiresAt.Value) : this.GetExpiresAt(this.ExpirationTime));
 					else
 						this.SendL1CacheRequests(items?.Select(kvp => kvp.Key), keyPrefix);
@@ -468,7 +517,7 @@ namespace net.vieapps.Components.Caching
 			=> this._distributedCache.SetAsync(items, keyPrefix, validFor != TimeSpan.Zero ? (int)validFor.TotalMinutes : this.ExpirationTime, cancellationToken)
 				.ContinueWith(_ =>
 				{
-					if (this.UseL1Cache)
+					if (this.UseL1Cache && this._L1Cache != null)
 						this._L1Cache.Set(items, keyPrefix, this.GetExpiresAt(validFor != TimeSpan.Zero ? (int)validFor.TotalMinutes : this.ExpirationTime));
 					else
 						this.SendL1CacheRequests(items?.Select(kvp => kvp.Key), keyPrefix);
@@ -496,7 +545,7 @@ namespace net.vieapps.Components.Caching
 			=> this._distributedCache.SetAsync(items, keyPrefix, expiresAt != null ? (int)expiresAt.Value.ToTimeSpan().TotalMinutes : this.ExpirationTime, cancellationToken)
 				.ContinueWith(_ =>
 				{
-					if (this.UseL1Cache)
+					if (this.UseL1Cache && this._L1Cache != null)
 						this._L1Cache.Set(items, keyPrefix, expiresAt != null ? this.GetExpiresAt(expiresAt.Value) : this.GetExpiresAt(this.ExpirationTime));
 					else
 						this.SendL1CacheRequests(items?.Select(kvp => kvp.Key), keyPrefix);
@@ -514,7 +563,7 @@ namespace net.vieapps.Components.Caching
 			=> this._distributedCache.SetAsync(items, keyPrefix, validFor != TimeSpan.Zero ? (int)validFor.TotalMinutes : this.ExpirationTime, cancellationToken)
 				.ContinueWith(_ =>
 				{
-					if (this.UseL1Cache)
+					if (this.UseL1Cache && this._L1Cache != null)
 						this._L1Cache.Set(items, keyPrefix, this.GetExpiresAt(validFor != TimeSpan.Zero ? (int)validFor.TotalMinutes : this.ExpirationTime));
 					else
 						this.SendL1CacheRequests(items?.Select(kvp => kvp.Key), keyPrefix);
@@ -570,7 +619,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
 		public bool SetAsFragments(string key, object value, int expirationTime = 0)
-			=> this._distributedCache.SetAsFragments(key, value, expirationTime) && (this.UseL1Cache ? this._L1Cache.Set(key, value, this.GetExpiresAt(expirationTime)) : this.SendL1CacheRequests(key));
+			=> this._distributedCache.SetAsFragments(key, value, expirationTime) && (this.UseL1Cache && this._L1Cache != null ? this._L1Cache.Set(key, value, this.GetExpiresAt(expirationTime)) : this.SendL1CacheRequests(key));
 
 		/// <summary>
 		/// Serializes object into array of bytes, splits into one or more fragments and updates into cache with a specified key (if the key is already existed, then old cached item will be overriden)
@@ -581,7 +630,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
 		public Task<bool> SetAsFragmentsAsync(string key, object value, int expirationTime = 0, CancellationToken cancellationToken = default)
 			=> this._distributedCache.SetAsFragmentsAsync(key, value, expirationTime, cancellationToken)
-				.ContinueWith(task => task.Result && (this.UseL1Cache ? this._L1Cache.Set(key, value, this.GetExpiresAt(expirationTime)) : this.SendL1CacheRequests(key)), TaskContinuationOptions.OnlyOnRanToCompletion);
+				.ContinueWith(task => task.Result && (this.UseL1Cache && this._L1Cache != null ? this._L1Cache.Set(key, value, this.GetExpiresAt(expirationTime)) : this.SendL1CacheRequests(key)), TaskContinuationOptions.OnlyOnRanToCompletion);
 
 		/// <summary>
 		/// Serializes object into array of bytes, splits into one or more fragments and updates into cache with a specified key (if the key is already existed, then old cached item will be overriden)
@@ -602,7 +651,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
 		public bool Add(string key, object value, int expirationTime = 0)
-			=> this._distributedCache.Add(key, value, expirationTime) && (this.UseL1Cache ? this._L1Cache.Set(key, value, this.GetExpiresAt(expirationTime)) : this.SendL1CacheRequests(key));
+			=> this._distributedCache.Add(key, value, expirationTime) && (this.UseL1Cache && this._L1Cache != null ? this._L1Cache.Set(key, value, this.GetExpiresAt(expirationTime)) : this.SendL1CacheRequests(key));
 
 		/// <summary>
 		/// Adds an item into cache with a specified key when the the key is not existed
@@ -612,7 +661,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="validFor">The time when the item is invalidated in the cache</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
 		public bool Add(string key, object value, TimeSpan validFor)
-			=> this._distributedCache.Add(key, value, validFor) && (this.UseL1Cache ? this._L1Cache.Set(key, value, this.GetExpiresAt(validFor)) : this.SendL1CacheRequests(key));
+			=> this._distributedCache.Add(key, value, validFor) && (this.UseL1Cache && this._L1Cache != null ? this._L1Cache.Set(key, value, this.GetExpiresAt(validFor)) : this.SendL1CacheRequests(key));
 
 		/// <summary>
 		/// Adds an item into cache with a specified key when the the key is not existed
@@ -622,7 +671,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="expiresAt">The time when the item is invalidated in the cache</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
 		public bool Add(string key, object value, DateTime expiresAt)
-			=> this._distributedCache.Add(key, value, expiresAt) && (this.UseL1Cache ? this._L1Cache.Set(key, value, this.GetExpiresAt(expiresAt)) : this.SendL1CacheRequests(key));
+			=> this._distributedCache.Add(key, value, expiresAt) && (this.UseL1Cache && this._L1Cache != null ? this._L1Cache.Set(key, value, this.GetExpiresAt(expiresAt)) : this.SendL1CacheRequests(key));
 
 		/// <summary>
 		/// Adds an item into cache with a specified key when the the key is not existed
@@ -633,7 +682,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
 		public Task<bool> AddAsync(string key, object value, int expirationTime = 0, CancellationToken cancellationToken = default)
 			=> this._distributedCache.AddAsync(key, value, expirationTime, cancellationToken)
-				.ContinueWith(task => task.Result && (this.UseL1Cache ? this._L1Cache.Set(key, value, this.GetExpiresAt(expirationTime)) : this.SendL1CacheRequests(key)), TaskContinuationOptions.OnlyOnRanToCompletion);
+				.ContinueWith(task => task.Result && (this.UseL1Cache && this._L1Cache != null ? this._L1Cache.Set(key, value, this.GetExpiresAt(expirationTime)) : this.SendL1CacheRequests(key)), TaskContinuationOptions.OnlyOnRanToCompletion);
 
 		/// <summary>
 		/// Adds an item into cache with a specified key when the the key is not existed
@@ -653,7 +702,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
 		public Task<bool> AddAsync(string key, object value, TimeSpan validFor, CancellationToken cancellationToken = default)
 			=> this._distributedCache.AddAsync(key, value, validFor, cancellationToken)
-				.ContinueWith(task => task.Result && (this.UseL1Cache ? this._L1Cache.Set(key, value, this.GetExpiresAt(validFor)) : this.SendL1CacheRequests(key)), TaskContinuationOptions.OnlyOnRanToCompletion);
+				.ContinueWith(task => task.Result && (this.UseL1Cache && this._L1Cache != null ? this._L1Cache.Set(key, value, this.GetExpiresAt(validFor)) : this.SendL1CacheRequests(key)), TaskContinuationOptions.OnlyOnRanToCompletion);
 
 		/// <summary>
 		/// Adds an item into cache with a specified key when the the key is not existed
@@ -664,7 +713,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
 		public Task<bool> AddAsync(string key, object value, DateTime expiresAt, CancellationToken cancellationToken = default)
 			=> this._distributedCache.AddAsync(key, value, expiresAt, cancellationToken)
-				.ContinueWith(task => task.Result && (this.UseL1Cache ? this._L1Cache.Set(key, value, this.GetExpiresAt(expiresAt)) : this.SendL1CacheRequests(key)), TaskContinuationOptions.OnlyOnRanToCompletion);
+				.ContinueWith(task => task.Result && (this.UseL1Cache && this._L1Cache != null ? this._L1Cache.Set(key, value, this.GetExpiresAt(expiresAt)) : this.SendL1CacheRequests(key)), TaskContinuationOptions.OnlyOnRanToCompletion);
 		#endregion
 
 		#region Replace
@@ -676,7 +725,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="expirationTime">The time (in minutes) that the object will expired (from added time)</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
 		public bool Replace(string key, object value, int expirationTime = 0)
-			=> this._distributedCache.Replace(key, value, expirationTime) && (this.UseL1Cache ? this._L1Cache.Set(key, value, this.GetExpiresAt(expirationTime)) : this.SendL1CacheRequests(key));
+			=> this._distributedCache.Replace(key, value, expirationTime) && (this.UseL1Cache && this._L1Cache != null ? this._L1Cache.Set(key, value, this.GetExpiresAt(expirationTime)) : this.SendL1CacheRequests(key));
 
 		/// <summary>
 		/// Adds an item into cache with a specified key when the the key is existed (means update existed item)
@@ -686,7 +735,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="validFor">The time when the item is invalidated in the cache</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
 		public bool Replace(string key, object value, TimeSpan validFor)
-			=> this._distributedCache.Replace(key, value, validFor) && (this.UseL1Cache ? this._L1Cache.Set(key, value, this.GetExpiresAt(validFor)) : this.SendL1CacheRequests(key));
+			=> this._distributedCache.Replace(key, value, validFor) && (this.UseL1Cache && this._L1Cache != null ? this._L1Cache.Set(key, value, this.GetExpiresAt(validFor)) : this.SendL1CacheRequests(key));
 
 		/// <summary>
 		/// Adds an item into cache with a specified key when the the key is existed (means update existed item)
@@ -696,7 +745,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="expiresAt">The time when the item is invalidated in the cache</param>
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
 		public bool Replace(string key, object value, DateTime expiresAt)
-			=> this._distributedCache.Replace(key, value, expiresAt) && (this.UseL1Cache ? this._L1Cache.Set(key, value, this.GetExpiresAt(expiresAt)) : this.SendL1CacheRequests(key));
+			=> this._distributedCache.Replace(key, value, expiresAt) && (this.UseL1Cache && this._L1Cache != null ? this._L1Cache.Set(key, value, this.GetExpiresAt(expiresAt)) : this.SendL1CacheRequests(key));
 
 		/// <summary>
 		/// Adds an item into cache with a specified key when the the key is existed (means update existed item)
@@ -707,7 +756,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
 		public Task<bool> ReplaceAsync(string key, object value, int expirationTime = 0, CancellationToken cancellationToken = default)
 			=> this._distributedCache.ReplaceAsync(key, value, expirationTime, cancellationToken)
-				.ContinueWith(task => task.Result && (this.UseL1Cache ? this._L1Cache.Set(key, value, this.GetExpiresAt(expirationTime)) : this.SendL1CacheRequests(key)), TaskContinuationOptions.OnlyOnRanToCompletion);
+				.ContinueWith(task => task.Result && (this.UseL1Cache && this._L1Cache != null ? this._L1Cache.Set(key, value, this.GetExpiresAt(expirationTime)) : this.SendL1CacheRequests(key)), TaskContinuationOptions.OnlyOnRanToCompletion);
 
 		/// <summary>
 		/// Adds an item into cache with a specified key when the the key is existed (means update existed item)
@@ -727,7 +776,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
 		public Task<bool> ReplaceAsync(string key, object value, TimeSpan validFor, CancellationToken cancellationToken = default)
 			=> this._distributedCache.ReplaceAsync(key, value, validFor, cancellationToken)
-				.ContinueWith(task => task.Result && (this.UseL1Cache ? this._L1Cache.Set(key, value, this.GetExpiresAt(validFor)) : this.SendL1CacheRequests(key)), TaskContinuationOptions.OnlyOnRanToCompletion);
+				.ContinueWith(task => task.Result && (this.UseL1Cache && this._L1Cache != null ? this._L1Cache.Set(key, value, this.GetExpiresAt(validFor)) : this.SendL1CacheRequests(key)), TaskContinuationOptions.OnlyOnRanToCompletion);
 
 		/// <summary>
 		/// Adds an item into cache with a specified key when the the key is existed (means update existed item)
@@ -738,7 +787,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns>Returns a boolean value indicating if the item is added into cache successful or not</returns>
 		public Task<bool> ReplaceAsync(string key, object value, DateTime expiresAt, CancellationToken cancellationToken = default)
 			=> this._distributedCache.ReplaceAsync(key, value, expiresAt, cancellationToken)
-				.ContinueWith(task => task.Result && (this.UseL1Cache ? this._L1Cache.Set(key, value, this.GetExpiresAt(expiresAt)) : this.SendL1CacheRequests(key)), TaskContinuationOptions.OnlyOnRanToCompletion);
+				.ContinueWith(task => task.Result && (this.UseL1Cache && this._L1Cache != null ? this._L1Cache.Set(key, value, this.GetExpiresAt(expiresAt)) : this.SendL1CacheRequests(key)), TaskContinuationOptions.OnlyOnRanToCompletion);
 		#endregion
 
 		#region Refresh
@@ -748,7 +797,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="key">The string that presents key of item</param>
 		/// <returns>Returns a boolean value indicating if the item is refreshed or not</returns>
 		public bool Refresh(string key)
-			=> this._distributedCache.Refresh(key) && (!this.UseL1Cache || this._L1Cache.Remove(key));
+			=> this._distributedCache.Refresh(key) && (!this.UseL1Cache || this.RemoveL1CacheItem(key, true));
 
 		/// <summary>
 		/// Refreshs an existed item
@@ -757,7 +806,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns>Returns a boolean value indicating if the item is refreshed or not</returns>
 		public Task<bool> RefreshAsync(string key, CancellationToken cancellationToken = default)
 			=> this._distributedCache.RefreshAsync(key, cancellationToken)
-				.ContinueWith(task => task.Result && (!this.UseL1Cache || this._L1Cache.Remove(key)), TaskContinuationOptions.OnlyOnRanToCompletion);
+				.ContinueWith(task => task.Result && (!this.UseL1Cache || this.RemoveL1CacheItem(key, true)), TaskContinuationOptions.OnlyOnRanToCompletion);
 		#endregion
 
 		#region Get
@@ -768,10 +817,10 @@ namespace net.vieapps.Components.Caching
 		/// <returns>The retrieved cache item, or a null reference if the key is not found</returns>
 		public object Get(string key)
 		{
-			var value = this.UseL1Cache
+			var value = this.UseL1Cache && this._L1Cache != null
 				? this._L1Cache.Get(key)
 				: this._distributedCache.Get(key);
-			if (value == null && this.UseL1Cache)
+			if (value == null && this.UseL1Cache && this._L1Cache != null)
 				this._L1Cache.Set(key, value = this._distributedCache.Get(key), this.GetExpiresAt(), false);
 			return value;
 		}
@@ -784,10 +833,10 @@ namespace net.vieapps.Components.Caching
 		/// <returns>The retrieved cache item, or a null reference if the key is not found</returns>
 		public T Get<T>(string key)
 		{
-			var value = this.UseL1Cache
+			var value = this.UseL1Cache && this._L1Cache != null
 				? this._L1Cache.Get<T>(key)
 				: this._distributedCache.Get<T>(key);
-			if (value == null && this.UseL1Cache)
+			if (value == null && this.UseL1Cache && this._L1Cache != null)
 				this._L1Cache.Set(key, value = this._distributedCache.Get<T>(key), this.GetExpiresAt(), false);
 			return value;
 		}
@@ -799,10 +848,10 @@ namespace net.vieapps.Components.Caching
 		/// <returns>The retrieved cache item, or a null reference if the key is not found</returns>
 		public async Task<object> GetAsync(string key, CancellationToken cancellationToken = default)
 		{
-			var value = this.UseL1Cache
+			var value = this.UseL1Cache && this._L1Cache != null
 				? this._L1Cache.Get(key)
 				: await this._distributedCache.GetAsync(key, cancellationToken).ConfigureAwait(false);
-			if (value == null && this.UseL1Cache)
+			if (value == null && this.UseL1Cache && this._L1Cache != null)
 				this._L1Cache.Set(key, value = await this._distributedCache.GetAsync(key, cancellationToken).ConfigureAwait(false), this.GetExpiresAt(), false);
 			return value;
 		}
@@ -815,10 +864,10 @@ namespace net.vieapps.Components.Caching
 		/// <returns>The retrieved cache item, or a null reference if the key is not found</returns>
 		public async Task<T> GetAsync<T>(string key, CancellationToken cancellationToken = default)
 		{
-			var value = this.UseL1Cache
+			var value = this.UseL1Cache && this._L1Cache != null
 				? this._L1Cache.Get<T>(key)
 				: await this._distributedCache.GetAsync<T>(key, cancellationToken).ConfigureAwait(false);
-			if (value == null && this.UseL1Cache)
+			if (value == null && this.UseL1Cache && this._L1Cache != null)
 				this._L1Cache.Set(key, value = await this._distributedCache.GetAsync<T>(key, cancellationToken).ConfigureAwait(false), this.GetExpiresAt(), false);
 			return value;
 		}
@@ -832,10 +881,10 @@ namespace net.vieapps.Components.Caching
 		/// <returns>The collection of cache items</returns>
 		public IDictionary<string, object> Get(IEnumerable<string> keys)
 		{
-			var value = this.UseL1Cache
+			var value = this.UseL1Cache && this._L1Cache != null
 				? this._L1Cache.Get(keys)
 				: keys == null ? null : this._distributedCache.Get(keys);
-			if ((value == null || value.Count != keys.Count()) && this.UseL1Cache)
+			if ((value == null || value.Count != keys.Count()) && this.UseL1Cache && this._L1Cache != null)
 				this._L1Cache.Set(value = keys == null ? null : this._distributedCache.Get(keys), null, this.GetExpiresAt(), false);
 			return value;
 		}
@@ -847,10 +896,10 @@ namespace net.vieapps.Components.Caching
 		/// <returns>The collection of cache items</returns>
 		public IDictionary<string, T> Get<T>(IEnumerable<string> keys)
 		{
-			var value = this.UseL1Cache
+			var value = this.UseL1Cache && this._L1Cache != null
 				? this._L1Cache.Get<T>(keys)
 				: keys == null ? null : this._distributedCache.Get<T>(keys);
-			if ((value == null || value.Count != keys.Count()) && this.UseL1Cache)
+			if ((value == null || value.Count != keys.Count()) && this.UseL1Cache && this._L1Cache != null)
 				this._L1Cache.Set(value = keys == null ? null : this._distributedCache.Get<T>(keys), null, this.GetExpiresAt(), false);
 			return value;
 		}
@@ -862,10 +911,10 @@ namespace net.vieapps.Components.Caching
 		/// <returns>The collection of cache items</returns>
 		public async Task<IDictionary<string, object>> GetAsync(IEnumerable<string> keys, CancellationToken cancellationToken = default)
 		{
-			var value = this.UseL1Cache
+			var value = this.UseL1Cache && this._L1Cache != null
 				? this._L1Cache.Get(keys)
 				: keys == null ? null : await this._distributedCache.GetAsync(keys, cancellationToken).ConfigureAwait(false);
-			if ((value == null || value.Count != keys.Count()) && this.UseL1Cache)
+			if ((value == null || value.Count != keys.Count()) && this.UseL1Cache && this._L1Cache != null)
 				this._L1Cache.Set(value = keys == null ? null : await this._distributedCache.GetAsync(keys, cancellationToken).ConfigureAwait(false), null, this.GetExpiresAt(), false);
 			return value;
 		}
@@ -877,10 +926,10 @@ namespace net.vieapps.Components.Caching
 		/// <returns>The collection of cache items</returns>
 		public async Task<IDictionary<string, T>> GetAsync<T>(IEnumerable<string> keys, CancellationToken cancellationToken = default)
 		{
-			var value = this.UseL1Cache
+			var value = this.UseL1Cache && this._L1Cache != null
 				? this._L1Cache.Get<T>(keys)
 				: keys == null ? null : await this._distributedCache.GetAsync<T>(keys, cancellationToken).ConfigureAwait(false);
-			if ((value == null || value.Count != keys.Count()) && this.UseL1Cache)
+			if ((value == null || value.Count != keys.Count()) && this.UseL1Cache && this._L1Cache != null)
 				this._L1Cache.Set(value = keys == null ? null : await this._distributedCache.GetAsync<T>(keys, cancellationToken).ConfigureAwait(false), null, this.GetExpiresAt(), false);
 			return value;
 		}
@@ -947,7 +996,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="key">The string that presents key of cached item need to remove</param>
 		/// <returns>Returns a boolean value indicating if the item is removed or not</returns>
 		public bool Remove(string key)
-			=> this._distributedCache.Remove(key) && (this.UseL1Cache ? this._L1Cache.Remove(key) : this.SendL1CacheRequests(key, "remove"));
+			=> this._distributedCache.Remove(key) && (this.UseL1Cache && this._L1Cache != null ? this._L1Cache.Remove(key) : this.SendL1CacheRequests(key, "remove"));
 
 		/// <summary>
 		/// Removes a cached item
@@ -956,7 +1005,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns>Returns a boolean value indicating if the item is removed or not</returns>
 		public Task<bool> RemoveAsync(string key, CancellationToken cancellationToken = default)
 			=> this._distributedCache.RemoveAsync(key, cancellationToken)
-				.ContinueWith(task => task.Result && (this.UseL1Cache ? this._L1Cache.Remove(key) : this.SendL1CacheRequests(key, "remove")), TaskContinuationOptions.OnlyOnRanToCompletion);
+				.ContinueWith(task => task.Result && (this.UseL1Cache && this._L1Cache != null ? this._L1Cache.Remove(key) : this.SendL1CacheRequests(key, "remove")), TaskContinuationOptions.OnlyOnRanToCompletion);
 		#endregion
 
 		#region Remove (Multiple)
@@ -968,7 +1017,7 @@ namespace net.vieapps.Components.Caching
 		public void Remove(IEnumerable<string> keys, string keyPrefix = null)
 		{
 			this._distributedCache.Remove(keys, keyPrefix);
-			if (this.UseL1Cache)
+			if (this.UseL1Cache && this._L1Cache != null)
 				this._L1Cache.Remove(keys, keyPrefix);
 			else
 				this.SendL1CacheRequests(keys, keyPrefix, "remove");
@@ -983,7 +1032,7 @@ namespace net.vieapps.Components.Caching
 			=> this._distributedCache.RemoveAsync(keys, keyPrefix, cancellationToken)
 				.ContinueWith(_ =>
 				{
-					if (this.UseL1Cache)
+					if (this.UseL1Cache && this._L1Cache != null)
 						this._L1Cache.Remove(keys, keyPrefix);
 					else
 						this.SendL1CacheRequests(keys, keyPrefix, "remove");
@@ -1005,7 +1054,7 @@ namespace net.vieapps.Components.Caching
 		public void RemoveFragments(string key)
 		{
 			this._distributedCache.RemoveFragments(key);
-			if (this.UseL1Cache)
+			if (this.UseL1Cache && this._L1Cache != null)
 				this._L1Cache.Remove(key);
 			else
 				this.SendL1CacheRequests(key, "remove");
@@ -1019,7 +1068,7 @@ namespace net.vieapps.Components.Caching
 			=> this._distributedCache.RemoveFragmentsAsync(key, cancellationToken)
 				.ContinueWith(_ =>
 				{
-					if (this.UseL1Cache)
+					if (this.UseL1Cache && this._L1Cache != null)
 						this._L1Cache.Remove(key);
 					else
 						this.SendL1CacheRequests(key, "remove");
@@ -1033,7 +1082,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="key">The string that presents key of cached item need to check</param>
 		/// <returns>Returns a boolean value indicating if the object that associates with the key is cached or not</returns>
 		public bool Exists(string key)
-			=> (this.UseL1Cache && this._L1Cache.Exists(key)) || this._distributedCache.Exists(key);
+			=> (this.UseL1Cache && this._L1Cache != null && this._L1Cache.Exists(key)) || this._distributedCache.Exists(key);
 
 		/// <summary>
 		/// Determines whether an item exists in the cache
@@ -1041,7 +1090,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="key">The string that presents key of cached item need to check</param>
 		/// <returns>Returns a boolean value indicating if the object that associates with the key is cached or not</returns>
 		public async Task<bool> ExistsAsync(string key, CancellationToken cancellationToken = default)
-			=> (this.UseL1Cache && this._L1Cache.Exists(key)) || await this._distributedCache.ExistsAsync(key, cancellationToken).ConfigureAwait(false);
+			=> (this.UseL1Cache && this._L1Cache != null && this._L1Cache.Exists(key)) || await this._distributedCache.ExistsAsync(key, cancellationToken).ConfigureAwait(false);
 		#endregion
 
 		#region Working with Set
@@ -1052,10 +1101,10 @@ namespace net.vieapps.Components.Caching
 		/// <returns></returns>
 		public HashSet<string> GetSetMembers(string key)
 		{
-			var value = this.UseL1Cache
+			var value = this.UseL1Cache && this._L1Cache != null
 				? this._L1Cache.Get<HashSet<string>>(key)
 				: this._distributedCache.GetSetMembers(key);
-			if (value == null && this.UseL1Cache)
+			if (value == null && this.UseL1Cache && this._L1Cache != null)
 				this._L1Cache.Set(key, value = this._distributedCache.GetSetMembers(key), this.GetExpiresAt(), false);
 			return value;
 		}
@@ -1068,10 +1117,10 @@ namespace net.vieapps.Components.Caching
 		/// <returns></returns>
 		public async Task<HashSet<string>> GetSetMembersAsync(string key, CancellationToken cancellationToken = default)
 		{
-			var value = this.UseL1Cache
+			var value = this.UseL1Cache && this._L1Cache != null
 				? this._L1Cache.Get<HashSet<string>>(key)
 				: await this._distributedCache.GetSetMembersAsync(key, cancellationToken).ConfigureAwait(false);
-			if (value == null && this.UseL1Cache)
+			if (value == null && this.UseL1Cache && this._L1Cache != null)
 				this._L1Cache.Set(key, value = await this._distributedCache.GetSetMembersAsync(key, cancellationToken).ConfigureAwait(false), this.GetExpiresAt(), false);
 			return value;
 		}
@@ -1083,7 +1132,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="value"></param>
 		/// <returns></returns>
 		public bool AddSetMember(string key, string value)
-			=> this._distributedCache.AddSetMember(key, value) && (this.UseL1Cache ? this._L1Cache.Remove(key) : this.SendL1CacheRequests(key, "remove"));
+			=> this._distributedCache.AddSetMember(key, value) && (this.UseL1Cache && this._L1Cache != null ? this._L1Cache.Remove(key) : this.SendL1CacheRequests(key, "remove"));
 
 		/// <summary>
 		/// Adds the values into a set
@@ -1092,7 +1141,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="values"></param>
 		/// <returns></returns>
 		public bool AddSetMembers(string key, IEnumerable<string> values)
-			=> this._distributedCache.AddSetMembers(key, values) && (this.UseL1Cache ? this._L1Cache.Remove(key) : this.SendL1CacheRequests(key, "remove"));
+			=> this._distributedCache.AddSetMembers(key, values) && (this.UseL1Cache && this._L1Cache != null ? this._L1Cache.Remove(key) : this.SendL1CacheRequests(key, "remove"));
 
 		/// <summary>
 		/// Adds a value into a set
@@ -1103,7 +1152,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns></returns>
 		public Task<bool> AddSetMemberAsync(string key, string value, CancellationToken cancellationToken = default)
 			=> this._distributedCache.AddSetMemberAsync(key, value, cancellationToken)
-				.ContinueWith(task => task.Result && (this.UseL1Cache ? this._L1Cache.Remove(key) : this.SendL1CacheRequests(key, "remove")), TaskContinuationOptions.OnlyOnRanToCompletion);
+				.ContinueWith(task => task.Result && (this.UseL1Cache && this._L1Cache != null ? this._L1Cache.Remove(key) : this.SendL1CacheRequests(key, "remove")), TaskContinuationOptions.OnlyOnRanToCompletion);
 
 		/// <summary>
 		/// Adds the values into a set
@@ -1114,7 +1163,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns></returns>
 		public Task<bool> AddSetMembersAsync(string key, IEnumerable<string> values, CancellationToken cancellationToken = default)
 			=> this._distributedCache.AddSetMembersAsync(key, values, cancellationToken)
-				.ContinueWith(task => task.Result && (this.UseL1Cache ? this._L1Cache.Remove(key) : this.SendL1CacheRequests(key, "remove")), TaskContinuationOptions.OnlyOnRanToCompletion);
+				.ContinueWith(task => task.Result && (this.UseL1Cache && this._L1Cache != null ? this._L1Cache.Remove(key) : this.SendL1CacheRequests(key, "remove")), TaskContinuationOptions.OnlyOnRanToCompletion);
 
 		/// <summary>
 		/// Removes a value from a set
@@ -1123,7 +1172,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="value"></param>
 		/// <returns></returns>
 		public bool RemoveSetMember(string key, string value)
-			=> this._distributedCache.RemoveSetMember(key, value) && (this.UseL1Cache ? this._L1Cache.Remove(key) : this.SendL1CacheRequests(key, "remove"));
+			=> this._distributedCache.RemoveSetMember(key, value) && (this.UseL1Cache && this._L1Cache != null ? this._L1Cache.Remove(key) : this.SendL1CacheRequests(key, "remove"));
 
 		/// <summary>
 		/// Removes the values from a set
@@ -1132,7 +1181,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="values"></param>
 		/// <returns></returns>
 		public bool RemoveSetMembers(string key, IEnumerable<string> values)
-			=> this._distributedCache.RemoveSetMembers(key, values) && (this.UseL1Cache ? this._L1Cache.Remove(key) : this.SendL1CacheRequests(key, "remove"));
+			=> this._distributedCache.RemoveSetMembers(key, values) && (this.UseL1Cache && this._L1Cache != null ? this._L1Cache.Remove(key) : this.SendL1CacheRequests(key, "remove"));
 
 		/// <summary>
 		/// Removes a value from a set
@@ -1143,7 +1192,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns></returns>
 		public Task<bool> RemoveSetMemberAsync(string key, string value, CancellationToken cancellationToken = default)
 			=> this._distributedCache.RemoveSetMemberAsync(key, value, cancellationToken)
-				.ContinueWith(task => task.Result && (this.UseL1Cache ? this._L1Cache.Remove(key) : this.SendL1CacheRequests(key, "remove")), TaskContinuationOptions.OnlyOnRanToCompletion);
+				.ContinueWith(task => task.Result && (this.UseL1Cache && this._L1Cache != null ? this._L1Cache.Remove(key) : this.SendL1CacheRequests(key, "remove")), TaskContinuationOptions.OnlyOnRanToCompletion);
 
 		/// <summary>
 		/// Removes the values from a set
@@ -1154,7 +1203,7 @@ namespace net.vieapps.Components.Caching
 		/// <returns></returns>
 		public Task<bool> RemoveSetMembersAsync(string key, IEnumerable<string> values, CancellationToken cancellationToken = default)
 			=> this._distributedCache.RemoveSetMembersAsync(key, values, cancellationToken)
-				.ContinueWith(task => task.Result && (this.UseL1Cache ? this._L1Cache.Remove(key) : this.SendL1CacheRequests(key, "remove")), TaskContinuationOptions.OnlyOnRanToCompletion);
+				.ContinueWith(task => task.Result && (this.UseL1Cache && this._L1Cache != null ? this._L1Cache.Remove(key) : this.SendL1CacheRequests(key, "remove")), TaskContinuationOptions.OnlyOnRanToCompletion);
 		#endregion
 
 		#region Clear
