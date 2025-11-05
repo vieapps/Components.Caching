@@ -13,7 +13,9 @@ namespace net.vieapps.Components.Caching
 {
 	public static class RedisCachingExtensions
 	{
-		internal static bool Set(this IDatabase redis, string key, byte[] value, TimeSpan validFor, bool setSize = true)
+
+		#region Internals
+		internal static bool Set(this IDatabase redis, string key, byte[] value, TimeSpan validFor, bool setSize)
 		{
 			var result = !string.IsNullOrWhiteSpace(key) && redis.StringSet(key, value, validFor);
 			if (result && setSize && value != null && value.Length > 0)
@@ -21,40 +23,7 @@ namespace net.vieapps.Components.Caching
 			return result;
 		}
 
-		/// <summary>
-		/// Adds an item into cache with a specified key (if the key is already existed, then old cached item will be overriden)
-		/// </summary>
-		/// <param name="redis"></param>
-		/// <param name="key"></param>
-		/// <param name="value"></param>
-		/// <param name="validFor"></param>
-		/// <returns></returns>
-		public static bool Set(this IDatabase redis, string key, object value, TimeSpan validFor)
-			=> !string.IsNullOrWhiteSpace(key) && redis.Set(key, Helper.Serialize(value), validFor);
-
-		/// <summary>
-		/// Adds an item into cache with a specified key (if the key is already existed, then old cached item will be overriden)
-		/// </summary>
-		/// <param name="redis"></param>
-		/// <param name="key"></param>
-		/// <param name="value"></param>
-		/// <param name="expiresAt"></param>
-		/// <returns></returns>
-		public static bool Set(this IDatabase redis, string key, object value, DateTime expiresAt)
-			=> redis.Set(key, value, expiresAt.ToTimeSpan());
-
-		/// <summary>
-		/// Adds an item into cache with a specified key (if the key is already existed, then old cached item will be overriden)
-		/// </summary>
-		/// <param name="redis"></param>
-		/// <param name="key"></param>
-		/// <param name="value"></param>
-		/// <param name="expirationTime"></param>
-		/// <returns></returns>
-		public static bool Set(this IDatabase redis, string key, object value, int expirationTime = 0)
-			=> redis.Set(key, value, expirationTime > 0 ? TimeSpan.FromMinutes(expirationTime) : TimeSpan.Zero);
-
-		internal static Task<bool> SetAsync(this IDatabase redis, string key, byte[] value, TimeSpan validFor, CancellationToken cancellationToken = default, bool setSize = true)
+		internal static Task<bool> SetAsync(this IDatabase redis, string key, byte[] value, TimeSpan validFor, bool setSize, CancellationToken cancellationToken)
 			=> string.IsNullOrWhiteSpace(key)
 				? Task.FromResult(false)
 				: redis.StringSetAsync(key, value, validFor).WithCancellationToken(cancellationToken)
@@ -65,59 +34,14 @@ namespace net.vieapps.Components.Caching
 						return task.Result;
 					}, TaskContinuationOptions.OnlyOnRanToCompletion);
 
-		/// <summary>
-		/// Adds an item into cache with a specified key (if the key is already existed, then old cached item will be overriden)
-		/// </summary>
-		/// <param name="redis"></param>
-		/// <param name="key"></param>
-		/// <param name="value"></param>
-		/// <param name="validFor"></param>
-		/// <returns></returns>
-		public static Task<bool> SetAsync(this IDatabase redis, string key, object value, TimeSpan validFor, CancellationToken cancellationToken = default)
-			=> string.IsNullOrWhiteSpace(key)
-				? Task.FromResult(false)
-				: redis.SetAsync(key, Helper.Serialize(value), validFor, cancellationToken);
-
-		/// <summary>
-		/// Adds an item into cache with a specified key (if the key is already existed, then old cached item will be overriden)
-		/// </summary>
-		/// <param name="redis"></param>
-		/// <param name="key"></param>
-		/// <param name="value"></param>
-		/// <param name="expiresAt"></param>
-		/// <returns></returns>
-		public static Task<bool> SetAsync(this IDatabase redis, string key, object value, DateTime expiresAt, CancellationToken cancellationToken = default)
-			=> redis.SetAsync(key, value, expiresAt.ToTimeSpan(), cancellationToken);
-
-		/// <summary>
-		/// Adds an item into cache with a specified key (if the key is already existed, then old cached item will be overriden)
-		/// </summary>
-		/// <param name="redis"></param>
-		/// <param name="key"></param>
-		/// <param name="value"></param>
-		/// <param name="expirationTime"></param>
-		/// <returns></returns>
-		public static Task<bool> SetAsync(this IDatabase redis, string key, object value, int expirationTime = 0, CancellationToken cancellationToken = default)
-			=> redis.SetAsync(key, value, expirationTime > 0 ? TimeSpan.FromMinutes(expirationTime) : TimeSpan.Zero, cancellationToken);
-
-		internal static void Set(this IDatabase redis, IDictionary<string, byte[]> items, TimeSpan validFor, bool setSize = true)
+		internal static void Set(this IDatabase redis, IDictionary<string, byte[]> items, TimeSpan validFor, bool setSize)
 			=> items?.Where(kvp => !string.IsNullOrWhiteSpace(kvp.Key)).ToList().ForEach(kvp =>
 			{
 				if (redis.StringSet(kvp.Key, kvp.Value, validFor) && setSize && kvp.Value != null && kvp.Value.Length > 0)
 					Cache.Sizes[kvp.Key] = kvp.Value.LongLength;
 			});
 
-		/// <summary>
-		/// Adds an item into cache with a specified key (if the key is already existed, then old cached item will be overriden)
-		/// </summary>
-		/// <typeparam name="T"></typeparam>
-		/// <param name="redis"></param>
-		/// <param name="items"></param>
-		/// <param name="validFor"></param>
-		public static void Set<T>(this IDatabase redis, IDictionary<string, T> items, TimeSpan validFor)
-			=> redis.Set(items?.ToDictionary(kvp => kvp.Key, kvp => Helper.Serialize(kvp.Value)), validFor);
-
-		internal static async Task SetAsync(this IDatabase redis, IDictionary<string, byte[]> items, TimeSpan validFor, CancellationToken cancellationToken = default, bool setSize = true)
+		internal static async Task SetAsync(this IDatabase redis, IDictionary<string, byte[]> items, TimeSpan validFor, bool setSize, CancellationToken cancellationToken)
 		{
 			var listOfItems = items?.Where(kvp => !string.IsNullOrWhiteSpace(kvp.Key)).ToList();
 			var tasks = new List<Task<bool>>();
@@ -141,6 +65,139 @@ namespace net.vieapps.Components.Caching
 			}
 		}
 
+		internal static object Get(this IDatabase redis, string key, bool doDeserialize)
+		{
+			var value = !string.IsNullOrWhiteSpace(key)
+				? (byte[])redis.StringGet(key)
+				: null;
+			return value != null && doDeserialize
+				? Helper.Deserialize(value)
+				: value;
+		}
+
+		internal static async Task<object> GetAsync(this IDatabase redis, string key, bool doDeserialize, CancellationToken cancellationToken = default)
+		{
+			var value = !string.IsNullOrWhiteSpace(key)
+				? (byte[])await redis.StringGetAsync(key).WithCancellationToken(cancellationToken).ConfigureAwait(false)
+				: null;
+			return value != null && doDeserialize
+				? Helper.Deserialize(value)
+				: value;
+		}
+
+		internal static IDictionary<string, object> Get(this IDatabase redis, IEnumerable<string> keys, bool doDeserialize)
+		{
+			var objects = new Dictionary<string, object>();
+			if (keys != null)
+			{
+				var redisKeys = keys.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => (RedisKey)key).ToArray();
+				var redisValues = redis.StringGet(redisKeys);
+				for (var index = 0; index < redisKeys.Length; index++)
+					objects[redisKeys[index]] = redisValues[index].IsNull
+						? null
+						: doDeserialize
+							? Helper.Deserialize(redisValues[index])
+							: (byte[])redisValues[index];
+			}
+			return objects;
+		}
+
+		internal static async Task<IDictionary<string, object>> GetAsync(this IDatabase redis, IEnumerable<string> keys, bool doDeserialize, CancellationToken cancellationToken = default)
+		{
+			var objects = new Dictionary<string, object>();
+			if (keys != null)
+			{
+				var redisKeys = keys.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => (RedisKey)key).ToArray();
+				var redisValues = await redis.StringGetAsync(redisKeys).WithCancellationToken(cancellationToken).ConfigureAwait(false);
+				for (var index = 0; index < redisKeys.Length; index++)
+					objects[redisKeys[index]] = redisValues[index].IsNull
+						? null
+						: doDeserialize
+							? Helper.Deserialize(redisValues[index])
+							: (byte[])redisValues[index];
+			}
+			return objects;
+		}
+		#endregion
+
+		/// <summary>
+		/// Adds an item into cache with a specified key (if the key is already existed, then old cached item will be overriden)
+		/// </summary>
+		/// <param name="redis"></param>
+		/// <param name="key"></param>
+		/// <param name="value"></param>
+		/// <param name="validFor"></param>
+		/// <returns></returns>
+		public static bool Set(this IDatabase redis, string key, object value, TimeSpan validFor)
+			=> !string.IsNullOrWhiteSpace(key) && redis.Set(key, Helper.Serialize(value), validFor, true);
+
+		/// <summary>
+		/// Adds an item into cache with a specified key (if the key is already existed, then old cached item will be overriden)
+		/// </summary>
+		/// <param name="redis"></param>
+		/// <param name="key"></param>
+		/// <param name="value"></param>
+		/// <param name="expiresAt"></param>
+		/// <returns></returns>
+		public static bool Set(this IDatabase redis, string key, object value, DateTime expiresAt)
+			=> redis.Set(key, value, expiresAt.ToTimeSpan());
+
+		/// <summary>
+		/// Adds an item into cache with a specified key (if the key is already existed, then old cached item will be overriden)
+		/// </summary>
+		/// <param name="redis"></param>
+		/// <param name="key"></param>
+		/// <param name="value"></param>
+		/// <param name="expirationTime"></param>
+		/// <returns></returns>
+		public static bool Set(this IDatabase redis, string key, object value, int expirationTime = 0)
+			=> redis.Set(key, value, expirationTime > 0 ? TimeSpan.FromMinutes(expirationTime) : TimeSpan.Zero);
+
+		/// <summary>
+		/// Adds an item into cache with a specified key (if the key is already existed, then old cached item will be overriden)
+		/// </summary>
+		/// <param name="redis"></param>
+		/// <param name="key"></param>
+		/// <param name="value"></param>
+		/// <param name="validFor"></param>
+		/// <returns></returns>
+		public static Task<bool> SetAsync(this IDatabase redis, string key, object value, TimeSpan validFor, CancellationToken cancellationToken = default)
+			=> string.IsNullOrWhiteSpace(key)
+				? Task.FromResult(false)
+				: redis.SetAsync(key, Helper.Serialize(value), validFor, true, cancellationToken);
+
+		/// <summary>
+		/// Adds an item into cache with a specified key (if the key is already existed, then old cached item will be overriden)
+		/// </summary>
+		/// <param name="redis"></param>
+		/// <param name="key"></param>
+		/// <param name="value"></param>
+		/// <param name="expiresAt"></param>
+		/// <returns></returns>
+		public static Task<bool> SetAsync(this IDatabase redis, string key, object value, DateTime expiresAt, CancellationToken cancellationToken = default)
+			=> redis.SetAsync(key, value, expiresAt.ToTimeSpan(), cancellationToken);
+
+		/// <summary>
+		/// Adds an item into cache with a specified key (if the key is already existed, then old cached item will be overriden)
+		/// </summary>
+		/// <param name="redis"></param>
+		/// <param name="key"></param>
+		/// <param name="value"></param>
+		/// <param name="expirationTime"></param>
+		/// <returns></returns>
+		public static Task<bool> SetAsync(this IDatabase redis, string key, object value, int expirationTime = 0, CancellationToken cancellationToken = default)
+			=> redis.SetAsync(key, value, expirationTime > 0 ? TimeSpan.FromMinutes(expirationTime) : TimeSpan.Zero, cancellationToken);
+
+		/// <summary>
+		/// Adds an item into cache with a specified key (if the key is already existed, then old cached item will be overriden)
+		/// </summary>
+		/// <typeparam name="T"></typeparam>
+		/// <param name="redis"></param>
+		/// <param name="items"></param>
+		/// <param name="validFor"></param>
+		public static void Set<T>(this IDatabase redis, IDictionary<string, T> items, TimeSpan validFor)
+			=> redis.Set(items?.ToDictionary(kvp => kvp.Key, kvp => Helper.Serialize(kvp.Value)), validFor, true);
+
 		/// <summary>
 		/// Adds an item into cache with a specified key (if the key is already existed, then old cached item will be overriden)
 		/// </summary>
@@ -150,7 +207,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="validFor"></param>
 		/// <returns></returns>
 		public static Task SetAsync<T>(this IDatabase redis, IDictionary<string, T> items, TimeSpan validFor, CancellationToken cancellationToken = default)
-			=> redis.SetAsync(items?.ToDictionary(kvp => kvp.Key, kvp => Helper.Serialize(kvp.Value)), validFor, cancellationToken);
+			=> redis.SetAsync(items?.ToDictionary(kvp => kvp.Key, kvp => Helper.Serialize(kvp.Value)), validFor, true, cancellationToken);
 
 		/// <summary>
 		/// Adds an item into cache with a specified key when the the key is not existed
@@ -284,16 +341,6 @@ namespace net.vieapps.Components.Caching
 		public static Task<bool> ReplaceAsync(this IDatabase redis, string key, object value, int expirationTime = 0, CancellationToken cancellationToken = default)
 			=> redis.ReplaceAsync(key, value, expirationTime > 0 ? TimeSpan.FromMinutes(expirationTime) : TimeSpan.Zero, cancellationToken);
 
-		internal static object Get(this IDatabase redis, string key, bool doDeserialize)
-		{
-			var value = !string.IsNullOrWhiteSpace(key)
-				? (byte[])redis.StringGet(key)
-				: null;
-			return value != null && doDeserialize
-				? Helper.Deserialize(value)
-				: value;
-		}
-
 		/// <summary>
 		/// Retreives a cached item
 		/// </summary>
@@ -302,16 +349,6 @@ namespace net.vieapps.Components.Caching
 		/// <returns></returns>
 		public static object Get(this IDatabase redis, string key)
 			=> redis.Get(key, true);
-
-		internal static async Task<object> GetAsync(this IDatabase redis, string key, bool doDeserialize, CancellationToken cancellationToken = default)
-		{
-			var value = !string.IsNullOrWhiteSpace(key)
-				? (byte[])await redis.StringGetAsync(key).WithCancellationToken(cancellationToken).ConfigureAwait(false)
-				: null;
-			return value != null && doDeserialize
-				? Helper.Deserialize(value)
-				: value;
-		}
 
 		/// <summary>
 		/// Retreives a cached item
@@ -356,23 +393,6 @@ namespace net.vieapps.Components.Caching
 				: default;
 		}
 
-		internal static IDictionary<string, object> Get(this IDatabase redis, IEnumerable<string> keys, bool doDeserialize)
-		{
-			var objects = new Dictionary<string, object>();
-			if (keys != null)
-			{
-				var redisKeys = keys.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => (RedisKey)key).ToArray();
-				var redisValues = redis.StringGet(redisKeys);
-				for (var index = 0; index < redisKeys.Length; index++)
-					objects[redisKeys[index]] = redisValues[index].IsNull
-						? null
-						: doDeserialize
-							? Helper.Deserialize(redisValues[index])
-							: (byte[])redisValues[index];
-			}
-			return objects;
-		}
-
 		/// <summary>
 		/// Retreives a collection of cached items
 		/// </summary>
@@ -381,23 +401,6 @@ namespace net.vieapps.Components.Caching
 		/// <returns></returns>
 		public static IDictionary<string, object> Get(this IDatabase redis, IEnumerable<string> keys)
 			=> redis.Get(keys, true);
-
-		internal static async Task<IDictionary<string, object>> GetAsync(this IDatabase redis, IEnumerable<string> keys, bool doDeserialize, CancellationToken cancellationToken = default)
-		{
-			var objects = new Dictionary<string, object>();
-			if (keys != null)
-			{
-				var redisKeys = keys.Where(key => !string.IsNullOrWhiteSpace(key)).Select(key => (RedisKey)key).ToArray();
-				var redisValues = await redis.StringGetAsync(redisKeys).WithCancellationToken(cancellationToken).ConfigureAwait(false);
-				for (var index = 0; index < redisKeys.Length; index++)
-					objects[redisKeys[index]] = redisValues[index].IsNull
-						? null
-						: doDeserialize
-							? Helper.Deserialize(redisValues[index])
-							: (byte[])redisValues[index];
-			}
-			return objects;
-		}
 
 		/// <summary>
 		/// Retreives a collection of cached items

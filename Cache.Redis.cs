@@ -37,7 +37,7 @@ namespace net.vieapps.Components.Caching
 			this._storeKeys = storeKeys;
 
 			// register the region
-			Task.Run(async () => await Redis.RegisterRegionAsync(this.Name).ConfigureAwait(false)).ConfigureAwait(false);
+			_ = Redis.RegisterRegionAsync(this.Name);
 		}
 
 		public void Dispose()
@@ -304,7 +304,7 @@ namespace net.vieapps.Components.Caching
 		async Task<bool> _SetFragmentsAsync(string key, List<byte[]> fragments, int expirationTime = 0, CancellationToken cancellationToken = default)
 		{
 			var validFor = TimeSpan.FromMinutes(expirationTime > 0 ? expirationTime : this.ExpirationTime);
-			var success = fragments != null && fragments.Count > 0 && await Redis.Client.SetAsync(this._GetKey(key), fragments.GetFirstFragment(), validFor, cancellationToken, false).ConfigureAwait(false);
+			var success = fragments != null && fragments.Count > 0 && await Redis.Client.SetAsync(this._GetKey(key), fragments.GetFirstFragment(), validFor, false, cancellationToken).ConfigureAwait(false);
 
 			if (success)
 			{
@@ -314,7 +314,7 @@ namespace net.vieapps.Components.Caching
 					var items = new Dictionary<string, byte[]>();
 					for (var index = 1; index < fragments.Count; index++)
 						items[this._GetKey(this._GetFragmentKey(key, index))] = fragments[index];
-					tasks.Add(Redis.Client.SetAsync(items, validFor, cancellationToken, false));
+					tasks.Add(Redis.Client.SetAsync(items, validFor, false, cancellationToken));
 				}
 				await Task.WhenAll(tasks);
 			}
