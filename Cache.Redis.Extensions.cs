@@ -75,7 +75,7 @@ namespace net.vieapps.Components.Caching
 				: value;
 		}
 
-		internal static async Task<object> GetAsync(this IDatabase redis, string key, bool doDeserialize, CancellationToken cancellationToken = default)
+		internal static async Task<object> GetAsync(this IDatabase redis, string key, bool doDeserialize, CancellationToken cancellationToken)
 		{
 			var value = !string.IsNullOrWhiteSpace(key)
 				? (byte[])await redis.StringGetAsync(key).WithCancellationToken(cancellationToken).ConfigureAwait(false)
@@ -102,7 +102,7 @@ namespace net.vieapps.Components.Caching
 			return objects;
 		}
 
-		internal static async Task<IDictionary<string, object>> GetAsync(this IDatabase redis, IEnumerable<string> keys, bool doDeserialize, CancellationToken cancellationToken = default)
+		internal static async Task<IDictionary<string, object>> GetAsync(this IDatabase redis, IEnumerable<string> keys, bool doDeserialize, CancellationToken cancellationToken)
 		{
 			var objects = new Dictionary<string, object>();
 			if (keys != null)
