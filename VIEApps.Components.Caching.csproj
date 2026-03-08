@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFrameworks>net10.0;netstandard2.0</TargetFrameworks>
+		<TargetFrameworks>netstandard2.0</TargetFrameworks>
 		<WarningLevel>3</WarningLevel>
 		<NoWarn>1701,1702,1705,1066,0067,1573,1591,IDE0059,IDE0074,IDE0090,IDE1006,IDE0130,CA1510,CA2254</NoWarn>
 		<DocumentationFile>bin/$(Configuration)/$(TargetFramework)/VIEApps.Components.Caching.xml</DocumentationFile>
@@ -33,7 +33,7 @@
 		<PackageIcon>Icon.png</PackageIcon>
 		<PackageOutputPath>../</PackageOutputPath>
 		<PackageTags>cache;caching;distributed;distributed-cache;distributed-caching;memcached;redis;vieapps;vieapps.components</PackageTags>
-		<PackageReleaseNotes>Support .NET 10</PackageReleaseNotes>
+		<PackageReleaseNotes>Latest components</PackageReleaseNotes>
 		<PackageProjectUrl>https://vieapps.net/</PackageProjectUrl>
 		<RepositoryUrl>https://github.com/vieapps/Components.Caching</RepositoryUrl>
 		<RepositoryType>git</RepositoryType>
@@ -50,8 +50,8 @@
 
 	<ItemGroup>
 		<PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="10.0.0" />
-		<PackageReference Include="StackExchange.Redis" Version="2.9.32" />
-		<PackageReference Include="VIEApps.Enyim.Caching" Version="10.10.2511.1" Condition="'$(GeneratePackage)' != 'true'" />
+		<PackageReference Include="StackExchange.Redis" Version="2.11.8" />
+		<PackageReference Include="VIEApps.Enyim.Caching" Version="10.10.2603.3" Condition="'$(GeneratePackage)' != 'true'" />
 		<PackageReference Include="VIEApps.Enyim.Caching$(PackageSuffix)" Version="10.10$(ReleaseVersion)" Condition="'$(GeneratePackage)' == 'true'" />
 	</ItemGroup>
 
