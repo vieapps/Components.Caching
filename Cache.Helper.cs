@@ -25,6 +25,8 @@ namespace net.vieapps.Components.Caching
 		public static readonly int FragmentSize = (1024 * 1024) - 256;
 		internal static readonly string RegionsKey = "VIEApps-NGX-Regions";
 
+		public static Random Random { get; } = new Random();
+
 		public static int ExpirationTime => Cache.Configuration != null && Cache.Configuration.ExpirationTime > 0 ? Cache.Configuration.ExpirationTime : 30;
 
 		public static string GetRegionName(string name)
@@ -316,7 +318,7 @@ namespace net.vieapps.Components.Caching
 	/// </summary>
 	public class MemoryCache : IDisposable
 	{
-		internal readonly Microsoft.Extensions.Caching.Memory.MemoryCache _cache;
+		internal readonly List<Microsoft.Extensions.Caching.Memory.MemoryCache> _shards = new List<Microsoft.Extensions.Caching.Memory.MemoryCache>(16);
 		internal readonly Action<string> _onUpdateCallback;
 		internal readonly Action<string> _onRemoveCallback;
 		internal readonly Func<string, string> _getKey;
@@ -326,7 +328,7 @@ namespace net.vieapps.Components.Caching
 		/// Gets the collection of keys
 		/// </summary>
 		public IEnumerable<string> Keys
-			=> this._cache.Keys.Select(key => key as string);
+			=> this._shards.Select(shard => shard.Keys).SelectMany(key => key).Select(key => key as string);
 
 		/// <summary>
 		/// Creates new an instance
@@ -342,27 +344,23 @@ namespace net.vieapps.Components.Caching
 			this._onRemoveCallback = onRemoveCallback;
 			this._getKey = getKey;
 			this._maxSize = maxSize > 0 ? maxSize : (byte)0;
-			this._cache = new Microsoft.Extensions.Caching.Memory.MemoryCache(new MemoryCacheOptions { SizeLimit = this._maxSize > 0 ? this._maxSize * 1024 * 1024 * 1024 : (long?)null }, loggerFactory);
+			long maxCacheSize = this._maxSize > 0 ? this._maxSize * 1024 * 1024 * 1024 : 0;
+			for (var index = 0; index < 16; index++)
+				this._shards.Add(new Microsoft.Extensions.Caching.Memory.MemoryCache(new MemoryCacheOptions { SizeLimit = maxCacheSize > 0 ? maxCacheSize / 16 : (long?)null, ExpirationScanFrequency = TimeSpan.FromMinutes(5) }, loggerFactory));
 		}
 
-		public void Dispose()
-		{
-			GC.SuppressFinalize(this);
-			this._cache.Dispose();
-		}
-
-		~MemoryCache()
-			=> this.Dispose();
+		Microsoft.Extensions.Caching.Memory.MemoryCache GetShard(string key)
+			=> this._shards[(key.GetHashCode() & 0x7fffffff) % this._shards.Count];
 
 		bool Set<T>(string key, T value, TimeSpan validFor)
 		{
 			var options = new MemoryCacheEntryOptions
 			{
-				AbsoluteExpirationRelativeToNow = validFor
+				AbsoluteExpirationRelativeToNow = validFor + TimeSpan.FromSeconds(Helper.Random.Next(0, 30))
 			};
-			if (Cache.Sizes.TryRemove(this._getKey?.Invoke(key) ?? key, out var size) && this._maxSize > 0)
+			if (this._maxSize > 0 && Cache.Sizes.TryRemove(this._getKey?.Invoke(key) ?? key, out var size))
 				options.SetSize(size);
-			return this._cache.Set(key, value, options) != null;
+			return this.GetShard(key).Set(key, value, options) != null;
 		}
 
 		/// <summary>
@@ -375,7 +373,6 @@ namespace net.vieapps.Components.Caching
 		/// <returns></returns>
 		public bool Set<T>(string key, T value, TimeSpan validFor, bool fireCallbackHandler)
 		{
-			this.Remove(key, false);
 			if (!string.IsNullOrWhiteSpace(key) && value != null && this.Set(key, value, validFor))
 			{
 				if (fireCallbackHandler)
@@ -418,7 +415,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="key"></param>
 		/// <returns></returns>
 		public object Get(string key)
-			=> !string.IsNullOrWhiteSpace(key) && this._cache.TryGetValue(key, out var value) ? value : null;
+			=> !string.IsNullOrWhiteSpace(key) && this.GetShard(key).TryGetValue(key, out var value) ? value : null;
 
 		/// <summary>
 		/// Gets a cache item
@@ -427,10 +424,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="key"></param>
 		/// <returns></returns>
 		public T Get<T>(string key)
-		{
-			var value = this.Get(key);
-			return value != null && value is T tvalue ? tvalue : default;
-		}
+			=> !string.IsNullOrWhiteSpace(key) && this.GetShard(key).TryGetValue(key, out var value) && value is T tvalue ? tvalue : default;
 
 		/// <summary>
 		/// Gets a collection of cache items
@@ -439,8 +433,9 @@ namespace net.vieapps.Components.Caching
 		/// <returns></returns>
 		public IDictionary<string, object> Get(IEnumerable<string> keys)
 		{
-			var dictionary = keys?.Select(key => new KeyValuePair<string, object>(key, this.Get(key))).Where(kvp => kvp.Key != null && kvp.Value != null).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
-			return dictionary != null && keys != null && dictionary.Count > 0 && dictionary.Count == keys.Count() ? dictionary : null;
+			var dictKeys = keys?.ToList();
+			var dictionary = dictKeys?.Select(key => new KeyValuePair<string, object>(key, this.Get(key))).Where(kvp => kvp.Key != null && kvp.Value != null).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+			return dictionary != null && dictKeys != null && dictionary.Count > 0 && dictionary.Count == dictKeys.Count ? dictionary : null;
 		}
 
 		/// <summary>
@@ -462,7 +457,7 @@ namespace net.vieapps.Components.Caching
 		{
 			if (!string.IsNullOrWhiteSpace(key))
 			{
-				this._cache.Remove(key);
+				this.GetShard(key).Remove(key);
 				if (fireCallbackHandler)
 					this._onRemoveCallback?.Invoke(key);
 				return true;
@@ -486,13 +481,16 @@ namespace net.vieapps.Components.Caching
 		/// <param name="key"></param>
 		/// <returns></returns>
 		public bool Exists(string key)
-			=> this._cache.TryGetValue(key, out var _);
+			=> this.GetShard(key).TryGetValue(key, out var _);
 
 		/// <summary>
 		/// Clears the cache bag
 		/// </summary>
 		public void Clear()
-			=> this._cache.Clear();
+			=> this._shards.ForEach(shard => shard.Clear());
+
+		public void Dispose()
+			=> this._shards.ForEach(shard => shard.Dispose());
 	}
 }
 

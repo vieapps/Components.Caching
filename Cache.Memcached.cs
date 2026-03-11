@@ -47,13 +47,7 @@ namespace net.vieapps.Components.Caching
 		}
 
 		public void Dispose()
-		{
-			GC.SuppressFinalize(this);
-			this._lock.Dispose();
-		}
-
-		~Memcached()
-			=> this.Dispose();
+			=> this._lock.Dispose();
 
 		#region Get client (singleton)
 		static MemcachedClient _Client { get; set; }

@@ -41,13 +41,7 @@ namespace net.vieapps.Components.Caching
 		}
 
 		public void Dispose()
-		{
-			GC.SuppressFinalize(this);
-			this._lock.Dispose();
-		}
-
-		~Redis()
-			=> this.Dispose();
+			=> this._lock.Dispose();
 
 		#region Get client (singleton)
 		static ConnectionMultiplexer _Connection { get; set; }
@@ -329,7 +323,7 @@ namespace net.vieapps.Components.Caching
 				var bytes = Helper.Serialize(value);
 				if (this._SetFragments(key, CacheUtils.Helper.Split(bytes, Helper.FragmentSize).ToList(), expirationTime))
 				{
-					Cache.Sizes[this._GetKey(key)] = bytes.LongLength;
+					Cache.Sizes.TryAdd(this._GetKey(key), bytes.Length);
 					return true;
 				}
 			}
@@ -343,7 +337,7 @@ namespace net.vieapps.Components.Caching
 				var bytes = Helper.Serialize(value);
 				if (await this._SetFragmentsAsync(key, CacheUtils.Helper.Split(bytes, Helper.FragmentSize).ToList(), expirationTime, cancellationToken).ConfigureAwait(false))
 				{
-					Cache.Sizes[this._GetKey(key)] = bytes.LongLength;
+					Cache.Sizes.TryAdd(this._GetKey(key), bytes.Length);
 					return true;
 				}
 			}

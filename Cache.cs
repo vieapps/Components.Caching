@@ -77,13 +77,9 @@ namespace net.vieapps.Components.Caching
 
 		public void Dispose()
 		{
-			GC.SuppressFinalize(this);
 			this._distributedCache.Dispose();
 			this._L1Cache?.Dispose();
 		}
-
-		~Cache()
-			=> this.Dispose();
 
 		#region Singleton
 		internal static Cache _Instance { get; set; }

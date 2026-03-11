@@ -19,7 +19,7 @@ namespace net.vieapps.Components.Caching
 		{
 			var result = !string.IsNullOrWhiteSpace(key) && redis.StringSet(key, value, validFor);
 			if (result && setSize && value != null && value.Length > 0)
-				Cache.Sizes[key] = value.LongLength;
+				Cache.Sizes.TryAdd(key, value.Length);
 			return result;
 		}
 
@@ -30,7 +30,7 @@ namespace net.vieapps.Components.Caching
 					.ContinueWith(task =>
 					{
 						if (task.Exception == null && task.Result && setSize && value != null && value.Length > 0)
-							Cache.Sizes[key] = value.LongLength;
+							Cache.Sizes.TryAdd(key, value.Length);
 						return task.Result;
 					}, TaskContinuationOptions.OnlyOnRanToCompletion);
 
@@ -38,7 +38,7 @@ namespace net.vieapps.Components.Caching
 			=> items?.Where(kvp => !string.IsNullOrWhiteSpace(kvp.Key)).ToList().ForEach(kvp =>
 			{
 				if (redis.StringSet(kvp.Key, kvp.Value, validFor) && setSize && kvp.Value != null && kvp.Value.Length > 0)
-					Cache.Sizes[kvp.Key] = kvp.Value.LongLength;
+					Cache.Sizes.TryAdd(kvp.Key, kvp.Value.Length);
 			});
 
 		internal static async Task SetAsync(this IDatabase redis, IDictionary<string, byte[]> items, TimeSpan validFor, bool setSize, CancellationToken cancellationToken)
@@ -59,7 +59,7 @@ namespace net.vieapps.Components.Caching
 					{
 						var kvp = listOfItems[index];
 						if (kvp.Value != null && kvp.Value.Length > 0)
-							Cache.Sizes[kvp.Key] = kvp.Value.LongLength;
+							Cache.Sizes.TryAdd(kvp.Key, kvp.Value.Length);
 					}
 				});
 			}
