@@ -481,7 +481,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="key"></param>
 		/// <returns></returns>
 		public bool Exists(string key)
-			=> this.GetShard(key).TryGetValue(key, out var _);
+			=> !string.IsNullOrWhiteSpace(key) && this.GetShard(key).TryGetValue(key, out var _);
 
 		/// <summary>
 		/// Clears the cache bag
