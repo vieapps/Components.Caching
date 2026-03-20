@@ -300,6 +300,14 @@ namespace net.vieapps.Components.Caching
 			=> this._L1Cache != null && this._L1Cache.Remove(key, fireCallbackHandler);
 
 		/// <summary>
+		/// Checks to see an item that assocciated with a key that exists in the L1-Cache
+		/// </summary>
+		/// <param name="key"></param>
+		/// <returns></returns>
+		public bool ExistsInL1Cache(string key)
+			=> this.UseL1Cache && this._L1Cache != null && this._L1Cache.Exists(key);
+
+		/// <summary>
 		/// Clears L1-Cache
 		/// </summary>
 		public void ClearL1Cache()
@@ -810,10 +818,11 @@ namespace net.vieapps.Components.Caching
 		/// Retreives a cached item
 		/// </summary>
 		/// <param name="key">The string that presents key of cached item need to retreive</param>
+		/// <param name="bypassL1Cache">true to by-pass L1-Cache</param>
 		/// <returns>The retrieved cache item, or a null reference if the key is not found</returns>
-		public object Get(string key)
+		public object Get(string key, bool bypassL1Cache)
 		{
-			var value = this.UseL1Cache && this._L1Cache != null
+			var value = this.UseL1Cache && this._L1Cache != null && !bypassL1Cache
 				? this._L1Cache.Get(key)
 				: this._distributedCache.Get(key);
 			if (value == null && this.UseL1Cache && this._L1Cache != null)
@@ -824,12 +833,21 @@ namespace net.vieapps.Components.Caching
 		/// <summary>
 		/// Retreives a cached item
 		/// </summary>
-		/// <typeparam name="T">The type for casting the cached item</typeparam>
 		/// <param name="key">The string that presents key of cached item need to retreive</param>
 		/// <returns>The retrieved cache item, or a null reference if the key is not found</returns>
-		public T Get<T>(string key)
+		public object Get(string key)
+			=> this.Get(key, false);
+
+		/// <summary>
+		/// Retreives a cached item
+		/// </summary>
+		/// <typeparam name="T">The type for casting the cached item</typeparam>
+		/// <param name="key">The string that presents key of cached item need to retreive</param>
+		/// <param name="bypassL1Cache">true to by-pass L1-Cache</param>
+		/// <returns>The retrieved cache item, or a null reference if the key is not found</returns>
+		public T Get<T>(string key, bool bypassL1Cache)
 		{
-			var value = this.UseL1Cache && this._L1Cache != null
+			var value = this.UseL1Cache && this._L1Cache != null && !bypassL1Cache
 				? this._L1Cache.Get<T>(key)
 				: this._distributedCache.Get<T>(key);
 			if (value == null && this.UseL1Cache && this._L1Cache != null)
@@ -840,11 +858,21 @@ namespace net.vieapps.Components.Caching
 		/// <summary>
 		/// Retreives a cached item
 		/// </summary>
+		/// <typeparam name="T">The type for casting the cached item</typeparam>
 		/// <param name="key">The string that presents key of cached item need to retreive</param>
 		/// <returns>The retrieved cache item, or a null reference if the key is not found</returns>
-		public async Task<object> GetAsync(string key, CancellationToken cancellationToken = default)
+		public T Get<T>(string key)
+			=> this.Get<T>(key, false);
+
+		/// <summary>
+		/// Retreives a cached item
+		/// </summary>
+		/// <param name="key">The string that presents key of cached item need to retreive</param>
+		/// <param name="bypassL1Cache">true to by-pass L1-Cache</param>
+		/// <returns>The retrieved cache item, or a null reference if the key is not found</returns>
+		public async Task<object> GetAsync(string key, bool bypassL1Cache, CancellationToken cancellationToken)
 		{
-			var value = this.UseL1Cache && this._L1Cache != null
+			var value = this.UseL1Cache && this._L1Cache != null && !bypassL1Cache
 				? this._L1Cache.Get(key)
 				: await this._distributedCache.GetAsync(key, cancellationToken).ConfigureAwait(false);
 			if (value == null && this.UseL1Cache && this._L1Cache != null)
@@ -855,18 +883,36 @@ namespace net.vieapps.Components.Caching
 		/// <summary>
 		/// Retreives a cached item
 		/// </summary>
-		/// <typeparam name="T">The type for casting the cached item</typeparam>
 		/// <param name="key">The string that presents key of cached item need to retreive</param>
 		/// <returns>The retrieved cache item, or a null reference if the key is not found</returns>
-		public async Task<T> GetAsync<T>(string key, CancellationToken cancellationToken = default)
+		public Task<object> GetAsync(string key, CancellationToken cancellationToken = default)
+			=> this.GetAsync(key, false, cancellationToken);
+
+		/// <summary>
+		/// Retreives a cached item
+		/// </summary>
+		/// <typeparam name="T">The type for casting the cached item</typeparam>
+		/// <param name="key">The string that presents key of cached item need to retreive</param>
+		/// <param name="bypassL1Cache">true to by-pass L1-Cache</param>
+		/// <returns>The retrieved cache item, or a null reference if the key is not found</returns>
+		public async Task<T> GetAsync<T>(string key, bool bypassL1Cache, CancellationToken cancellationToken)
 		{
-			var value = this.UseL1Cache && this._L1Cache != null
+			var value = this.UseL1Cache && this._L1Cache != null && !bypassL1Cache
 				? this._L1Cache.Get<T>(key)
 				: await this._distributedCache.GetAsync<T>(key, cancellationToken).ConfigureAwait(false);
 			if (value == null && this.UseL1Cache && this._L1Cache != null)
 				this._L1Cache.Set(key, value = await this._distributedCache.GetAsync<T>(key, cancellationToken).ConfigureAwait(false), this.GetExpiresAt(), false);
 			return value;
 		}
+
+		/// <summary>
+		/// Retreives a cached item
+		/// </summary>
+		/// <typeparam name="T">The type for casting the cached item</typeparam>
+		/// <param name="key">The string that presents key of cached item need to retreive</param>
+		/// <returns>The retrieved cache item, or a null reference if the key is not found</returns>
+		public Task<T> GetAsync<T>(string key, CancellationToken cancellationToken = default)
+			=> this.GetAsync<T>(key, false, cancellationToken);
 		#endregion
 
 		#region Get (Multiple)
@@ -1078,7 +1124,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="key">The string that presents key of cached item need to check</param>
 		/// <returns>Returns a boolean value indicating if the object that associates with the key is cached or not</returns>
 		public bool Exists(string key)
-			=> (this.UseL1Cache && this._L1Cache != null && this._L1Cache.Exists(key)) || this._distributedCache.Exists(key);
+			=> this.ExistsInL1Cache(key) || this._distributedCache.Exists(key);
 
 		/// <summary>
 		/// Determines whether an item exists in the cache
@@ -1086,7 +1132,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="key">The string that presents key of cached item need to check</param>
 		/// <returns>Returns a boolean value indicating if the object that associates with the key is cached or not</returns>
 		public async Task<bool> ExistsAsync(string key, CancellationToken cancellationToken = default)
-			=> (this.UseL1Cache && this._L1Cache != null && this._L1Cache.Exists(key)) || await this._distributedCache.ExistsAsync(key, cancellationToken).ConfigureAwait(false);
+			=> this.ExistsInL1Cache(key) || await this._distributedCache.ExistsAsync(key, cancellationToken).ConfigureAwait(false);
 		#endregion
 
 		#region Working with Set
