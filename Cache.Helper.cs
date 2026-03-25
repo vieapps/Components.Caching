@@ -3,14 +3,18 @@ using System;
 using System.Net;
 using System.Xml;
 using System.Linq;
+using System.Diagnostics;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
-using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Caching.Distributed;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
+using System.Threading;
+using System.Threading.Tasks;
+using StackExchange.Redis;
 using Enyim.Caching.Configuration;
 using Enyim.Caching.Memcached;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Logging;
 using net.vieapps.Components.Caching;
 using CacheUtils;
 #endregion
@@ -491,6 +495,129 @@ namespace net.vieapps.Components.Caching
 
 		public void Dispose()
 			=> this._shards.ForEach(shard => shard.Dispose());
+	}
+
+	public class Monitor
+	{
+		readonly Action<string, (string Level, long Total, int Interactive, int Subscription, int Other, long PingMiliseconds)> _onMonitor;
+		readonly Action<string, EndPoint, Exception> _onConnectionFailed;
+		readonly Action<string, EndPoint> _onConnectionRestored;
+		readonly Action<string, EndPoint, Exception> _onError;
+		readonly int _interval;
+		readonly int _warnQueueSize;
+		readonly int _criticalQueueSize;
+
+		ConnectionMultiplexer _redisConnection;
+		EventHandler<ConnectionFailedEventArgs> _onRedisConnectionFailed;
+		EventHandler<ConnectionFailedEventArgs> _onRedisConnectionRestored;
+		EventHandler<RedisErrorEventArgs> _onRedisError;
+		EventHandler<InternalErrorEventArgs> _onRedisInternalError;
+
+		IDatabase _redisDatabase;
+		Func<Task> _redisMonitorAsync;
+
+		CancellationTokenSource _cts;
+		Task _worker;
+
+		public Monitor(
+			Action<string, (string Level, long Total, int Interactive, int Subscription, int Other, long PingMiliseconds)> onMonitor,
+			Action<string, EndPoint, Exception> onConnectionFailed,
+			Action<string, EndPoint> onConnectionRestored,
+			Action<string, EndPoint, Exception> onError,
+			int interval = 1000,
+			int warnQueueSize = 1000,
+			int criticalQueueSize = 5000
+		)
+		{
+			this._onMonitor = onMonitor ?? ((_, __) => { });
+			this._onConnectionFailed = onConnectionFailed ?? ((_, __, ___) => { });
+			this._onConnectionRestored = onConnectionRestored ?? ((_, __) => { });
+			this._onError = onError ?? ((_, __, ___) => { });
+			this._interval = interval > 0 ? interval : 1000;
+			this._warnQueueSize = warnQueueSize > 0 ? warnQueueSize : 1000;
+			this._criticalQueueSize = criticalQueueSize > 0 ? criticalQueueSize : 5000;
+		}
+
+		public Monitor Start(ConnectionMultiplexer redisConnection, IDatabase redisDatabase, CancellationToken cancellationToken)
+		{
+			if (this._redisConnection != null || this._redisDatabase != null)
+				return this;
+
+			this._onRedisConnectionFailed = null;
+			this._onRedisConnectionRestored = null;
+			this._onRedisError = null;
+			this._onRedisInternalError = null;
+
+			this._redisConnection = redisConnection;
+			this._redisConnection.ConnectionFailed += this._onRedisConnectionFailed;
+			this._redisConnection.ConnectionRestored += this._onRedisConnectionRestored;
+			this._redisConnection.InternalError += this._onRedisInternalError;
+			this._redisConnection.ErrorMessage += this._onRedisError;
+
+			this._redisDatabase = redisDatabase;
+			this._cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+			this._redisMonitorAsync = async () =>
+			{
+				var stopwatch = Stopwatch.StartNew();
+				while (!this._cts.IsCancellationRequested)
+				{
+					try
+					{
+						stopwatch.Restart();
+						await this._redisDatabase.PingAsync().ConfigureAwait(false);
+						stopwatch.Stop();
+
+						var serverCounters = this._redisConnection.GetCounters();
+						var total = serverCounters.TotalOutstanding;
+						var interactive = serverCounters.Interactive.TotalOutstanding;
+						var subscription = serverCounters.Subscription.TotalOutstanding;
+						var other = serverCounters.Other.TotalOutstanding;
+
+						var level = total >= this._criticalQueueSize
+							? "🔥CRITICAL"
+							: total >= this._warnQueueSize
+								? "⚠️WARN"
+								: "OK";
+						this._onMonitor($"[{level}] total={total} (interactive={interactive}, subscription={subscription}, other={other}) | ping={stopwatch.ElapsedMilliseconds}ms", (level, total, interactive, subscription, other, stopwatch.ElapsedMilliseconds));
+					}
+					catch (OperationCanceledException) { }
+					catch (Exception ex)
+					{
+						this._onError($"Monitor error => {ex.Message}", this._redisDatabase.IdentifyEndpoint(), ex);
+					}
+
+					if (!this._cts.IsCancellationRequested)
+						try
+						{
+							await Task.Delay(this._interval + Helper.Random.Next(123, 456), this._cts.Token).ConfigureAwait(false);
+						}
+						catch { }
+				}
+			};
+
+			this._worker = Task.Run(this._redisMonitorAsync);
+			return this;
+		}
+
+		public Monitor Stop()
+		{
+			this._cts.Cancel();
+			if  (this._redisConnection != null)
+			{
+				this._redisConnection.ConnectionFailed -= this._onRedisConnectionFailed;
+				this._redisConnection.ConnectionRestored -= this._onRedisConnectionRestored;
+				this._redisConnection.InternalError -= this._onRedisInternalError;
+				this._redisConnection.ErrorMessage -= this._onRedisError;
+			}
+			this._worker?.GetAwaiter().GetResult();
+			this._cts.Dispose();
+			this._cts = null;
+			this._onRedisConnectionFailed = null;
+			this._onRedisConnectionRestored = null;
+			this._onRedisError = null;
+			this._onRedisInternalError = null;
+			return this;
+		}
 	}
 }
 

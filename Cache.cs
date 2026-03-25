@@ -1,5 +1,6 @@
 #region Related components
 using System;
+using System.Net;
 using System.Linq;
 using System.Diagnostics;
 using System.Threading;
@@ -27,8 +28,9 @@ namespace net.vieapps.Components.Caching
 	{
 		internal static ConcurrentDictionary<string, long> Sizes { get; } = new ConcurrentDictionary<string, long>(StringComparer.OrdinalIgnoreCase);
 
-		internal readonly ICache _distributedCache;
 		internal readonly MemoryCache _L1Cache;
+		internal readonly ICache _distributedCache;
+		Monitor _distributedCacheMonitor;
 
 		/// <summary>
 		/// Create a new instance of distributed cache with isolated region
@@ -77,8 +79,52 @@ namespace net.vieapps.Components.Caching
 
 		public void Dispose()
 		{
-			this._distributedCache.Dispose();
 			this._L1Cache?.Dispose();
+			this._distributedCache.Dispose();
+			this._distributedCacheMonitor?.Stop();
+		}
+
+		/// <summary>
+		/// Initializes and starts the monitor of distributed cache
+		/// </summary>
+		/// <param name="onMonitor"></param>
+		/// <param name="onConnectionFailed"></param>
+		/// <param name="onConnectionRestored"></param>
+		/// <param name="onError"></param>
+		/// <param name="interval"></param>
+		/// <param name="warnQueueSize"></param>
+		/// <param name="criticalQueueSize"></param>
+		/// <param name="cancellationToken"></param>
+		public void StartMonitor(
+			Action<string, (string Level, long Total, int Interactive, int Subscription, int Other, long PingMiliseconds)> onMonitor,
+			Action<string, EndPoint, Exception> onConnectionFailed = null,
+			Action<string, EndPoint> onConnectionRestored = null,
+			Action<string, EndPoint, Exception> onError = null,
+			int interval = 1000,
+			int warnQueueSize = 1000,
+			int criticalQueueSize = 5000,
+			CancellationToken cancellationToken = default
+		)
+		{
+			if (this._distributedCache?.GetType() == typeof(Redis) && this._distributedCacheMonitor == null)
+				this._distributedCacheMonitor = new Monitor(onMonitor, onConnectionFailed, onConnectionRestored, onError, interval, warnQueueSize, criticalQueueSize).Start(Redis.Connection, Redis.Database, cancellationToken);
+		}
+
+		/// <summary>
+		/// Initializes and starts the monitor of distributed cache
+		/// </summary>
+		/// <param name="onMonitor"></param>
+		/// <param name="cancellationToken"></param>
+		public void StartMonitor(Action<string, (string Level, long Total, int Interactive, int Subscription, int Other, long PingMiliseconds)> onMonitor, CancellationToken cancellationToken)
+			=> this.StartMonitor(onMonitor, null, null, null, 1000, 1000, 5000, cancellationToken);
+
+		/// <summary>
+		/// Stops the monitor of distributed cache
+		/// </summary>
+		public void StopMonitor()
+		{
+			this._distributedCacheMonitor?.Stop();
+			this._distributedCacheMonitor = null;
 		}
 
 		#region Singleton

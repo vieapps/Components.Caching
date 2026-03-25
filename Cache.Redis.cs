@@ -122,11 +122,7 @@ namespace net.vieapps.Components.Caching
 				if (Redis._Client == null)
 				{
 					if (!(ConfigurationManager.GetSection("net.vieapps.cache") is CacheConfigurationSectionHandler config))
-					{
-						config = ConfigurationManager.GetSection("cache") as CacheConfigurationSectionHandler;
-						if (config == null)
-							config = ConfigurationManager.GetSection("redis") as CacheConfigurationSectionHandler;
-					}
+						config = ConfigurationManager.GetSection("cache") as CacheConfigurationSectionHandler ?? ConfigurationManager.GetSection("redis") as CacheConfigurationSectionHandler;
 
 					if (config == null)
 						throw new ConfigurationErrorsException("No configuration section is found, the configuration file (app.config/web.config) must have a section named 'net.vieapps.cache' or 'cache' or 'redis'.");
@@ -143,10 +139,18 @@ namespace net.vieapps.Components.Caching
 		}
 		#endregion
 
-		#region Attributes
+		/// <summary>
+		/// Gets the Redis connection
+		/// </summary>
+		static public ConnectionMultiplexer Connection => Redis._Connection;
+
+		/// <summary>
+		/// Gets the Redis database (client)
+		/// </summary>
+		static public IDatabase Database => Redis._Client;
+
 		readonly SemaphoreSlim _lock = new SemaphoreSlim(1, 1);
 		readonly bool _storeKeys;
-		#endregion
 
 		#region Keys
 		void _UpdateKey(string key)
