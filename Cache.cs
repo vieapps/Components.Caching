@@ -96,7 +96,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="criticalQueueSize"></param>
 		/// <param name="cancellationToken"></param>
 		public void StartMonitor(
-			Action<string, (string Level, long Total, int Interactive, int Subscription, int Other, long PingMiliseconds)> onMonitor,
+			Action<string, (string Level, long Total, long Interactive, long PingMiliseconds)> onMonitor,
 			Action<string, EndPoint, Exception> onConnectionFailed = null,
 			Action<string, EndPoint> onConnectionRestored = null,
 			Action<string, EndPoint, Exception> onError = null,
@@ -106,8 +106,14 @@ namespace net.vieapps.Components.Caching
 			CancellationToken cancellationToken = default
 		)
 		{
-			if (this._distributedCache?.GetType() == typeof(Redis) && this._distributedCacheMonitor == null)
-				this._distributedCacheMonitor = new Monitor(onMonitor, onConnectionFailed, onConnectionRestored, onError, interval, warnQueueSize, criticalQueueSize).Start(Redis.Connection, Redis.Database, cancellationToken);
+			if (this._distributedCacheMonitor == null)
+			{
+				this._distributedCacheMonitor = new Monitor(onMonitor, onConnectionFailed, onConnectionRestored, onError, interval, warnQueueSize, criticalQueueSize);
+				if (this._distributedCache?.GetType() == typeof(Memcached))
+					this._distributedCacheMonitor.Start(Memcached.MemcachedClient, cancellationToken);
+				else
+					this._distributedCacheMonitor.Start(Redis.Connection, Redis.Database, cancellationToken);
+			}
 		}
 
 		/// <summary>
@@ -115,7 +121,7 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		/// <param name="onMonitor"></param>
 		/// <param name="cancellationToken"></param>
-		public void StartMonitor(Action<string, (string Level, long Total, int Interactive, int Subscription, int Other, long PingMiliseconds)> onMonitor, CancellationToken cancellationToken)
+		public void StartMonitor(Action<string, (string Level, long Total, long Interactive, long PingMiliseconds)> onMonitor, CancellationToken cancellationToken)
 			=> this.StartMonitor(onMonitor, null, null, null, 1000, 1000, 5000, cancellationToken);
 
 		/// <summary>

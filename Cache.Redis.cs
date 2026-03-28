@@ -139,16 +139,8 @@ namespace net.vieapps.Components.Caching
 		}
 		#endregion
 
-		/// <summary>
-		/// Gets the Redis connection
-		/// </summary>
-		static public ConnectionMultiplexer Connection => Redis._Connection;
-
-		/// <summary>
-		/// Gets the Redis database (client)
-		/// </summary>
-		static public IDatabase Database => Redis._Client;
-
+		internal static ConnectionMultiplexer Connection => Redis._Connection;
+		internal static IDatabase Database => Redis._Client;
 		readonly SemaphoreSlim _lock = new SemaphoreSlim(1, 1);
 		readonly bool _storeKeys;
 

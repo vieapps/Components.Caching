@@ -8,9 +8,10 @@ using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-using StackExchange.Redis;
+using Enyim.Caching;
 using Enyim.Caching.Configuration;
 using Enyim.Caching.Memcached;
+using StackExchange.Redis;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Caching.Distributed;
@@ -499,7 +500,7 @@ namespace net.vieapps.Components.Caching
 
 	public class Monitor
 	{
-		readonly Action<string, (string Level, long Total, int Interactive, int Subscription, int Other, long PingMiliseconds)> _onMonitor;
+		readonly Action<string, (string Level, long Total, long Interactive, long PingMiliseconds)> _onMonitor;
 		readonly Action<string, EndPoint, Exception> _onConnectionFailed;
 		readonly Action<string, EndPoint> _onConnectionRestored;
 		readonly Action<string, EndPoint, Exception> _onError;
@@ -516,11 +517,14 @@ namespace net.vieapps.Components.Caching
 		IDatabase _redisDatabase;
 		Func<Task> _redisMonitorAsync;
 
+		IMemcachedClient _memcachedClient;
+		Func <Task> _memcachedMonitorAsync;
+
 		CancellationTokenSource _cts;
 		Task _worker;
 
 		public Monitor(
-			Action<string, (string Level, long Total, int Interactive, int Subscription, int Other, long PingMiliseconds)> onMonitor,
+			Action<string, (string Level, long Total, long Interactive, long PingMiliseconds)> onMonitor,
 			Action<string, EndPoint, Exception> onConnectionFailed,
 			Action<string, EndPoint> onConnectionRestored,
 			Action<string, EndPoint, Exception> onError,
@@ -538,15 +542,15 @@ namespace net.vieapps.Components.Caching
 			this._criticalQueueSize = criticalQueueSize > 0 ? criticalQueueSize : 5000;
 		}
 
-		public Monitor Start(ConnectionMultiplexer redisConnection, IDatabase redisDatabase, CancellationToken cancellationToken)
+		internal Monitor Start(ConnectionMultiplexer redisConnection, IDatabase redisDatabase, CancellationToken cancellationToken)
 		{
 			if (this._redisConnection != null || this._redisDatabase != null)
 				return this;
 
-			this._onRedisConnectionFailed = null;
-			this._onRedisConnectionRestored = null;
-			this._onRedisError = null;
-			this._onRedisInternalError = null;
+			this._onRedisConnectionFailed = (_, args) => this._onConnectionFailed($"Connection failed [{args.EndPoint}] => {args.Exception?.Message}", args.EndPoint, args.Exception);
+			this._onRedisConnectionRestored = (_, args) => this._onConnectionRestored($"Connection restored [{args.EndPoint}]", args.EndPoint);
+			this._onRedisInternalError = (_, args) => this._onError($"Internal Error [{args.EndPoint}] => {args.Exception?.Message}", args.EndPoint, args.Exception);
+			this._onRedisError = (_, args) => this._onError($"Error [{args.EndPoint}] => {args.Message}", args.EndPoint, null);
 
 			this._redisConnection = redisConnection;
 			this._redisConnection.ConnectionFailed += this._onRedisConnectionFailed;
@@ -578,7 +582,7 @@ namespace net.vieapps.Components.Caching
 							: total >= this._warnQueueSize
 								? "⚠️WARN"
 								: "OK";
-						this._onMonitor($"[{level}] total={total} (interactive={interactive}, subscription={subscription}, other={other}) | ping={stopwatch.ElapsedMilliseconds}ms", (level, total, interactive, subscription, other, stopwatch.ElapsedMilliseconds));
+						this._onMonitor($"[{level}] total={total} (interactive={interactive}, subscription={subscription}, other={other}) | ping={stopwatch.ElapsedMilliseconds}ms", (level, total, interactive, stopwatch.ElapsedMilliseconds));
 					}
 					catch (OperationCanceledException) { }
 					catch (Exception ex)
@@ -599,7 +603,63 @@ namespace net.vieapps.Components.Caching
 			return this;
 		}
 
-		public Monitor Stop()
+		internal Monitor Start(IMemcachedClient memcachedClient, CancellationToken cancellationToken)
+		{
+			if (this._memcachedClient != null)
+				return this;
+
+			this._memcachedClient = memcachedClient;
+			this._cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+
+			this._memcachedMonitorAsync = async () =>
+			{
+				var stopwatch = Stopwatch.StartNew();
+				while (!this._cts.IsCancellationRequested)
+				{
+					try
+					{
+						stopwatch.Restart();
+						await this._memcachedClient.GetAsync("monitor_ping_key").ConfigureAwait(false);
+						stopwatch.Stop();
+
+						var stats = await this._memcachedClient.StatsAsync(this._cts.Token).ConfigureAwait(false);
+						var allServers = new IPEndPoint(IPAddress.Any, 0);
+
+						var interactive = stats.GetValue(allServers, StatItem.ConnectionCount);
+						var cmdGet = stats.GetValue(allServers, StatItem.GetCount);
+						var getHits = stats.GetValue(allServers, StatItem.GetHits);
+						var getMisses = stats.GetValue(allServers, StatItem.GetMisses);
+						var total = stats.GetValue(allServers, StatItem.TotalConnections);
+						var hitRate = (getHits + getMisses) > 0 ? (double)getHits / (getHits + getMisses) : 0;
+
+						var latency = stopwatch.ElapsedMilliseconds;
+						var level = latency >= this._criticalQueueSize
+							? "🔥CRITICAL"
+							: latency >= this._warnQueueSize
+								? "⚠️WARN"
+								: "OK";
+						this._onMonitor($"[{level}] latency={latency}ms | conn={interactive} | hit={(hitRate * 100):0.0}% | yield={total} | get={cmdGet}", (level, total, interactive, latency));
+					}
+					catch (OperationCanceledException) { }
+					catch (Exception ex)
+					{
+						this._onError($"Monitor error => {ex.Message}", null, ex);
+					}
+
+					if (!this._cts.IsCancellationRequested)
+						try
+						{
+							await Task.Delay(this._interval + Helper.Random.Next(123, 456), this._cts.Token).ConfigureAwait(false);
+						}
+						catch { }
+				}
+			};
+
+			this._worker = Task.Run(this._memcachedMonitorAsync);
+			return this;
+		}
+
+		internal Monitor Stop()
 		{
 			this._cts.Cancel();
 			if  (this._redisConnection != null)
@@ -616,6 +676,9 @@ namespace net.vieapps.Components.Caching
 			this._onRedisConnectionRestored = null;
 			this._onRedisError = null;
 			this._onRedisInternalError = null;
+			this._redisConnection = null;
+			this._redisDatabase = null;
+			this._memcachedClient = null;
 			return this;
 		}
 	}

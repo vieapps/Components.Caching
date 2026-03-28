@@ -49,6 +49,8 @@ namespace net.vieapps.Components.Caching
 		public void Dispose()
 			=> this._lock.Dispose();
 
+		internal static IMemcachedClient MemcachedClient => Memcached._Client;
+
 		#region Get client (singleton)
 		static MemcachedClient _Client { get; set; }
 
