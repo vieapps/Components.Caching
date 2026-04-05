@@ -323,7 +323,7 @@ namespace net.vieapps.Components.Caching
 	/// </summary>
 	public class MemoryCache : IDisposable
 	{
-		internal readonly List<Microsoft.Extensions.Caching.Memory.MemoryCache> _shards = new List<Microsoft.Extensions.Caching.Memory.MemoryCache>(16);
+		internal readonly List<Microsoft.Extensions.Caching.Memory.MemoryCache> _shards = new List<Microsoft.Extensions.Caching.Memory.MemoryCache>(Environment.ProcessorCount * 2);
 		internal readonly Action<string> _onUpdateCallback;
 		internal readonly Action<string> _onRemoveCallback;
 		internal readonly Func<string, string> _getKey;
@@ -349,9 +349,10 @@ namespace net.vieapps.Components.Caching
 			this._onRemoveCallback = onRemoveCallback;
 			this._getKey = getKey;
 			this._maxSize = maxSize > 0 ? maxSize : (byte)0;
-			long maxCacheSize = this._maxSize > 0 ? this._maxSize * 1024 * 1024 * 1024 : 0;
-			for (var index = 0; index < 16; index++)
-				this._shards.Add(new Microsoft.Extensions.Caching.Memory.MemoryCache(new MemoryCacheOptions { SizeLimit = maxCacheSize > 0 ? maxCacheSize / 16 : (long?)null, ExpirationScanFrequency = TimeSpan.FromMinutes(5) }, loggerFactory));
+			long maxCacheSize = this._maxSize > 0 ? (long)this._maxSize * 1024 * 1024 * 1024 : 0;
+			var numberOfShards = Environment.ProcessorCount * 2;
+			for (var index = 0; index < numberOfShards; index++)
+				this._shards.Add(new Microsoft.Extensions.Caching.Memory.MemoryCache(new MemoryCacheOptions { SizeLimit = maxCacheSize > 0 ? maxCacheSize / numberOfShards : (long?)null, ExpirationScanFrequency = TimeSpan.FromMinutes(5) }, loggerFactory));
 		}
 
 		Microsoft.Extensions.Caching.Memory.MemoryCache GetShard(string key)
