@@ -2,6 +2,7 @@
 
 	<PropertyGroup>
 		<TargetFrameworks>netstandard2.0</TargetFrameworks>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<WarningLevel>3</WarningLevel>
 		<NoWarn>1701,1702,1705,1066,0067,1573,1591,IDE0059,IDE0074,IDE0090,IDE1006,IDE0130,CA1510,CA2254</NoWarn>
 		<DocumentationFile>bin/$(Configuration)/$(TargetFramework)/VIEApps.Components.Caching.xml</DocumentationFile>

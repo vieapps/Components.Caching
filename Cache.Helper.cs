@@ -323,11 +323,11 @@ namespace net.vieapps.Components.Caching
 	/// </summary>
 	public class MemoryCache : IDisposable
 	{
-		internal readonly List<Microsoft.Extensions.Caching.Memory.MemoryCache> _shards = new List<Microsoft.Extensions.Caching.Memory.MemoryCache>(Environment.ProcessorCount * 2);
-		internal readonly Action<string> _onUpdateCallback;
-		internal readonly Action<string> _onRemoveCallback;
-		internal readonly Func<string, string> _getKey;
-		internal readonly byte _maxSize;
+		readonly Microsoft.Extensions.Caching.Memory.MemoryCache[] _shards;
+		readonly Action<string> _onUpdateCallback;
+		readonly Action<string> _onRemoveCallback;
+		readonly Func<string, string> _getKey;
+		readonly byte _maxSize;
 
 		/// <summary>
 		/// Gets the collection of keys
@@ -350,13 +350,55 @@ namespace net.vieapps.Components.Caching
 			this._getKey = getKey;
 			this._maxSize = maxSize > 0 ? maxSize : (byte)0;
 			long maxCacheSize = this._maxSize > 0 ? (long)this._maxSize * 1024 * 1024 * 1024 : 0;
-			var numberOfShards = Environment.ProcessorCount * 2;
+			int numberOfShards = 1;
+			while (numberOfShards < Environment.ProcessorCount * 2)
+				numberOfShards <<= 1;
+			this._shards = new Microsoft.Extensions.Caching.Memory.MemoryCache[numberOfShards];
 			for (var index = 0; index < numberOfShards; index++)
-				this._shards.Add(new Microsoft.Extensions.Caching.Memory.MemoryCache(new MemoryCacheOptions { SizeLimit = maxCacheSize > 0 ? maxCacheSize / numberOfShards : (long?)null, ExpirationScanFrequency = TimeSpan.FromMinutes(5) }, loggerFactory));
+				this._shards[index] = new Microsoft.Extensions.Caching.Memory.MemoryCache(new MemoryCacheOptions { SizeLimit = maxCacheSize > 0 ? (maxCacheSize / numberOfShards) + (maxCacheSize / numberOfShards) / 5 : (long?)null, ExpirationScanFrequency = TimeSpan.FromMinutes(5) }, loggerFactory);
 		}
 
-		Microsoft.Extensions.Caching.Memory.MemoryCache GetShard(string key)
-			=> this._shards[(key.GetHashCode() & 0x7fffffff) % this._shards.Count];
+		unsafe Microsoft.Extensions.Caching.Memory.MemoryCache GetShard(string key)
+		{
+			const uint M = 0x5bd1e995;
+			const int R = 24;
+			int length = key.Length * 2;
+			uint seed = (uint)(0xdeadbeef * length);
+			uint hash = seed ^ (uint)length;
+			fixed (char* c = key)
+			{
+				byte* data = (byte*)c;
+				int count = length >> 2;
+				uint* ptr = (uint*)data;
+				while (count-- > 0)
+				{
+					uint k = *ptr++;
+					k *= M;
+					k ^= k >> R;
+					k *= M;
+					hash *= M;
+					hash ^= k;
+				}
+				byte* tail = (byte*)ptr;
+				switch (length & 3)
+				{
+					case 3:
+						hash ^= (uint)(tail[2] << 16);
+						goto case 2;
+					case 2:
+						hash ^= (uint)(tail[1] << 8);
+						goto case 1;
+					case 1:
+						hash ^= tail[0];
+						hash *= M;
+						break;
+				}
+			}
+			hash ^= hash >> 13;
+			hash *= M;
+			hash ^= hash >> 15;
+			return this._shards[(int)(hash & 0x7fffffff) & (this._shards.Length - 1)];
+		}
 
 		bool Set<T>(string key, T value, TimeSpan validFor)
 		{
@@ -493,10 +535,16 @@ namespace net.vieapps.Components.Caching
 		/// Clears the cache bag
 		/// </summary>
 		public void Clear()
-			=> this._shards.ForEach(shard => shard.Clear());
+		{
+			foreach (var shard in this._shards)
+				shard.Clear();
+		}
 
 		public void Dispose()
-			=> this._shards.ForEach(shard => shard.Dispose());
+		{
+			foreach (var shard in this._shards)
+				shard.Dispose();
+		}
 	}
 
 	public class Monitor
