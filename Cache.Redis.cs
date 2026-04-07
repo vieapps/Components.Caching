@@ -726,8 +726,8 @@ namespace net.vieapps.Components.Caching
 		{
 			try
 			{
-				var info = firstBlock.GetFragmentsInfo();
-				return CacheUtils.Helper.Concat(new[] { firstBlock }.Concat(info.Blocks > 1 ? this._GetAsFragments(key, Enumerable.Range(1, info.Blocks - 1).ToList()) : new List<byte[]>())).DeserializeFromFragments();
+				var (blocks, _) = firstBlock.GetFragmentsInfo();
+				return CacheUtils.Helper.Concat(new[] { firstBlock }.Concat(blocks > 1 ? this._GetAsFragments(key, Enumerable.Range(1, blocks - 1).ToList()) : new List<byte[]>())).DeserializeFromFragments();
 			}
 			catch (Exception ex)
 			{
@@ -740,8 +740,8 @@ namespace net.vieapps.Components.Caching
 		{
 			try
 			{
-				var info = firstBlock.GetFragmentsInfo();
-				return CacheUtils.Helper.Concat(new[] { firstBlock }.Concat(info.Blocks > 1 ? await this._GetAsFragmentsAsync(key, Enumerable.Range(1, info.Blocks - 1).ToList(), cancellationToken).ConfigureAwait(false) : new List<byte[]>())).DeserializeFromFragments();
+				var (blocks, _) = firstBlock.GetFragmentsInfo();
+				return CacheUtils.Helper.Concat(new[] { firstBlock }.Concat(blocks > 1 ? await this._GetAsFragmentsAsync(key, Enumerable.Range(1, blocks - 1).ToList(), cancellationToken).ConfigureAwait(false) : new List<byte[]>())).DeserializeFromFragments();
 			}
 			catch (OperationCanceledException)
 			{

@@ -27,7 +27,7 @@ namespace net.vieapps.Components.Caching
 
 		#region Data
 		public const int FlagOfFirstFragmentBlock = 0xfe52;
-		public static readonly int FragmentSize = (1024 * 1024) - 256;
+		public static readonly int FragmentSize = (10 * 1024 * 1024) - 256;
 		internal static readonly string RegionsKey = "VIEApps-NGX-Regions";
 
 		public static Random Random { get; } = new Random();
@@ -89,10 +89,10 @@ namespace net.vieapps.Components.Caching
 		/// <returns></returns>
 		public static byte[] Serialize(object value, bool addFlags = true)
 		{
-			var data = CacheUtils.Helper.Serialize(value);
+			var (typeFlag, data) = CacheUtils.Helper.Serialize(value);
 			return addFlags
-				? CacheUtils.Helper.Concat(new[] { BitConverter.GetBytes(data.TypeFlag), data.Data })
-				: data.Data;
+				? CacheUtils.Helper.Concat(new[] { BitConverter.GetBytes(typeFlag), data })
+				: data;
 		}
 
 		/// <summary>
@@ -135,15 +135,15 @@ namespace net.vieapps.Components.Caching
 		public static T Deserialize<T>(byte[] data)
 		{
 			var value = data != null ? Helper.Deserialize(data) : null;
-			return value != null && value is T val ? val : default;
+			return value != null && value is T tvalue ? tvalue : default;
 		}
 
 		internal static object DeserializeFromFragments(this byte[] data)
 		{
 			var tmp = new byte[4];
 			Buffer.BlockCopy(data, 8, tmp, 0, 4);
-			var typeFlag = BitConverter.ToInt32(tmp, 0);
-			return Helper.Deserialize(data, typeFlag, 12, data.Length - 12);
+			var flagType = BitConverter.ToInt32(tmp, 0);
+			return Helper.Deserialize(data, flagType, 12, data.Length - 12);
 		}
 
 		/// <summary>
@@ -161,13 +161,13 @@ namespace net.vieapps.Components.Caching
 		/// <returns></returns>
 		public static (int Blocks, int Length) GetFragmentsInfo(this byte[] data)
 		{
-			var info = data.GetFlags(true);
-			if (info.TypeFlag == 0 && info.Length == 0)
+			var (flagType, flagLength) = data.GetFlags(true);
+			if (flagType == 0 && flagLength == 0)
 				return (0, 0);
 
 			var blocks = 0;
 			var offset = 0;
-			var length = info.Length;
+			var length = flagLength;
 			while (offset < length)
 			{
 				blocks++;
