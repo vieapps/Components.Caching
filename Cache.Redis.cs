@@ -877,11 +877,14 @@ namespace net.vieapps.Components.Caching
 		// -----------------------------------------------------
 
 		#region [Helper]
-		string _GetKey(string key) => Helper.GetCacheKey(this.Name, key);
+		string _GetKey(string key)
+			=> string.IsNullOrWhiteSpace(key) ? null : Helper.GetCacheKey(this.Name, key);
 
-		string _GetFragmentKey(string key, int index) => Helper.GetFragmentKey(key, index);
+		string _GetFragmentKey(string key, int index)
+			=> string.IsNullOrWhiteSpace(key) ? null : Helper.GetFragmentKey(key, index);
 
-		List<string> _GetFragmentKeys(string key, int max) => Helper.GetFragmentKeys(key, max);
+		List<string> _GetFragmentKeys(string key, int max)
+			=> string.IsNullOrWhiteSpace(key) ? null : Helper.GetFragmentKeys(key, max);
 
 		string _RegionKey => this._GetKey("<Keys-Of-Region>");
 		#endregion
