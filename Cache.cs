@@ -94,13 +94,17 @@ namespace net.vieapps.Components.Caching
 		/// <param name="interval"></param>
 		/// <param name="warnQueueSize"></param>
 		/// <param name="criticalQueueSize"></param>
+		/// <param name="warnPing"></param>
+		/// <param name="criticalPing"></param>
 		/// <param name="cancellationToken"></param>
 		public void StartMonitor(
 			Action<string, (string Level, long Total, long Interactive, long PingMiliseconds)> onMonitor,
 			Action<string, EndPoint, Exception> onConnectionFailed = null,
 			Action<string, EndPoint> onConnectionRestored = null,
 			Action<string, EndPoint, Exception> onError = null,
-			int interval = 1000,
+			int interval = 15000,
+			int warnPing = 5,
+			int criticalPing = 10,
 			int warnQueueSize = 1000,
 			int criticalQueueSize = 5000,
 			CancellationToken cancellationToken = default
@@ -108,7 +112,7 @@ namespace net.vieapps.Components.Caching
 		{
 			if (this._distributedCacheMonitor == null)
 			{
-				this._distributedCacheMonitor = new Monitor(onMonitor, onConnectionFailed, onConnectionRestored, onError, interval, warnQueueSize, criticalQueueSize);
+				this._distributedCacheMonitor = new Monitor(onMonitor, onConnectionFailed, onConnectionRestored, onError, interval, warnPing, criticalPing, warnQueueSize, criticalQueueSize);
 				if (this._distributedCache?.GetType() == typeof(Memcached))
 					this._distributedCacheMonitor.Start(Memcached.MemcachedClient, cancellationToken);
 				else
@@ -122,7 +126,7 @@ namespace net.vieapps.Components.Caching
 		/// <param name="onMonitor"></param>
 		/// <param name="cancellationToken"></param>
 		public void StartMonitor(Action<string, (string Level, long Total, long Interactive, long PingMiliseconds)> onMonitor, CancellationToken cancellationToken)
-			=> this.StartMonitor(onMonitor, null, null, null, 1000, 1000, 5000, cancellationToken);
+			=> this.StartMonitor(onMonitor, null, null, null, 15000, 5, 10, 1000, 5000, cancellationToken);
 
 		/// <summary>
 		/// Stops the monitor of distributed cache
@@ -373,6 +377,13 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		public HashSet<string> GetL1CacheKeys()
 			=> new HashSet<string>(this._L1Cache?.Keys ?? Array.Empty<string>());
+
+		/// <summary>
+		/// Gets the count of the L1-Cache items
+		/// </summary>
+		/// <returns></returns>
+		public int GetL1CacheCount()
+			=> this.UseL1Cache && this._L1Cache != null ? this._L1Cache.Count : 0;
 		#endregion
 
 		#region Keys

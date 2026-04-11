@@ -336,6 +336,11 @@ namespace net.vieapps.Components.Caching
 			=> this._shards.Select(shard => shard.Keys).SelectMany(key => key).Select(key => key as string);
 
 		/// <summary>
+		/// Gets the count of the items
+		/// </summary>
+		public int Count => this._shards.Select(shard => shard.Count).Sum();
+
+		/// <summary>
 		/// Creates new an instance
 		/// </summary>
 		/// <param name="onUpdateCallback">The action to callback when an item was updated</param>
@@ -350,8 +355,9 @@ namespace net.vieapps.Components.Caching
 			this._getKey = getKey;
 			this._maxSize = maxSize > 0 ? maxSize : (byte)0;
 			long maxCacheSize = this._maxSize > 0 ? (long)this._maxSize * 1024 * 1024 * 1024 : 0;
+			var maxShards = Environment.ProcessorCount * 2;
 			int numberOfShards = 1;
-			while (numberOfShards < Environment.ProcessorCount * 2)
+			while (numberOfShards < maxShards)
 				numberOfShards <<= 1;
 			this._shards = new Microsoft.Extensions.Caching.Memory.MemoryCache[numberOfShards];
 			for (var index = 0; index < numberOfShards; index++)
@@ -554,6 +560,8 @@ namespace net.vieapps.Components.Caching
 		readonly Action<string, EndPoint> _onConnectionRestored;
 		readonly Action<string, EndPoint, Exception> _onError;
 		readonly int _interval;
+		readonly int _warnPing = 5;
+		readonly int _criticalPing = 10;
 		readonly int _warnQueueSize;
 		readonly int _criticalQueueSize;
 
@@ -577,7 +585,9 @@ namespace net.vieapps.Components.Caching
 			Action<string, EndPoint, Exception> onConnectionFailed,
 			Action<string, EndPoint> onConnectionRestored,
 			Action<string, EndPoint, Exception> onError,
-			int interval = 1000,
+			int interval = 15000,
+			int warnPing = 5,
+			int criticalPing = 10,
 			int warnQueueSize = 1000,
 			int criticalQueueSize = 5000
 		)
@@ -587,6 +597,8 @@ namespace net.vieapps.Components.Caching
 			this._onConnectionRestored = onConnectionRestored ?? ((_, __) => { });
 			this._onError = onError ?? ((_, __, ___) => { });
 			this._interval = interval > 0 ? interval : 1000;
+			this._warnPing = warnPing > 0 ? warnPing : 5;
+			this._criticalPing = criticalPing > 0 ? criticalPing : 10;
 			this._warnQueueSize = warnQueueSize > 0 ? warnQueueSize : 1000;
 			this._criticalQueueSize = criticalQueueSize > 0 ? criticalQueueSize : 5000;
 		}
@@ -626,12 +638,17 @@ namespace net.vieapps.Components.Caching
 						var subscription = serverCounters.Subscription.TotalOutstanding;
 						var other = serverCounters.Other.TotalOutstanding;
 
-						var level = total >= this._criticalQueueSize
+						var level = stopwatch.ElapsedMilliseconds >= this._criticalPing
 							? "🔥CRITICAL"
-							: total >= this._warnQueueSize
+							: stopwatch.ElapsedMilliseconds >= this._warnPing
 								? "⚠️WARN"
-								: "OK";
-						this._onMonitor($"[{level}] total={total} (interactive={interactive}, subscription={subscription}, other={other}) | ping={stopwatch.ElapsedMilliseconds}ms", (level, total, interactive, stopwatch.ElapsedMilliseconds));
+								: total >= this._criticalQueueSize
+									? "🔥CRITICAL"
+									: total >= this._warnQueueSize
+										? "⚠️WARN"
+										: "OK";
+
+						this._onMonitor($"{level} | Ping: {stopwatch.ElapsedMilliseconds:###,##0}ms | Queue: {total:###,##0} | Interactive: {interactive:###,##0} | Subscription: {subscription:###,##0} | Other: {other:###,##0}", (level, total, interactive, stopwatch.ElapsedMilliseconds));
 					}
 					catch (OperationCanceledException) { }
 					catch (Exception ex)
@@ -687,7 +704,7 @@ namespace net.vieapps.Components.Caching
 							: latency >= this._warnQueueSize
 								? "⚠️WARN"
 								: "OK";
-						this._onMonitor($"[{level}] latency={latency}ms | conn={interactive} | hit={(hitRate * 100):0.0}% | yield={total} | get={cmdGet}", (level, total, interactive, latency));
+						this._onMonitor($"{level} Latency: {latency}ms | Hits: {(hitRate * 100):0.0}% | Connections: {interactive:###,###,##0} | Yield: {total:###,###,##0} | Get: {cmdGet:###,###,##0}", (level, total, interactive, latency));
 					}
 					catch (OperationCanceledException) { }
 					catch (Exception ex)
