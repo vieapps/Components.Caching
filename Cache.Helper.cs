@@ -560,8 +560,8 @@ namespace net.vieapps.Components.Caching
 		readonly Action<string, EndPoint> _onConnectionRestored;
 		readonly Action<string, EndPoint, Exception> _onError;
 		readonly int _interval;
-		readonly int _warnPing = 5;
-		readonly int _criticalPing = 10;
+		readonly int _warnPing;
+		readonly int _criticalPing;
 		readonly int _warnQueueSize;
 		readonly int _criticalQueueSize;
 
@@ -585,22 +585,22 @@ namespace net.vieapps.Components.Caching
 			Action<string, EndPoint, Exception> onConnectionFailed,
 			Action<string, EndPoint> onConnectionRestored,
 			Action<string, EndPoint, Exception> onError,
-			int interval = 15000,
-			int warnPing = 5,
-			int criticalPing = 10,
-			int warnQueueSize = 1000,
-			int criticalQueueSize = 5000
+			int interval = 5000,
+			int warnPing = 15,
+			int criticalPing = 100,
+			int warnQueueSize = 50,
+			int criticalQueueSize = 100
 		)
 		{
 			this._onMonitor = onMonitor ?? ((_, __) => { });
 			this._onConnectionFailed = onConnectionFailed ?? ((_, __, ___) => { });
 			this._onConnectionRestored = onConnectionRestored ?? ((_, __) => { });
 			this._onError = onError ?? ((_, __, ___) => { });
-			this._interval = interval > 0 ? interval : 1000;
-			this._warnPing = warnPing > 0 ? warnPing : 5;
-			this._criticalPing = criticalPing > 0 ? criticalPing : 10;
-			this._warnQueueSize = warnQueueSize > 0 ? warnQueueSize : 1000;
-			this._criticalQueueSize = criticalQueueSize > 0 ? criticalQueueSize : 5000;
+			this._interval = interval > 0 ? interval : 5000;
+			this._warnPing = warnPing > 0 ? warnPing : 15;
+			this._criticalPing = criticalPing > 0 ? criticalPing : 100;
+			this._warnQueueSize = warnQueueSize > 0 ? warnQueueSize : 50;
+			this._criticalQueueSize = criticalQueueSize > 0 ? criticalQueueSize : 100;
 		}
 
 		internal Monitor Start(ConnectionMultiplexer redisConnection, IDatabase redisDatabase, CancellationToken cancellationToken)
@@ -631,24 +631,22 @@ namespace net.vieapps.Components.Caching
 						stopwatch.Restart();
 						await this._redisDatabase.PingAsync().ConfigureAwait(false);
 						stopwatch.Stop();
-
+						var ping = stopwatch.ElapsedMilliseconds;
 						var serverCounters = this._redisConnection.GetCounters();
 						var total = serverCounters.TotalOutstanding;
 						var interactive = serverCounters.Interactive.TotalOutstanding;
 						var subscription = serverCounters.Subscription.TotalOutstanding;
 						var other = serverCounters.Other.TotalOutstanding;
-
-						var status = stopwatch.ElapsedMilliseconds >= this._criticalPing
+						var status = total >= this._criticalQueueSize
 							? "🔥CRITICAL"
-							: stopwatch.ElapsedMilliseconds >= this._warnPing
+							: total >= this._warnQueueSize
 								? "⚠️WARN"
-								: total >= this._criticalQueueSize
-									? "🔥CRITICAL"
-									: total >= this._warnQueueSize
+								: ping >= this._criticalPing
+									? (total > 0 ? "⚠️WARN" : "OK")
+									: ping >= this._warnPing
 										? "⚠️WARN"
 										: "OK";
-
-						this._onMonitor($"{status} | Ping: {stopwatch.ElapsedMilliseconds:###,##0}ms | Queue: {total:###,##0} | Interactive: {interactive:###,##0} | Subscription: {subscription:###,##0} | Other: {other:###,##0}", (status, total, interactive, stopwatch.ElapsedMilliseconds));
+						this._onMonitor($"{status} | Ping: {ping:###,##0}ms | Queue: {total:###,##0} | Interactive: {interactive:###,##0} | Subscription: {subscription:###,##0} | Other: {other:###,##0}", (status, total, interactive, ping));
 					}
 					catch (OperationCanceledException) { }
 					catch (Exception ex)
