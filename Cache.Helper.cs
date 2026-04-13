@@ -555,7 +555,7 @@ namespace net.vieapps.Components.Caching
 
 	public class Monitor
 	{
-		readonly Action<string, (string Level, long Total, long Interactive, long PingMiliseconds)> _onMonitor;
+		readonly Action<string, (string Status, long Total, long Interactive, long PingMilliseconds)> _onMonitor;
 		readonly Action<string, EndPoint, Exception> _onConnectionFailed;
 		readonly Action<string, EndPoint> _onConnectionRestored;
 		readonly Action<string, EndPoint, Exception> _onError;
@@ -581,7 +581,7 @@ namespace net.vieapps.Components.Caching
 		Task _worker;
 
 		public Monitor(
-			Action<string, (string Level, long Total, long Interactive, long PingMiliseconds)> onMonitor,
+			Action<string, (string Status, long Total, long Interactive, long PingMilliseconds)> onMonitor,
 			Action<string, EndPoint, Exception> onConnectionFailed,
 			Action<string, EndPoint> onConnectionRestored,
 			Action<string, EndPoint, Exception> onError,
@@ -638,7 +638,7 @@ namespace net.vieapps.Components.Caching
 						var subscription = serverCounters.Subscription.TotalOutstanding;
 						var other = serverCounters.Other.TotalOutstanding;
 
-						var level = stopwatch.ElapsedMilliseconds >= this._criticalPing
+						var status = stopwatch.ElapsedMilliseconds >= this._criticalPing
 							? "🔥CRITICAL"
 							: stopwatch.ElapsedMilliseconds >= this._warnPing
 								? "⚠️WARN"
@@ -648,7 +648,7 @@ namespace net.vieapps.Components.Caching
 										? "⚠️WARN"
 										: "OK";
 
-						this._onMonitor($"{level} | Ping: {stopwatch.ElapsedMilliseconds:###,##0}ms | Queue: {total:###,##0} | Interactive: {interactive:###,##0} | Subscription: {subscription:###,##0} | Other: {other:###,##0}", (level, total, interactive, stopwatch.ElapsedMilliseconds));
+						this._onMonitor($"{status} | Ping: {stopwatch.ElapsedMilliseconds:###,##0}ms | Queue: {total:###,##0} | Interactive: {interactive:###,##0} | Subscription: {subscription:###,##0} | Other: {other:###,##0}", (status, total, interactive, stopwatch.ElapsedMilliseconds));
 					}
 					catch (OperationCanceledException) { }
 					catch (Exception ex)
@@ -699,12 +699,12 @@ namespace net.vieapps.Components.Caching
 						var hitRate = (getHits + getMisses) > 0 ? (double)getHits / (getHits + getMisses) : 0;
 
 						var latency = stopwatch.ElapsedMilliseconds;
-						var level = latency >= this._criticalQueueSize
+						var status = latency >= this._criticalQueueSize
 							? "🔥CRITICAL"
 							: latency >= this._warnQueueSize
 								? "⚠️WARN"
 								: "OK";
-						this._onMonitor($"{level} Latency: {latency}ms | Hits: {(hitRate * 100):0.0}% | Connections: {interactive:###,###,##0} | Yield: {total:###,###,##0} | Get: {cmdGet:###,###,##0}", (level, total, interactive, latency));
+						this._onMonitor($"{status} | Latency: {latency}ms | Hits: {(hitRate * 100):0.0}% | Connections: {interactive:###,###,##0} | Yield: {total:###,###,##0} | Get: {cmdGet:###,###,##0}", (status, total, interactive, latency));
 					}
 					catch (OperationCanceledException) { }
 					catch (Exception ex)
