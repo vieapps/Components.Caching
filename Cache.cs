@@ -98,15 +98,15 @@ namespace net.vieapps.Components.Caching
 		/// <param name="criticalPing"></param>
 		/// <param name="cancellationToken"></param>
 		public void StartMonitor(
-			Action<string, (string Level, long Total, long Interactive, long PingMiliseconds)> onMonitor,
+			Action<string, (string Status, long Total, long Interactive, long PingMilliseconds)> onMonitor,
 			Action<string, EndPoint, Exception> onConnectionFailed = null,
 			Action<string, EndPoint> onConnectionRestored = null,
 			Action<string, EndPoint, Exception> onError = null,
-			int interval = 15000,
-			int warnPing = 5,
-			int criticalPing = 10,
-			int warnQueueSize = 1000,
-			int criticalQueueSize = 5000,
+			int interval = 0,
+			int warnPing = 0,
+			int criticalPing = 0,
+			int warnQueueSize = 0,
+			int criticalQueueSize = 0,
 			CancellationToken cancellationToken = default
 		)
 		{
@@ -125,8 +125,8 @@ namespace net.vieapps.Components.Caching
 		/// </summary>
 		/// <param name="onMonitor"></param>
 		/// <param name="cancellationToken"></param>
-		public void StartMonitor(Action<string, (string Level, long Total, long Interactive, long PingMiliseconds)> onMonitor, CancellationToken cancellationToken)
-			=> this.StartMonitor(onMonitor, null, null, null, 15000, 5, 10, 1000, 5000, cancellationToken);
+		public void StartMonitor(Action<string, (string Status, long Total, long Interactive, long PingMilliseconds)> onMonitor, CancellationToken cancellationToken)
+			=> this.StartMonitor(onMonitor, null, null, null, 0, 0, 0, 0, 0, cancellationToken);
 
 		/// <summary>
 		/// Stops the monitor of distributed cache

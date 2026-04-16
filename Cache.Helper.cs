@@ -355,9 +355,8 @@ namespace net.vieapps.Components.Caching
 			this._getKey = getKey;
 			this._maxSize = maxSize > 0 ? maxSize : (byte)0;
 			long maxCacheSize = this._maxSize > 0 ? (long)this._maxSize * 1024 * 1024 * 1024 : 0;
-			var maxShards = Environment.ProcessorCount * 2;
 			int numberOfShards = 1;
-			while (numberOfShards < maxShards)
+			while (numberOfShards < Environment.ProcessorCount * 2)
 				numberOfShards <<= 1;
 			this._shards = new Microsoft.Extensions.Caching.Memory.MemoryCache[numberOfShards];
 			for (var index = 0; index < numberOfShards; index++)
@@ -564,6 +563,8 @@ namespace net.vieapps.Components.Caching
 		readonly int _criticalPing;
 		readonly int _warnQueueSize;
 		readonly int _criticalQueueSize;
+		readonly int _warnInteractive;
+		readonly int _criticalInteractive;
 
 		ConnectionMultiplexer _redisConnection;
 		EventHandler<ConnectionFailedEventArgs> _onRedisConnectionFailed;
@@ -582,14 +583,14 @@ namespace net.vieapps.Components.Caching
 
 		public Monitor(
 			Action<string, (string Status, long Total, long Interactive, long PingMilliseconds)> onMonitor,
-			Action<string, EndPoint, Exception> onConnectionFailed,
-			Action<string, EndPoint> onConnectionRestored,
-			Action<string, EndPoint, Exception> onError,
-			int interval = 5000,
-			int warnPing = 15,
-			int criticalPing = 100,
-			int warnQueueSize = 50,
-			int criticalQueueSize = 100
+			Action<string, EndPoint, Exception> onConnectionFailed = null,
+			Action<string, EndPoint> onConnectionRestored = null,
+			Action<string, EndPoint, Exception> onError = null,
+			int interval = 0,
+			int warnPing = 0,
+			int criticalPing = 0,
+			int warnQueueSize = 0,
+			int criticalQueueSize = 0
 		)
 		{
 			this._onMonitor = onMonitor ?? ((_, __) => { });
@@ -597,10 +598,12 @@ namespace net.vieapps.Components.Caching
 			this._onConnectionRestored = onConnectionRestored ?? ((_, __) => { });
 			this._onError = onError ?? ((_, __, ___) => { });
 			this._interval = interval > 0 ? interval : 5000;
-			this._warnPing = warnPing > 0 ? warnPing : 15;
-			this._criticalPing = criticalPing > 0 ? criticalPing : 100;
-			this._warnQueueSize = warnQueueSize > 0 ? warnQueueSize : 50;
-			this._criticalQueueSize = criticalQueueSize > 0 ? criticalQueueSize : 100;
+			this._warnPing = warnPing > 0 ? warnPing : 50;
+			this._criticalPing = criticalPing > 0 ? criticalPing : 200;
+			this._warnQueueSize = warnQueueSize > 0 ? warnQueueSize : 200;
+			this._criticalQueueSize = criticalQueueSize > 0 ? criticalQueueSize : 1000;
+			this._warnInteractive = this._warnQueueSize / 10;
+			this._criticalInteractive = this._criticalQueueSize / 10;
 		}
 
 		internal Monitor Start(ConnectionMultiplexer redisConnection, IDatabase redisDatabase, CancellationToken cancellationToken)
@@ -637,13 +640,13 @@ namespace net.vieapps.Components.Caching
 						var interactive = serverCounters.Interactive.TotalOutstanding;
 						var subscription = serverCounters.Subscription.TotalOutstanding;
 						var other = serverCounters.Other.TotalOutstanding;
-						var status = total >= this._criticalQueueSize
+						var status = total >= this._criticalQueueSize || interactive >= this._criticalInteractive
 							? "🔥CRITICAL"
-							: total >= this._warnQueueSize
+							: total >= this._warnQueueSize || interactive >= this._warnInteractive
 								? "⚠️WARN"
-								: ping >= this._criticalPing
-									? (total > 0 ? "⚠️WARN" : "OK")
-									: ping >= this._warnPing
+								: ping >= this._criticalPing && total > 0
+									? "⚠️WARN"
+									: ping >= this._warnPing && total > 0
 										? "⚠️WARN"
 										: "OK";
 						this._onMonitor($"{status} | Ping: {ping:###,##0}ms | Queue: {total:###,##0} | Interactive: {interactive:###,##0} | Subscription: {subscription:###,##0} | Other: {other:###,##0}", (status, total, interactive, ping));
@@ -702,7 +705,7 @@ namespace net.vieapps.Components.Caching
 							: latency >= this._warnQueueSize
 								? "⚠️WARN"
 								: "OK";
-						this._onMonitor($"{status} | Latency: {latency}ms | Hits: {(hitRate * 100):0.0}% | Connections: {interactive:###,###,##0} | Yield: {total:###,###,##0} | Get: {cmdGet:###,###,##0}", (status, total, interactive, latency));
+						this._onMonitor($"{status} | Latency: {latency}ms | Hits: {hitRate * 100:0.0}% | Connections: {interactive:###,###,##0} | Yield: {total:###,###,##0} | Get: {cmdGet:###,###,##0}", (status, total, interactive, latency));
 					}
 					catch (OperationCanceledException) { }
 					catch (Exception ex)
