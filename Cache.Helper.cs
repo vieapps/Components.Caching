@@ -30,7 +30,7 @@ namespace net.vieapps.Components.Caching
 		public static readonly int FragmentSize = (10 * 1024 * 1024) - 256;
 		internal static readonly string RegionsKey = "VIEApps-NGX-Regions";
 
-		public static Random Random { get; } = new Random();
+		public static readonly ThreadLocal<Random> Random = new ThreadLocal<Random>(() => new Random(Guid.NewGuid().GetHashCode()));
 
 		public static int ExpirationTime => Cache.Configuration != null && Cache.Configuration.ExpirationTime > 0 ? Cache.Configuration.ExpirationTime : 30;
 
@@ -409,7 +409,7 @@ namespace net.vieapps.Components.Caching
 		{
 			var options = new MemoryCacheEntryOptions
 			{
-				AbsoluteExpirationRelativeToNow = validFor + TimeSpan.FromSeconds(Helper.Random.Next(0, 30))
+				AbsoluteExpirationRelativeToNow = validFor + TimeSpan.FromSeconds(Helper.Random.Value.Next(0, 30))
 			};
 			if (this._maxSize > 0 && Cache.Sizes.TryRemove(this._getKey?.Invoke(key) ?? key, out var size))
 				options.SetSize(size);
@@ -651,22 +651,33 @@ namespace net.vieapps.Components.Caching
 										: "OK";
 						this._onMonitor($"{status} | Ping: {ping:###,##0}ms | Queue: {total:###,##0} | Interactive: {interactive:###,##0} | Subscription: {subscription:###,##0} | Other: {other:###,##0}", (status, total, interactive, ping));
 					}
-					catch (OperationCanceledException) { }
+					catch (OperationCanceledException) when (this._cts.IsCancellationRequested)
+					{
+						break;
+					}
 					catch (Exception ex)
 					{
-						this._onError($"Monitor error => {ex.Message}", this._redisDatabase.IdentifyEndpoint(), ex);
+						EndPoint endpoint = null;
+						try
+						{
+							endpoint = this._redisConnection.GetEndPoints().FirstOrDefault();
+						} catch { }
+						this._onError($"Monitor error => {ex.Message}", endpoint, ex);
 					}
 
 					if (!this._cts.IsCancellationRequested)
 						try
 						{
-							await Task.Delay(this._interval + Helper.Random.Next(123, 456), this._cts.Token).ConfigureAwait(false);
+							await Task.Delay(this._interval + Helper.Random.Value.Next(123, 456), this._cts.Token).ConfigureAwait(false);
 						}
-						catch { }
+						catch (OperationCanceledException) when (this._cts.IsCancellationRequested)
+						{
+							break;
+						}
 				}
 			};
 
-			this._worker = Task.Run(this._redisMonitorAsync);
+			this._worker = Task.Factory.StartNew(this._redisMonitorAsync, this._cts.Token, TaskCreationOptions.LongRunning, TaskScheduler.Default).Unwrap();
 			return this;
 		}
 
@@ -707,7 +718,10 @@ namespace net.vieapps.Components.Caching
 								: "OK";
 						this._onMonitor($"{status} | Latency: {latency}ms | Hits: {hitRate * 100:0.0}% | Connections: {interactive:###,###,##0} | Yield: {total:###,###,##0} | Get: {cmdGet:###,###,##0}", (status, total, interactive, latency));
 					}
-					catch (OperationCanceledException) { }
+					catch (OperationCanceledException) when (this._cts.IsCancellationRequested)
+					{
+						break;
+					}
 					catch (Exception ex)
 					{
 						this._onError($"Monitor error => {ex.Message}", null, ex);
@@ -716,13 +730,16 @@ namespace net.vieapps.Components.Caching
 					if (!this._cts.IsCancellationRequested)
 						try
 						{
-							await Task.Delay(this._interval + Helper.Random.Next(123, 456), this._cts.Token).ConfigureAwait(false);
+							await Task.Delay(this._interval + Helper.Random.Value.Next(123, 456), this._cts.Token).ConfigureAwait(false);
 						}
-						catch { }
+						catch (OperationCanceledException) when (this._cts.IsCancellationRequested)
+						{
+							break;
+						}
 				}
 			};
 
-			this._worker = Task.Run(this._memcachedMonitorAsync);
+			this._worker = Task.Factory.StartNew(this._memcachedMonitorAsync, this._cts.Token, TaskCreationOptions.LongRunning, TaskScheduler.Default).Unwrap();
 			return this;
 		}
 
@@ -736,7 +753,6 @@ namespace net.vieapps.Components.Caching
 				this._redisConnection.InternalError -= this._onRedisInternalError;
 				this._redisConnection.ErrorMessage -= this._onRedisError;
 			}
-			this._worker?.GetAwaiter().GetResult();
 			this._cts.Dispose();
 			this._cts = null;
 			this._onRedisConnectionFailed = null;
