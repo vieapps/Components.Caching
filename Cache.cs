@@ -79,9 +79,9 @@ namespace net.vieapps.Components.Caching
 
 		public void Dispose()
 		{
+			this._distributedCacheMonitor?.Stop();
 			this._L1Cache?.Dispose();
 			this._distributedCache.Dispose();
-			this._distributedCacheMonitor?.Stop();
 		}
 
 		/// <summary>
